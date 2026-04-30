@@ -1,0 +1,10 @@
+# Helpers
+.vscode
+.remote
+/build
+.cache
+
+
+# Compiled
+**/@*
+**/!*
