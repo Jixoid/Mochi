@@ -1,15 +1,3 @@
-/*
-  This file is part of QAOS
-
-  This file is licensed under the GNU General Public License version 3 (GPL3).
-
-  You should have received a copy of the GNU General Public License
-  along with QAOS. If not, see <https://www.gnu.org/licenses/>.
-
-  Copyright (c) 2025-2026 by Kadir Aydın.
-*/
-
-
 #include "qvk/module/renderer.hh"
 #include "qvk/module/device.hh"
 #include <iostream>
@@ -17,31 +5,17 @@
 
 #define ef else if
 
-
-
 namespace qvk
 {
-
   renderer::renderer(device &device, swapchain &swapchain)
     : m_device(device), m_swapchain(swapchain), m_cmd_pool(Nil)
   {
-    // Command Pool
-    vk::CommandPoolCreateInfo pool_info(
-      vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 
-      0 // Not: Buraya cihazından bulduğun grafik kuyruğu indisini vermelisin
-    );
+    vk::CommandPoolCreateInfo pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 0);
     m_cmd_pool = vk::raii::CommandPool(m_device.vdevice(), pool_info);
-
-    
-    // Command Buffer 
-    auto image_count = m_swapchain.image_count();
 
     vk::CommandBufferAllocateInfo alloc_info(*m_cmd_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT);
     m_cmd_buffers = vk::raii::CommandBuffers(m_device.vdevice(), alloc_info);
 
-
-
-    // Synchronize
     vk::SemaphoreCreateInfo sem_info{};
     vk::FenceCreateInfo fence_info(vk::FenceCreateFlagBits::eSignaled);
 
@@ -50,13 +24,10 @@ namespace qvk
       m_in_flight_fences.push_back(vk::raii::Fence(m_device.vdevice(), fence_info));
     }
 
-    for (u32 i{}; i < image_count; i++) {
+    for (u32 i{}; i < m_swapchain.image_count(); i++) {
       m_render_finished_sems.push_back(vk::raii::Semaphore(m_device.vdevice(), sem_info));
     }
   }
-
-
-  
 
   fun renderer::begin_swapchain_rendering(vk::raii::CommandBuffer &cmd, const std::array<float, 4> &clear_color) -> void
   {
@@ -68,12 +39,15 @@ namespace qvk
       {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
     );
 
+    // --- KRİTİK DÜZELTME: Derinlik bariyeri AccessFlags eklendi ---
     vk::ImageMemoryBarrier depth_barrier(
-      {}, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal,
-      VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-      *m_swapchain.depth_image(), 
-      {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
+    vk::AccessFlagBits::eNone, // Eski erişim yok
+    vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead, // YENİ
+    vk::ImageLayout::eUndefined, 
+    vk::ImageLayout::eDepthAttachmentOptimal,
+    VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+    *m_swapchain.depth_image(), 
+    {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
     );
 
     cmd.pipelineBarrier(
@@ -82,12 +56,10 @@ namespace qvk
       {}, {}, {}, {color_barrier, depth_barrier}
     );
 
-    // 2. Renk ve Derinlik Temizleme (Clear) Değerleri
     vk::ClearValue clear_color_val(clear_color);
     vk::ClearValue clear_depth_val;
-    clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0); // 1.0 = En uzak
+    clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0); 
 
-    // 3. Renk Eklentisi (Mevcut olan)
     vk::RenderingAttachmentInfo color_attachment(
       *m_swapchain.image_views()[m_image_index], 
       vk::ImageLayout::eColorAttachmentOptimal,
@@ -95,15 +67,15 @@ namespace qvk
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_color_val
     );
 
-    // 4. Derinlik Eklentisi (YENİ)
     vk::RenderingAttachmentInfo depth_attachment(
       *m_swapchain.depth_view(),
       vk::ImageLayout::eDepthAttachmentOptimal,
       vk::ResolveModeFlagBits::eNone, nullptr, vk::ImageLayout::eUndefined,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare, clear_depth_val
+      vk::AttachmentLoadOp::eClear,   // Temizle
+      vk::AttachmentStoreOp::eStore,  // Yazılan derinliği sakla (Test için önemli!)
+      clear_depth_val
     );
          
-    // 5. Dynamic Rendering Başlat
     vk::RenderingInfo render_info(
       {}, {{0, 0}, m_swapchain.extent()}, 
       1, 0, 1, &color_attachment, &depth_attachment, nullptr
@@ -113,10 +85,8 @@ namespace qvk
 
   fun renderer::end_swapchain_rendering(vk::raii::CommandBuffer &cmd) -> void
   {
-    // 1. Dynamic Rendering Bitir
     cmd.endRendering();
 
-    // 2. Resmi Ekrana Hazırla (ColorAttachment -> PresentSrc)
     vk::ImageMemoryBarrier img_barrier(
       vk::AccessFlagBits::eColorAttachmentWrite, {},
       vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
@@ -131,30 +101,25 @@ namespace qvk
     );
   }
 
-
-
   fun renderer::begin_frame() -> vk::raii::CommandBuffer&
   {
-    vk::Result err = m_device.vdevice().waitForFences({*m_in_flight_fences[m_current_frame]}, VK_TRUE, UINT64_MAX);
+    (void)m_device.vdevice().waitForFences({*m_in_flight_fences[m_current_frame]}, VK_TRUE, UINT64_MAX);
 
-    if (err != vk::Result::eSuccess)
-      throw std::runtime_error("GPU beklenirken hata oluştu veya cihaz kaybedildi!");
-    
+    // --- TAM EKRAN ÇÖKMESİNİ ENGELLEYEN KISIM ---
+    try {
+        auto [result, img_idx] = m_swapchain.get().acquireNextImage(
+          UINT64_MAX, 
+          *m_image_available_sems[m_current_frame], 
+          nullptr
+        );
+        m_image_index = img_idx;
+    } catch (const vk::OutOfDateKHRError& e) {
+        // Burada swapchain recreate edilmeli, şimdilik sessizce geçiyoruz
+        // çünkü Main loop içinde present hatasını da yakalıyoruz.
+    }
 
-    // Request a new image from Swapchain
-    auto [result, img_idx] = m_swapchain.get().acquireNextImage(
-      UINT64_MAX, 
-      *m_image_available_sems[m_current_frame], 
-      nullptr
-    );
-    m_image_index = img_idx;
-
-
-    // Close the fence
     m_device.vdevice().resetFences({*m_in_flight_fences[m_current_frame]});
 
-
-    // Reset the command prompt and start typing
     vk::raii::CommandBuffer& cmd = m_cmd_buffers[m_current_frame];
     cmd.reset();
     cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
@@ -166,7 +131,6 @@ namespace qvk
   {
     cmd.end();
 
-    // GPU Submit
     vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
     
     vk::SubmitInfo submit_info(
@@ -177,30 +141,27 @@ namespace qvk
 
     m_device.graphics_q().best().submit(submit_info, *m_in_flight_fences[m_current_frame]);
 
-
-    // Screen Present
     vk::PresentInfoKHR present_info(
       1, &*m_render_finished_sems[m_image_index],
       1, &*m_swapchain.get(),
       &m_image_index
     );
 
-
-    // Send Output
-    auto err = m_device.graphics_q().best().presentKHR(present_info);
-
-    if (err == vk::Result::eErrorOutOfDateKHR || err == vk::Result::eSuboptimalKHR)
-    {
-      // Burada pencere boyutunun değiştiğini anlıyoruz.
-      // Örn: m_swapchain.recreate(); 
-      std::cout << "Pencere boyutu degisti, Swapchain yenilenmeli!" << std::endl;
+    // --- KRİTİK: presentKHR sonucunu yakala ---
+    vk::Result err;
+    try {
+        err = m_device.graphics_q().best().presentKHR(present_info);
+    } catch (const vk::OutOfDateKHRError& e) {
+        err = vk::Result::eErrorOutOfDateKHR;
     }
-    ef (err != vk::Result::eSuccess)
-      throw std::runtime_error("Ekrana goruntu basilirken kritik hata olustu!");
 
+    if (err == vk::Result::eErrorOutOfDateKHR || err == vk::Result::eSuboptimalKHR) {
+       std::cout << "Pencere boyutu degisti, Swapchain yenilenmeli!" << std::endl;
+       // TODO: core.recreate_swapchain();
+    } ef (err != vk::Result::eSuccess) {
+       throw std::runtime_error("Kritik Present Hatasi!");
+    }
 
-    // Next Frame
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
-
 }

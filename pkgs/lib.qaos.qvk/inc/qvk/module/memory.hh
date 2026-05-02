@@ -86,13 +86,16 @@ namespace qvk
 
     public:
       fun find_memory_type(u32 type_filter, vk::MemoryPropertyFlags properties) -> u32;
+      
+      // *** Yeni Eklenen Update Fonksiyonu ***
+      void update_buffer(qvk::buffer* target_buffer, const void* data, size_t size);
 
       
     private:
       fun load_UMA_UniformBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
       fun load_UMA_StorageBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
       fun load_UMA_VertexBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
-
+      
       fun load_DISC_UniformBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
       fun load_DISC_StorageBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
       fun load_DISC_VertexBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;

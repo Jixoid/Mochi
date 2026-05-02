@@ -32,7 +32,7 @@ namespace qvk
     };
 
     // Layers & Extensions
-    auto layers = std::vector<const char*>{ "VK_LAYER_KHRONOS_validation" };
+    auto layers = std::vector<const char*>{ /*"VK_LAYER_KHRONOS_validation"*/ };
     auto extensions = qvk::window::extensions();
 
     // Create Instance

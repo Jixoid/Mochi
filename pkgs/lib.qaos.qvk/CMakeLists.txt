@@ -17,7 +17,7 @@ target_include_directories(${TARGET_NAME}_shared PUBLIC inc)
 target_link_libraries(${TARGET_NAME}_shared PUBLIC
   qaos_basis
 
-  glfw
+  glfw3
   Vulkan::Vulkan
 )
 
@@ -32,7 +32,7 @@ target_include_directories(${TARGET_NAME}_static PUBLIC inc)
 target_link_libraries(${TARGET_NAME}_static PUBLIC
   qaos_basis
 
-  glfw
+  glfw3
   Vulkan::Vulkan
 )
 

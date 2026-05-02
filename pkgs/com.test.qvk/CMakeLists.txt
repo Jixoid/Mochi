@@ -7,7 +7,7 @@ file(GLOB_RECURSE SOURCES "src/*.cc")
 add_executable(${TARGET_NAME} ${SOURCES} ${RES_OBJECTS})
 
 target_link_libraries(${TARGET_NAME} PRIVATE
-  qaos_qvk_shared
+  qaos_qvk_static
   #qaos_mochi_shared
 )
 

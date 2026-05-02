@@ -57,6 +57,8 @@ namespace qvk
       static void framebuffer_resize_callback(GLFWwindow* win, int width, int height);
 
     public:
+      inline fun& get() { return m_window; }
+
       fun proc_events() -> bool;
 
   };

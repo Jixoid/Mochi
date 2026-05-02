@@ -18,7 +18,7 @@
 #include "qvk/types.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
-
+#include <cstring> // memcpy için eklendi
 
 
 namespace qvk
@@ -229,6 +229,20 @@ namespace qvk
     
     std::get<std::vector<buffer*>>(m_owned).push_back(ret);
     return ret;
+  }
+
+  // *** Yeni Eklenen Update Fonksiyonunun Gövdesi ***
+  void memory::update_buffer(qvk::buffer* target_buffer, const void* data, size_t size)
+  {
+      if (!target_buffer || !data) return;
+
+      // Senin buffer sınıfında mapped() fonksiyonu zaten bellek adresini (void*) dönüyor
+      void* mapped_memory = target_buffer->mapped(); 
+
+      if (mapped_memory) {
+          // Gelen yeni veriyi (Kamera Matrisini) GPU'nun map'lenmiş belleğine kopyala
+          memcpy(mapped_memory, data, size);
+      }
   }
 
 }

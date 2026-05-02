@@ -32,7 +32,7 @@ namespace qvk
     std::function<void ()> Idle
   )
     : m_bridge("QVK Test", {1,0,0,0})
-    , m_window(m_bridge, "QVK Test", 800, 600)
+    , m_window(m_bridge, "QVK Test", 1920, 1080)
     , m_device(GpuPicker(m_bridge.physicalDevices()))
     , m_swapchain(m_device, m_window)
     , m_renderer(m_device, m_swapchain)
