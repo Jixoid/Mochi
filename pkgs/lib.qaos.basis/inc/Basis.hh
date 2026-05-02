@@ -18,19 +18,88 @@
 #include <cstdlib>
 #include <cstring>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <pthread.h>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 #include "Basis.h"
 
 
-// Modern C++
+
+/// Modern C++
 #define fun auto
 
 
-// Vector
+
+
+/// Norm Types
+template <typename T>
+  requires std::is_integral_v<T>
+struct __norm
+{
+  public:
+    constexpr inline __norm() {}
+
+    constexpr inline __norm(f32 _): m_value(f_to_float(_)) {}
+
+
+  private:
+    T m_value;
+
+    constexpr static inline fun f_to_float(f32 value) -> T {
+      constexpr f32 max_val = std::numeric_limits<T>::max();
+
+      if constexpr (std::is_unsigned_v<T>) {
+        auto clamped = std::clamp<f32>(value, 0.0, +1.0);
+
+        return T(clamped * max_val + 0.5);
+      }
+      else {
+        auto clamped = std::clamp<f32>(value, -1.0, +1.0);
+
+        return T(clamped * max_val + (clamped >= 0 ? 0.5 : -0.5));
+      }
+    }
+
+
+  public:
+    constexpr inline fun& value() { return m_value; }
+
+    constexpr inline operator f32() const {
+      constexpr f32 max_val = std::numeric_limits<T>::max();
+      
+      if constexpr (std::is_unsigned_v<T>)
+        return f32(m_value) / max_val;
+      else
+        return std::max(-1.0f, f32(m_value) / max_val);
+    }
+
+};
+
+
+template <typename T>
+struct is_norm_type: std::false_type {};
+
+template <typename T>
+struct is_norm_type<__norm<T>>: std::true_type {};
+
+template <typename _Tp>
+inline constexpr bool is_norm_v = is_norm_type<_Tp>::value;
+
+
+using nu8  = __norm<u8>;
+using nu16 = __norm<u16>;
+
+using ni8  = __norm<i8>;
+using ni16 = __norm<i16>;
+
+
+
+
+/// Vector
 template <typename T, u0 S>
   requires std::is_arithmetic_v<T>
 struct alignas(sizeof(T) *S) vec
@@ -139,7 +208,9 @@ public:
 };
 
 
-// Data
+
+
+/// Data
 template <std::unsigned_integral T>
 struct __data
 {
@@ -148,13 +219,14 @@ struct __data
 };
 
 
-// Pointer
+
+
+/// Pointer
 template <typename T>
 using uptr = std::unique_ptr<T>;
 
 template <typename T>
 fun make_uptr(T* obj) -> uptr<T> { return uptr<T>(obj); }
-
 
 
 template <typename T>

@@ -10,10 +10,9 @@
 */
 
 
+#include "qvk/module/device.hh"
+#include "qvk/core.hh"
 #include "qvk/shader.hh"
-#include "qvk/device.hh"
-#include "qvk/engine.hh"
-#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -27,8 +26,9 @@
 namespace qvk
 {
 
-  shader::shader(qvk::engine &engine, std::string_view fpath)
+  shader::shader(core &core, std::string_view fpath, std::string_view entry)
     : vk_module(Nil)
+    , m_entry(entry)
   {
     // MMap File
     int fd = open(std::string(fpath).c_str(), O_RDONLY);
@@ -47,14 +47,12 @@ namespace qvk
     // Load Shader
     vk::ShaderModuleCreateInfo info({}, size, (u32*)data);
       
-    vk_module = vk::raii::ShaderModule(engine.sub<device>().vdevice(), info);
+    vk_module = vk::raii::ShaderModule(core.sub<device>().vdevice(), info);
 
 
     // Free File
     if (data != MAP_FAILED) munmap(data, size);
     if (fd != -1) close(fd);
-    
-    std::cout << "Shader modülü başarıyla yüklendi!" << std::endl;
   }
 
 }

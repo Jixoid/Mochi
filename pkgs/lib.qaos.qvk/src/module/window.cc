@@ -10,8 +10,8 @@
 */
 
 
-#include "qvk/window.hh"
-#include "qvk/bridge.hh"
+#include "qvk/module/window.hh"
+#include "qvk/module/bridge.hh"
 #include <GLFW/glfw3.h>
 #include <string>
 #include <vulkan/vulkan_raii.hpp>

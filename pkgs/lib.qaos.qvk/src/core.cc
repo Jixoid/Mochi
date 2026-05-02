@@ -10,16 +10,16 @@
 */
 
 
-#include "qvk/engine.hh"
 #include "Basis.hh"
-#include "qvk/buffer.hh"
-#include "qvk/device.hh"
-#include "qvk/memory.hh"
+#include "qvk/core.hh"
+#include "qvk/module/device.hh"
+#include "qvk/module/memory.hh"
+#include "qvk/module/swapchain.hh"
+#include "qvk/entity/pipeline.hh"
+#include "qvk/entity/buffer.hh"
 #include "qvk/geometry.hh"
-#include "qvk/object.hh"
-#include "qvk/camera.hh"
-#include "qvk/pipeline.hh"
-#include "qvk/swapchain.hh"
+#include "qvk/entity/object.hh"
+#include <chrono>
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -27,7 +27,7 @@
 namespace qvk
 {
 
-  engine::engine(
+  core::core(
     std::function<vk::raii::PhysicalDevice (vk::raii::PhysicalDevices)> GpuPicker,
     std::function<void ()> Idle
   )
@@ -37,12 +37,12 @@ namespace qvk
     , m_swapchain(m_device, m_window)
     , m_renderer(m_device, m_swapchain)
     , m_memory(m_device, m_renderer)
-    , m_meta(m_device)
+    , m_meta(m_memory)
 
     , m_idle(Idle)
   {}
 
-  engine::~engine()
+  core::~core()
   {
     // Close GPU
     m_device.vdevice().waitIdle();
@@ -51,9 +51,14 @@ namespace qvk
 
 
 
-  fun engine::run() -> void
+  fun core::run() -> void
   {
+    auto last_time = std::chrono::high_resolution_clock::now();
+    
     while (m_window.proc_events()) {
+      auto current_time = std::chrono::high_resolution_clock::now();
+      float dt = std::chrono::duration<float, std::chrono::seconds::period>(current_time-last_time).count();
+      last_time = current_time;
         
       // İleride buraya eklenecekler:
       // update_input();
@@ -67,7 +72,7 @@ namespace qvk
   }
 
 
-  fun engine::draw() -> void
+  fun core::draw() -> void
   {
     auto &cmd = m_renderer.begin_frame();
     m_renderer.begin_swapchain_rendering(cmd, {0.1f, 0.1f, 0.1f, 1.0f});
@@ -78,37 +83,38 @@ namespace qvk
     cmd.setScissor(0, {vk::Rect2D({0, 0}, extent)});
 
     // --- BİRDEN FAZLA NESNEYİ ÇİZME DÖNGÜSÜ ---
-    
-    qvk::pipeline* last_pipeline = nullptr;
-    qvk::buffer* last_buffer   = nullptr;
+    qvk::pipeline* last_pipeline{};
+    //qvk::buffer* last_buffer{};
 
     for (const auto &obj: sub<memory>().list<object>())
-    {  
-      // A. Eğer bu nesnenin pipeline'ı bir öncekinden farklıysa yenisini bağla
+    {
+      // 1. Pipeline Bağla
       if (obj->pipeline() != last_pipeline) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *obj->pipeline()->get());
         last_pipeline = obj->pipeline();
       }
 
-      // B. Eğer vertex buffer değiştiyse yenisini bağla
-      if (obj->buffer() != last_buffer) {
-        vk::DeviceSize offset = 0;
-        cmd.bindVertexBuffers(0, {*obj->buffer()->get()}, {offset});
-        last_buffer = obj->buffer();
+      // 2. Vertex ve Instance Buffer'ları Bağla
+      u32 i{};
+      for (auto &X: obj->vertexs()) {
+        // Vulkan array proxy beklediği için süslü parantez içine alıyoruz
+        cmd.bindVertexBuffers(i, {*X.buf()->get()}, {0}); 
+        i++;
       }
 
+      // --- YENİ: DESCRIPTOR SET (UBO) BAĞLAMA ---
+      if (!obj->uniforms().empty()) {
+        cmd.bindDescriptorSets(
+          vk::PipelineBindPoint::eGraphics,
+          *obj->pipeline()->layout(),
+          0,                       // firstSet (0'dan başlıyor)
+          {*obj->desc_sets()[0]},  // Bizim hazırladığımız paket
+          {}                       // dynamicOffsets (boş)
+        );
+      }
 
-      // Push Constant
-      cmd.pushConstants<qvk::mat4<f32>>(
-        last_pipeline->layout(),
-        vk::ShaderStageFlags::BitsType::eVertex,
-        0,
-        obj->camera()->proj() * obj->camera()->view() * obj->model()
-      );
-
-
-      // Draw
-      cmd.draw(obj->count(), 1, 0, 0);
+      // 3. Draw Komutu (Dinamik)
+      cmd.draw(obj->vertex_count(), obj->instance_count(), 0, 0);
     }
 
     // 3. Tuvali Kapat ve Ekrana Gönder

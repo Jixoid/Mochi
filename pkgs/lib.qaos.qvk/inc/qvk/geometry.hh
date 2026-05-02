@@ -28,7 +28,7 @@ namespace qvk
 {
 
   template <typename T>
-    requires std::is_arithmetic_v<T>
+    requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct vec2
   {
     public:
@@ -105,7 +105,7 @@ namespace qvk
 
 
   template <typename T>
-    requires std::is_arithmetic_v<T>
+    requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct vec3
   {
     public:
@@ -187,7 +187,7 @@ namespace qvk
 
 
   template <typename T>
-    requires std::is_arithmetic_v<T>
+    requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct vec4
   {
     public:
@@ -266,7 +266,7 @@ namespace qvk
 
 
   template <typename T>
-    requires std::is_arithmetic_v<T>
+    requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct quaternion
   {
     public:
@@ -453,7 +453,7 @@ namespace qvk
 
 
   template <typename T>
-    requires std::is_arithmetic_v<T>
+    requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct mat4
   {
     public:
@@ -538,7 +538,7 @@ namespace qvk
             if (val > maxv) { maxv = val; pivot = i; }
           }
 
-          if (maxv < EPS) return Matrix<T>(); // Singular
+          if (maxv < EPS) return mat4<T>(); // Singular
 
           if (pivot != k) {
             std::swap(rows[k], rows[pivot]);
@@ -599,14 +599,14 @@ namespace qvk
         mat4 res;
         res.setZero();
         
-        T tanHalfFov = std::tan(fovDeg * 0.5f * M_PI / 180.0f);
+        T tanHalfFov = std::tan(fovDeg * 0.5 * M_PI / 180.0);
         
-        res.SwVec[0][0] = 1.0f / (aspect * tanHalfFov);
-        res.SwVec[1][1] = 1.0f / tanHalfFov;
-        res.SwVec[2][2] = -(farZ + nearZ) / (farZ - nearZ);
-        res.SwVec[2][3] = -(2.0f * farZ * nearZ) / (farZ - nearZ);
-        res.SwVec[3][2] = -1.0f;
-        res.SwVec[3][3] = 0.0f;
+        res.SwVec[0][0] = 1.0 / (aspect * tanHalfFov);
+        res.SwVec[1][1] = -(1.0 / tanHalfFov);
+        res.SwVec[2][2] = -farZ / (farZ - nearZ);
+        res.SwVec[2][3] = -(farZ * nearZ) / (farZ - nearZ);
+        res.SwVec[3][2] = -1.0;
+        res.SwVec[3][3] = 0.0;
         
         return res;
       }
@@ -700,36 +700,6 @@ namespace qvk
                 1.0f
             }
         );
-      }
-
-  };
-
-
-
-
-
-
-  struct vertex
-  {
-    public:
-      vec3<f32> pos;
-      vec3<f32> color;
-      vec2<f32> uv;
-      
-    public:
-      static inline fun get_binding_description() -> vk::VertexInputBindingDescription {
-        return {0, sizeof(vertex), vk::VertexInputRate::eVertex};
-      }
-
-      static inline fun get_attribute_descriptions() -> std::array<vk::VertexInputAttributeDescription, 3> {
-        return {
-          // location 0: Pozisyon (vec3 -> R32G32B32_SFLOAT)
-          vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat, offsetof(vertex, pos)},
-          // location 1: Renk (vec3 -> R32G32B32_SFLOAT)
-          vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32Sfloat, offsetof(vertex, color)},
-          // location 2: UV (vec2 -> R32G32_SFLOAT)
-          vk::VertexInputAttributeDescription{2, 0, vk::Format::eR32G32Sfloat, offsetof(vertex, uv)}
-        };
       }
 
   };

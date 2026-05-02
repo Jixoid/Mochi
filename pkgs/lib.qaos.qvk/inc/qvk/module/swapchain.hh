@@ -13,7 +13,7 @@
 #pragma once
 
 #include "Basis.hh"
-#include "types.hh"
+#include "qvk/types.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
 
@@ -35,6 +35,10 @@ namespace qvk
       vk::Format m_format;
       vk::Extent2D m_extent;
       u32 m_image_count;
+      vk::raii::Image m_depth_image{nullptr};
+      vk::raii::DeviceMemory m_depth_memory{nullptr};
+      vk::raii::ImageView m_depth_view{nullptr};
+      vk::Format m_depth_format{vk::Format::eD32Sfloat};
 
     public:
       inline fun& get() { return m_swapchain; }
@@ -43,6 +47,10 @@ namespace qvk
       inline fun& format() { return m_format; }
       inline fun  extent() const { return m_extent; }
       inline fun  image_count() { return m_image_count; }
+      inline fun& depth_image() { return m_depth_image; }
+      inline fun& depth_view() { return m_depth_view; }
+      inline fun  depth_format() const { return m_depth_format; }
+
   };
 
 }

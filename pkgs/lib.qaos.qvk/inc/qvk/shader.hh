@@ -25,14 +25,16 @@ namespace qvk
   struct shader
   {
     public:
-      explicit shader(qvk::engine &engine, std::string_view fpath);
+      explicit shader(qvk::core &core, std::string_view fpath, std::string_view entry);
       
 
     private:
       vk::raii::ShaderModule vk_module;
+      std::string m_entry;
 
     public:
       inline fun& module() { return vk_module; }
+      inline fun& entry() { return m_entry; }
   };
 
 }

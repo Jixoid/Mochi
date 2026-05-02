@@ -13,13 +13,13 @@
 #pragma once
 
 #include "Basis.hh"
-#include "qvk/bridge.hh"
-#include "qvk/window.hh"
-#include "qvk/device.hh"
-#include "qvk/memory.hh"
-#include "qvk/swapchain.hh"
-#include "qvk/renderer.hh"
-#include "qvk/meta.hh"
+#include "qvk/module/bridge.hh"
+#include "qvk/module/window.hh"
+#include "qvk/module/device.hh"
+#include "qvk/module/memory.hh"
+#include "qvk/module/swapchain.hh"
+#include "qvk/module/renderer.hh"
+#include "qvk/module/meta.hh"
 #include <cassert>
 #include <functional>
 #include <vulkan/vulkan_raii.hpp>
@@ -29,16 +29,16 @@
 namespace qvk
 {
 
-  struct engine
+  struct core
   {
     public:
-      explicit engine(
+      explicit core(
         std::function<vk::raii::PhysicalDevice (vk::raii::PhysicalDevices)> GpuPicker,
         std::function<void ()> Idle
       );
 
     public:
-      ~engine();
+      ~core();
 
 
 
@@ -57,23 +57,23 @@ namespace qvk
 
     public:
       template <typename T>
-        requires std::derived_from<T, qvk::window>
+        requires std::is_same_v<T, qvk::window>
       inline fun& sub() { return m_window; }
 
       template <typename T>
-        requires std::derived_from<T, qvk::device>
+        requires std::is_same_v<T, qvk::device>
       inline fun& sub() { return m_device; }
 
       template <typename T>
-        requires std::derived_from<T, qvk::memory>
+        requires std::is_same_v<T, qvk::memory>
       inline fun& sub() { return m_memory; }
 
       template <typename T>
-        requires std::derived_from<T, qvk::swapchain>
+        requires std::is_same_v<T, qvk::swapchain>
       inline fun& sub() { return m_swapchain; }
 
       template <typename T>
-        requires std::derived_from<T, qvk::meta>
+        requires std::is_same_v<T, qvk::meta>
       inline fun& sub() { return m_meta; }
 
 

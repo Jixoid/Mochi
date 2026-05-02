@@ -10,9 +10,9 @@
 */
 
 
-#include "qvk/device.hh"
-#include "qvk/window.hh"
-#include "qvk/swapchain.hh"
+#include "qvk/module/device.hh"
+#include "qvk/module/window.hh"
+#include "qvk/module/swapchain.hh"
 #include <algorithm>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -78,6 +78,39 @@ namespace qvk
       );
       m_image_views.push_back(vk::raii::ImageView(device.vdevice(), view_info));
     }
+
+    // --- DERİNLİK (Z-BUFFER) RESMİ OLUŞTURMA ---
+    vk::ImageCreateInfo depth_info(
+      {}, vk::ImageType::e2D, m_depth_format,
+      vk::Extent3D(m_extent.width, m_extent.height, 1),
+      1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+      vk::ImageUsageFlagBits::eDepthStencilAttachment
+    );
+    m_depth_image = vk::raii::Image(device.vdevice(), depth_info);
+
+    // Bellek tahsisi (VRAM)
+    vk::MemoryRequirements mem_reqs = m_depth_image.getMemoryRequirements();
+    vk::PhysicalDeviceMemoryProperties mem_props = device.phys_dev().getMemoryProperties();
+    u32 mem_type_idx = 0;
+    
+    for (u32 i = 0; i < mem_props.memoryTypeCount; i++) {
+      if ((mem_reqs.memoryTypeBits & (1 << i)) &&
+          (mem_props.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal) == vk::MemoryPropertyFlagBits::eDeviceLocal) {
+        mem_type_idx = i;
+        break;
+      }
+    }
+
+    vk::MemoryAllocateInfo alloc_info(mem_reqs.size, mem_type_idx);
+    m_depth_memory = vk::raii::DeviceMemory(device.vdevice(), alloc_info);
+    m_depth_image.bindMemory(*m_depth_memory, 0);
+
+    // Derinlik Görünümü (ImageView)
+    vk::ImageViewCreateInfo depth_view_info(
+      {}, *m_depth_image, vk::ImageViewType::e2D, m_depth_format,
+      {}, {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
+    );
+    m_depth_view = vk::raii::ImageView(device.vdevice(), depth_view_info);
   }
 
 }

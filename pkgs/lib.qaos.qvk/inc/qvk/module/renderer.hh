@@ -14,9 +14,8 @@
 
 #include "Basis.hh"
 #include "qvk/types.hh"
-#include "qvk/device.hh"
-#include "qvk/swapchain.hh"
-#include <vector>
+#include "qvk/module/device.hh"
+#include "qvk/module/swapchain.hh"
 #include <vulkan/vulkan_raii.hpp>
 
 

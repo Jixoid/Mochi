@@ -13,9 +13,9 @@
 #pragma once
 
 #include "Basis.hh"
-#include "qvk/buffer.hh"
-#include "qvk/device.hh"
-#include "qvk/renderer.hh"
+#include "qvk/entity/buffer.hh"
+#include "qvk/module/device.hh"
+#include "qvk/module/renderer.hh"
 #include "qvk/types.hh"
 #include <algorithm>
 #include <cassert>
@@ -40,9 +40,9 @@ namespace qvk
       bool m_sharedMemory{};
 
       u32 m_pushConstant;
-      u64 m_uniformSize;
+      u64 m_uniformRange;
       u32 m_uniformAlign;
-      u64 m_storageSize;
+      u64 m_storageRange;
       u32 m_storageAlign;
       u64 m_allocCount;
       u64 m_mapAlign;
@@ -53,17 +53,20 @@ namespace qvk
       inline fun sharedMemory() { return m_sharedMemory; }
 
       inline fun pushConstant() { return m_pushConstant; }
-      inline fun uniformSize() { return m_uniformSize; }
+      inline fun uniformRange() { return m_uniformRange; }
       inline fun uniformAlign() { return m_uniformAlign; }
-      inline fun storageSize() { return m_storageSize; }
+      inline fun storageRange() { return m_storageRange; }
       inline fun storageAlign() { return m_storageAlign; }
 
 
     private: // Ownership
       std::tuple<
-        std::vector<camera*>,
         std::vector<buffer*>,
+        std::vector<info<buffer>*>,
+
         std::vector<pipeline*>,
+        std::vector<info<pipeline>*>,
+        
         std::vector<object*>
       > m_owned;
 
@@ -86,18 +89,18 @@ namespace qvk
 
       
     private:
-      fun load_UMA_UniformBuffer(u64 size, std::function<void (void*)> data) -> buffer*;
-      fun load_UMA_StorageBuffer(u64 size, std::function<void (void*)> data) -> buffer*;
-      fun load_UMA_VertexBuffer(u64 size, std::function<void (void*)> data) -> buffer*;
+      fun load_UMA_UniformBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
+      fun load_UMA_StorageBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
+      fun load_UMA_VertexBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
 
-      fun load_DISC_UniformBuffer(u64 size, std::function<void (void*)> data) -> buffer*;
-      fun load_DISC_StorageBuffer(u64 size, std::function<void (void*)> data) -> buffer*;
-      fun load_DISC_VertexBuffer(u64 size, std::function<void (void*)> data) -> buffer*;
+      fun load_DISC_UniformBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
+      fun load_DISC_StorageBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
+      fun load_DISC_VertexBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*;
 
     public:
-      inline fun load_UniformBuffer(u64 size, std::function<void (void*)> data) -> buffer* { return m_sharedMemory ? load_UMA_UniformBuffer(size, data) : load_DISC_UniformBuffer(size, data); }
-      inline fun load_StorageBuffer(u64 size, std::function<void (void*)> data) -> buffer* { return m_sharedMemory ? load_UMA_StorageBuffer(size, data) : load_DISC_StorageBuffer(size, data); }
-      inline fun load_VertexBuffer(u64 size, std::function<void (void*)> data) -> buffer* { return m_sharedMemory ? load_UMA_VertexBuffer(size, data) : load_DISC_VertexBuffer(size, data); }
+      inline fun load_UniformBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer* { return m_sharedMemory ? load_UMA_UniformBuffer(info, count, data) : load_DISC_UniformBuffer(info, count, data); }
+      inline fun load_StorageBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer* { return m_sharedMemory ? load_UMA_StorageBuffer(info, count, data) : load_DISC_StorageBuffer(info, count, data); }
+      inline fun load_VertexBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer* { return m_sharedMemory ? load_UMA_VertexBuffer(info, count, data) : load_DISC_VertexBuffer(info, count, data); }
 
   };
 

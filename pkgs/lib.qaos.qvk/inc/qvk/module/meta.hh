@@ -12,25 +12,23 @@
 
 #pragma once
 
-#include "Basis.hh"
 #include "qvk/types.hh"
-#include <vulkan/vulkan_raii.hpp>
-#include <vulkan/vulkan.h>
 
 
 
 namespace qvk
 {
 
-  struct scene
+  struct meta
   {
     public:
-      explicit scene(qvk::engine &engine);
-      
+      explicit meta(qvk::memory &memory);
 
     private:
+      memory &m_memory;
 
     public:
+      fun compile() -> void;
 
   };
 

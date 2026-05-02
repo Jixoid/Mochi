@@ -22,28 +22,50 @@
 namespace qvk
 {
 
-  struct BufferInfo
+  template<>
+  struct info<buffer>
   {
-    void *Data{};
-    u0    Size{};
+    private:
+      explicit inline info<buffer>(u64 stride, std::vector<qvk::gt> items)
+        : m_stride(stride)
+        , m_items(items)
+      {}
+
+    public:
+      static fun make(core &core, u64 stride, std::vector<qvk::gt> items) -> info<buffer>*;
+
+
+    private:
+      std::vector<qvk::gt> m_items;
+      u64 m_stride;
+
+    public:
+      inline fun items() { return m_items; }
+      inline fun stride() { return m_stride; }
   };
+
+
 
 
   struct buffer
   {
-    public:
-      explicit buffer(qvk::memory &memory, qvk::device &device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
+    friend struct memory;
+
+    private:
+      explicit buffer(device &device, memory &memory, info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
 
       ~buffer();
 
 
     private:
+      info<buffer> *m_info{};
       vk::raii::Buffer m_buffer;
       vk::raii::DeviceMemory m_memory;
       vk::DeviceSize m_size;
       void* m_mapped{};
 
     public:
+      inline fun  info() { return m_info; }
       inline fun& get() { return m_buffer; }
       inline fun& memory() const { return m_memory; }
       inline fun  size() const { return m_size; }

@@ -11,10 +11,11 @@
 
 
 #include "Basis.hh"
-#include "qvk/renderer.hh"
+#include "qvk/module/renderer.hh"
+#include "qvk/module/device.hh"
+#include "qvk/module/memory.hh"
+#include "qvk/entity/buffer.hh"
 #include "qvk/types.hh"
-#include "qvk/device.hh"
-#include "qvk/memory.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -32,10 +33,10 @@ namespace qvk
 
     m_pushConstant = props.limits.maxPushConstantsSize;
 
-    m_uniformSize  = props.limits.maxUniformBufferRange;
+    m_uniformRange = props.limits.maxUniformBufferRange;
     m_uniformAlign = props.limits.minUniformBufferOffsetAlignment;
 
-    m_storageSize  = props.limits.maxStorageBufferRange;
+    m_storageRange = props.limits.maxStorageBufferRange;
     m_storageAlign = props.limits.minStorageBufferOffsetAlignment;
 
     m_allocCount = props.limits.maxMemoryAllocationCount;
@@ -82,10 +83,10 @@ namespace qvk
 
 
 
-  fun memory::load_UMA_UniformBuffer(u64 size, std::function<void (void*)> data) -> buffer*
+  fun memory::load_UMA_UniformBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*
   {
     auto ret = new buffer(
-      *this, m_device, size, 
+      m_device, *this, info, count, 
       vk::BufferUsageFlagBits::eUniformBuffer,
       vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
     );
@@ -96,10 +97,10 @@ namespace qvk
     return ret;
   }
 
-  fun memory::load_DISC_UniformBuffer(u64 size, std::function<void (void*)> data) -> buffer*
+  fun memory::load_DISC_UniformBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*
   {
     auto ret = new buffer(
-      *this, m_device, size, 
+      m_device, *this, info, count, 
       vk::BufferUsageFlagBits::eUniformBuffer,
       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
     );
@@ -112,10 +113,10 @@ namespace qvk
   
 
 
-  fun memory::load_UMA_StorageBuffer(u64 size, std::function<void (void*)> data) -> buffer*
+  fun memory::load_UMA_StorageBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*
   {
     auto ret = new buffer(
-      *this, m_device, size, 
+      m_device, *this, info, count,
       vk::BufferUsageFlagBits::eStorageBuffer,
       vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
     );
@@ -126,10 +127,10 @@ namespace qvk
     return ret;
   }
 
-  fun memory::load_DISC_StorageBuffer(u64 size, std::function<void (void*)> data) -> buffer*
+  fun memory::load_DISC_StorageBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*
   {
     auto ret = new buffer(
-      *this, m_device, size, 
+      m_device, *this, info, count,
       vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, 
       vk::MemoryPropertyFlagBits::eDeviceLocal
     );
@@ -138,7 +139,7 @@ namespace qvk
     if (data) {
       // Host Buffer
       auto host_buffer = buffer(
-        *this, m_device, size, 
+        m_device, *this, info, count,
         vk::BufferUsageFlagBits::eTransferSrc, 
         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
       );
@@ -148,7 +149,7 @@ namespace qvk
       // Transfer
       vk::CommandBufferAllocateInfo alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
       vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), alloc_info).front());
-      vk::BufferCopy copy_region(0, 0, size);
+      vk::BufferCopy copy_region(0, 0, ret->size());
 
       temp_cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
       temp_cmd.copyBuffer(*host_buffer.get(), ret->get(), copy_region);
@@ -165,10 +166,10 @@ namespace qvk
 
 
 
-  fun memory::load_UMA_VertexBuffer(u64 size, std::function<void (void*)> data) -> buffer*
+  fun memory::load_UMA_VertexBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*
   {
     auto ret = new buffer(
-      *this, m_device, size, 
+      m_device, *this, info, count,
       vk::BufferUsageFlagBits::eVertexBuffer,
       vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
     );
@@ -179,10 +180,10 @@ namespace qvk
     return ret;
   }
 
-  fun memory::load_DISC_VertexBuffer(u64 size, std::function<void (void*)> data) -> buffer*
+  fun memory::load_DISC_VertexBuffer(info<buffer> *info, u64 count, std::function<void (void*)> data) -> buffer*
   {
     auto ret = new buffer(
-      *this, m_device, size, 
+      m_device, *this, info, count,
       vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, 
       vk::MemoryPropertyFlagBits::eDeviceLocal
     );
@@ -191,7 +192,7 @@ namespace qvk
     if (data) {
       // Host Buffer
       auto host_buffer = buffer(
-        *this, m_device, size, 
+        m_device, *this, info, count,
         vk::BufferUsageFlagBits::eTransferSrc, 
         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
       );
@@ -201,7 +202,7 @@ namespace qvk
       // Transfer
       vk::CommandBufferAllocateInfo alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
       vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), alloc_info).front());
-      vk::BufferCopy copy_region(0, 0, size);
+      vk::BufferCopy copy_region(0, 0, ret->size());
       vk::MemoryBarrier memory_barrier(
         vk::AccessFlagBits::eTransferWrite,
         vk::AccessFlagBits::eVertexAttributeRead

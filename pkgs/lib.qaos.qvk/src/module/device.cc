@@ -10,7 +10,7 @@
 */
 
 
-#include "qvk/device.hh"
+#include "qvk/module/device.hh"
 #include <vulkan/vulkan_raii.hpp>
 
 

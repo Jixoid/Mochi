@@ -10,9 +10,10 @@
 */
 
 
-#include "qvk/buffer.hh"
-#include "qvk/device.hh"
-#include "qvk/memory.hh"
+#include "qvk/entity/buffer.hh"
+#include "qvk/module/device.hh"
+#include "qvk/module/memory.hh"
+#include "qvk/core.hh"
 #include "vulkan/vulkan.hpp"
 
 
@@ -20,13 +21,27 @@
 namespace qvk
 {
 
-  buffer::buffer(qvk::memory &memory, qvk::device &device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
-    : m_buffer(Nil), m_memory(Nil), m_size(size)
+  fun info<buffer>::make(core &core, u64 stride, std::vector<qvk::gt> items) -> info<buffer>*
+  {
+    auto obj = new info<buffer>(stride, items);
+    
+    core.sub<memory>().push<info<buffer>>(obj);
+    return obj;
+  }
+
+
+  
+
+  buffer::buffer(device &device, qvk::memory &memory, qvk::info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
+    : m_info(info)
+    , m_buffer(Nil)
+    , m_memory(Nil)
+    , m_size(info->stride() * count)
   {
     // Create Buffer
     vk::BufferCreateInfo buffer_info(
       {},
-      size,
+      m_size,
       usage,
       vk::SharingMode::eExclusive
     );
@@ -47,7 +62,7 @@ namespace qvk
     m_buffer.bindMemory(*m_memory, 0);
 
     // Maping
-    m_mapped = m_memory.mapMemory(0, size, {});
+    m_mapped = m_memory.mapMemory(0, m_size, {});
   }
 
 

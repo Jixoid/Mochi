@@ -10,8 +10,8 @@
 */
 
 
-#include "qvk/renderer.hh"
-#include "qvk/device.hh"
+#include "qvk/module/renderer.hh"
+#include "qvk/module/device.hh"
 #include <iostream>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -60,34 +60,54 @@ namespace qvk
 
   fun renderer::begin_swapchain_rendering(vk::raii::CommandBuffer &cmd, const std::array<float, 4> &clear_color) -> void
   {
-    // 1. Resmi Çizime Hazırla (Undefined -> ColorAttachment)
-    vk::ImageMemoryBarrier img_barrier(
+    vk::ImageMemoryBarrier color_barrier(
       {}, vk::AccessFlagBits::eColorAttachmentWrite,
       vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal,
       VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-      m_swapchain.images()[m_image_index], // Artık Swapchain'e doğrudan Renderer erişiyor
+      m_swapchain.images()[m_image_index], 
       {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
     );
-    
-    cmd.pipelineBarrier(
-      vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-      {}, {}, {}, {img_barrier}
+
+    vk::ImageMemoryBarrier depth_barrier(
+      {}, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal,
+      VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+      *m_swapchain.depth_image(), 
+      {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
     );
 
-    // 2. Dynamic Rendering Başlat
-    vk::ClearValue clear_val(clear_color);
+    cmd.pipelineBarrier(
+      vk::PipelineStageFlagBits::eTopOfPipe, 
+      vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+      {}, {}, {}, {color_barrier, depth_barrier}
+    );
+
+    // 2. Renk ve Derinlik Temizleme (Clear) Değerleri
+    vk::ClearValue clear_color_val(clear_color);
+    vk::ClearValue clear_depth_val;
+    clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0); // 1.0 = En uzak
+
+    // 3. Renk Eklentisi (Mevcut olan)
     vk::RenderingAttachmentInfo color_attachment(
       *m_swapchain.image_views()[m_image_index], 
       vk::ImageLayout::eColorAttachmentOptimal,
       vk::ResolveModeFlagBits::eNone, nullptr, vk::ImageLayout::eUndefined,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_val
-    );
-    
-    vk::RenderingInfo render_info(
-      {}, {{0, 0}, m_swapchain.extent()}, 
-      1, 0, 1, &color_attachment
+      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_color_val
     );
 
+    // 4. Derinlik Eklentisi (YENİ)
+    vk::RenderingAttachmentInfo depth_attachment(
+      *m_swapchain.depth_view(),
+      vk::ImageLayout::eDepthAttachmentOptimal,
+      vk::ResolveModeFlagBits::eNone, nullptr, vk::ImageLayout::eUndefined,
+      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare, clear_depth_val
+    );
+         
+    // 5. Dynamic Rendering Başlat
+    vk::RenderingInfo render_info(
+      {}, {{0, 0}, m_swapchain.extent()}, 
+      1, 0, 1, &color_attachment, &depth_attachment, nullptr
+    );
     cmd.beginRendering(render_info);
   }
 
