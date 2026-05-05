@@ -14,6 +14,7 @@
 #include <string>
 
 #if defined(__unix__) || defined(__APPLE__)
+	#include <unistd.h>
   #include <fcntl.h>
   #include <sys/stat.h>
   #include <sys/mman.h>
