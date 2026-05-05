@@ -19,7 +19,6 @@
 #include "qvk/module/memory.hh"
 #include "qvk/module/swapchain.hh"
 #include "qvk/module/renderer.hh"
-#include "qvk/module/meta.hh"
 #include <cassert>
 #include <functional>
 #include <vulkan/vulkan_raii.hpp>
@@ -34,12 +33,22 @@ namespace qvk
     public:
       explicit core(
         std::function<vk::raii::PhysicalDevice (vk::raii::PhysicalDevices)> GpuPicker,
-        std::function<void ()> Idle
+        std::function<void (f32 dt)> Idle
       );
 
-    public:
       ~core();
 
+
+
+    // Propeties
+    private:
+      camera *m_camera{};
+      node *m_scene{};
+
+    public:
+      inline fun& camera() { return m_camera; }
+      inline fun& scene() { return m_scene; }
+      
 
 
     // Sub Module
@@ -50,9 +59,8 @@ namespace qvk
       memory    m_memory;
       swapchain m_swapchain;
       renderer  m_renderer;
-      meta      m_meta;
 
-      std::function<void ()> m_idle;
+      std::function<void (f32 dt)> m_idle;
 
 
     public:
@@ -71,10 +79,6 @@ namespace qvk
       template <typename T>
         requires std::is_same_v<T, qvk::swapchain>
       inline fun& sub() { return m_swapchain; }
-
-      template <typename T>
-        requires std::is_same_v<T, qvk::meta>
-      inline fun& sub() { return m_meta; }
 
 
     // Functions

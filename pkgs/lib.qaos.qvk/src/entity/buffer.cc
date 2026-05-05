@@ -13,24 +13,12 @@
 #include "qvk/entity/buffer.hh"
 #include "qvk/module/device.hh"
 #include "qvk/module/memory.hh"
-#include "qvk/core.hh"
 #include "vulkan/vulkan.hpp"
 
 
 
 namespace qvk
 {
-
-  fun info<buffer>::make(core &core, u64 stride, std::vector<qvk::gt> items) -> info<buffer>*
-  {
-    auto obj = new info<buffer>(stride, items);
-    
-    core.sub<memory>().push<info<buffer>>(obj);
-    return obj;
-  }
-
-
-  
 
   buffer::buffer(device &device, qvk::memory &memory, qvk::info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
     : m_info(info)

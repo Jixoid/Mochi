@@ -13,9 +13,11 @@
 #pragma once
 
 
+#include "Basis.h"
 #include "Basis.hh"
 #include "vulkan/vulkan.hpp"
-
+#include <string_view>
+#include <sys/mman.h>
 
 #define ef else if
 
@@ -32,8 +34,6 @@ namespace qvk
   struct swapchain;
   struct renderer;
   struct memory;
-  struct meta;
-
 
 
 
@@ -41,11 +41,15 @@ namespace qvk
   struct pipeline;
   struct buffer;
   struct shader;
-  struct object;
+
+  struct node;
+  struct camera;
+  struct light;
+
+  struct mesh;
 
   template <typename T>
   struct info;
-
 
   
 
@@ -200,6 +204,38 @@ namespace qvk
       inline fun align() { return m_align; }
       inline fun format() { return m_format; }
       inline fun count() { return m_count; }
+  };
+
+
+
+  /// Mapped Memory
+  struct mappedFile
+  {
+    public:
+      explicit mappedFile(std::string fpath);
+
+      ~mappedFile();
+
+    public:
+      inline fun view() const -> std::string_view {
+        return {static_cast<const char*>(data), size};
+      }
+
+    private:
+      #if defined(__unix__) || defined(__APPLE__)
+      int fd{-1};
+      void *data{MAP_FAILED};
+      #elif defined(_WIN32)
+      void* hFile;
+      void* hMapping;
+      void *data{};
+      #endif
+      
+      u0 size{};
+
+    public:
+      inline operator ::data () { return {data, size}; }
+
   };
 
 }

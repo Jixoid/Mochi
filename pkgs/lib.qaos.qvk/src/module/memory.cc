@@ -11,11 +11,15 @@
 
 
 #include "Basis.hh"
+#include "qvk/entity/camera.hh"
+#include "qvk/entity/light.hh"
+#include "qvk/geometry.hh"
 #include "qvk/module/renderer.hh"
 #include "qvk/module/device.hh"
 #include "qvk/module/memory.hh"
 #include "qvk/entity/buffer.hh"
 #include "qvk/types.hh"
+#include <cstring>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -65,7 +69,92 @@ namespace qvk
       m_sharedMemory = true;
     else
       m_sharedMemory = (m_vramSize > 0 && visible_vram >= (m_vramSize * 0.9));
+
+
+
+    prepare_light(0);
   }
+
+
+
+  fun memory::prepare_camera(u32 count) -> void
+  {
+    if (!m_camera_ubo && count)
+      m_camera_ubo = load_UniformBuffer(&camera_i, count, [](void*){});
+
+    
+    if (m_camera_ubo && (m_camera_ubo->size() / camera_i.stride()) != count) {
+
+      auto bak = m_camera_ubo;
+      m_camera_ubo = load_UniformBuffer(&camera_i, count, [](void*){});
+
+      memcpy(m_camera_ubo->mapped(), bak->mapped(), std::min(bak->size(), m_camera_ubo->size()));
+    }
+  }
+
+
+  fun memory::find_camera(camera *cam) -> u64
+  {
+    auto cams = list<camera>();
+
+    auto it = std::find(cams.begin(), cams.end(), cam);
+    if (it == cams.end())
+      throw std::runtime_error("Kamera mochi::memory ye kayıtlı değil.");
+
+      
+    return (it - cams.begin());
+  }
+
+  fun memory::sync_camera(camera *cam) -> void
+  {
+    auto &mem = ((camera_t*)m_camera_ubo->mapped())[find_camera(cam)];
+
+    mem.view = cam->view();
+    mem.proj = cam->proj();
+  }
+
+
+
+  fun memory::prepare_light(u32 count) -> void
+  {
+    if (!m_light_ubo)
+      m_light_ubo = load_UniformBuffer(&light_i, 33, [&count](void*){});
+
+
+    *((u32*)m_light_ubo->mapped()) = count;
+
+    
+    //if (m_light_ubo && (m_light_ubo->size() / light_i.stride()) != count) {
+    //
+    //  auto bak = m_light_ubo;
+    //  m_light_ubo = load_UniformBuffer(&light_i, count+1, [](void*){});
+    //
+    //  memcpy(m_light_ubo->mapped(), bak->mapped(), std::min(bak->size(), m_light_ubo->size()));
+    //  //*((u32*)m_light_ubo->mapped()) = count;
+    //}
+  }
+
+
+  fun memory::find_light(light *cam) -> u64
+  {
+    auto cams = list<light>();
+
+    auto it = std::find(cams.begin(), cams.end(), cam);
+    if (it == cams.end())
+      throw std::runtime_error("Kamera mochi::memory ye kayıtlı değil.");
+
+      
+    return (it - cams.begin())+1;
+  }
+
+  fun memory::sync_light(light *cam) -> void
+  {
+    auto &mem = ((light_t*)m_light_ubo->mapped())[find_light(cam)];
+
+    mem.position = {cam->getWorldPos(), 0};
+    mem.color = {cam->getColor(), cam->getIntensity()};
+  }
+
 
 
 

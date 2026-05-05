@@ -25,14 +25,11 @@ namespace qvk
   template<>
   struct info<buffer>
   {
-    private:
+    public:
       explicit inline info<buffer>(u64 stride, std::vector<qvk::gt> items)
         : m_stride(stride)
         , m_items(items)
       {}
-
-    public:
-      static fun make(core &core, u64 stride, std::vector<qvk::gt> items) -> info<buffer>*;
 
 
     private:
@@ -54,6 +51,7 @@ namespace qvk
     private:
       explicit buffer(device &device, memory &memory, info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
 
+    public:
       ~buffer();
 
 

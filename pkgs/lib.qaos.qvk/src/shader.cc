@@ -12,14 +12,11 @@
 
 #include "qvk/module/device.hh"
 #include "qvk/core.hh"
+#include "qvk/types.hh"
 #include "qvk/shader.hh"
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vulkan/vulkan_raii.hpp>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
 
 
 
@@ -30,29 +27,13 @@ namespace qvk
     : vk_module(Nil)
     , m_entry(entry)
   {
-    // MMap File
-    int fd = open(std::string(fpath).c_str(), O_RDONLY);
-    if (fd == -1)
-      throw std::runtime_error("Shader dosyası açılamadı.");
-
-    struct stat st;
-    fstat(fd, &st);
-    u0 size = st.st_size;
-
-    void *data = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (data == MAP_FAILED)
-      throw std::runtime_error("Shader dosyası belleğe eşlenemdi.");
+    mappedFile mfile((std::string)fpath);
     
 
     // Load Shader
-    vk::ShaderModuleCreateInfo info({}, size, (u32*)data);
+    vk::ShaderModuleCreateInfo info({}, mfile.view().size(), (u32*)mfile.view().data());
       
     vk_module = vk::raii::ShaderModule(core.sub<device>().vdevice(), info);
-
-
-    // Free File
-    if (data != MAP_FAILED) munmap(data, size);
-    if (fd != -1) close(fd);
   }
 
 }

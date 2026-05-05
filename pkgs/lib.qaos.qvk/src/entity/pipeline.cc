@@ -21,17 +21,72 @@
 
 namespace qvk
 {
+  constexpr inline fun align_size(u64 size, u64 alignment) { if (alignment == 0) return size; else return ((size + alignment - 1) / alignment) * alignment; }
 
-  fun info<pipeline>::make(core &core, std::vector<qvk::pushSlot> push, std::vector<vertexSlot> vertex, std::vector<uniformSlot> uniform) -> info<pipeline>*
+
+  info<pipeline>::info(std::vector<pushSlot> push, std::vector<vertexSlot> vertex, std::vector<descriptorSlot> descriptor)
+    : m_push(push)
+    , m_vertex(vertex)
+    , m_descriptor(descriptor)
   {
-    auto obj = new info<pipeline>(push, vertex, uniform);
-    
-    core.sub<memory>().push<info<pipeline>>(obj);
-    return obj;
-  }
+    /// Push Constants
+    u64 off{};
+    for (auto typ: push) {
+      off = align_size(off, typ.type().align());
+
+      vk_PushConstant.push_back(vk::PushConstantRange(
+        typ.shaderStage(),
+        off,
+        typ.type().size() * typ.type().count()
+      ));
+
+      // DÜZELTME: Sadece size değil, count kadar atlamalıyız!
+      off += typ.type().size() * typ.type().count();
+    }
 
 
+    /// Vertex Buffers
+    u32 binding_idx{}, location_idx{};
+    for (auto ibuf: vertex) {
+      u32 v_offset{};
+
+      for (auto &typ: ibuf.ibuf()->items()) {
+        v_offset = align_size(v_offset, typ.align());
+        
+        for (u32 c{}; c < typ.count(); c++) {
+          vk_via.push_back(vk::VertexInputAttributeDescription(
+            location_idx++,
+            binding_idx,
+            typ.format(),
+            v_offset
+          ));
+          v_offset += typ.size();
+        }
+      }
+
+      vk_vib.push_back(vk::VertexInputBindingDescription(
+        binding_idx++,
+        ibuf.ibuf()->stride(),
+        ibuf.inputRate()
+      )); 
+    }
   
+    
+    // Descriptors
+    u32 desc_binding_idx{};
+    for (auto d: descriptor)
+      vk_DescriptorBindings.push_back(vk::DescriptorSetLayoutBinding(
+        desc_binding_idx++,
+        d.kind(),
+        1,
+        d.shaderStage(),
+        nullptr
+      ));
+    
+  }
+  
+
+
 
   pipeline::pipeline(core &core, qvk::info<pipeline> *info, std::vector<shaderSlot> shaders)
     : m_info(info), vk_layout(Nil), vk_pipeline(Nil)
@@ -63,7 +118,7 @@ namespace qvk
     // Create Rasterizer
     vk::PipelineRasterizationStateCreateInfo rasterizer(
       {}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, 
-      vk::CullModeFlagBits::eBack, vk::FrontFace::eClockwise, 
+      vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, 
       VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f
     );
 
@@ -77,7 +132,7 @@ namespace qvk
 
 
     // Create Layout
-    vk::DescriptorSetLayoutCreateInfo set_info({}, info->vkUniformBindings());
+    vk::DescriptorSetLayoutCreateInfo set_info({}, info->vkDescriptorBindings());
     vk_desc_layout = vk::raii::DescriptorSetLayout(core.sub<device>().vdevice(), set_info);
 
 
@@ -106,8 +161,9 @@ namespace qvk
     );
 
     // Create Pipelin
+    auto VertexInput = info->vkVertexInput();
     vk::GraphicsPipelineCreateInfo pipeline_info(
-      {}, shader_stages, &info->vkVertexInput(), &input_assembly, nullptr,
+      {}, shader_stages, &VertexInput, &input_assembly, nullptr,
       &viewport_state, &rasterizer, &multisampling, &depth_stencil,
       &color_blending, &dynamic_info, *vk_layout
     );

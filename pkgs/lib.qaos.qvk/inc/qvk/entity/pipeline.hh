@@ -15,6 +15,7 @@
 #include "Basis.hh"
 #include "qvk/types.hh"
 #include "qvk/shader.hh"
+#include "vulkan/vulkan.hpp"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.hpp>
 
@@ -63,25 +64,26 @@ namespace qvk
   };
 
 
-  struct uniformSlot
+  struct descriptorSlot
   {
     public:
-      inline uniformSlot(info<buffer> *ibuf, vk::ShaderStageFlags shaderStage)
+      inline descriptorSlot(info<buffer> *ibuf, vk::DescriptorType kind, vk::ShaderStageFlags shaderStage)
         : m_ibuf(ibuf)
+        , m_kind(kind)
         , m_shaderStage(shaderStage)
       {}
 
-
+      
     private:
       info<buffer> *m_ibuf;
+      vk::DescriptorType m_kind;
       vk::ShaderStageFlags m_shaderStage;
 
     public:
       inline fun ibuf() { return m_ibuf; }
+      inline fun kind() { return m_kind; }
       inline fun shaderStage() { return m_shaderStage; }
-
   };
-
 
 
   struct shaderSlot
@@ -110,40 +112,29 @@ namespace qvk
   template<>
   struct info<pipeline>
   {
-    friend struct meta;
-
-    private:
-      explicit inline info<pipeline>(std::vector<pushSlot> push, std::vector<vertexSlot> vertex, std::vector<uniformSlot> uniform)
-        : m_push(push)
-        , m_vertex(vertex)
-        , m_uniform(uniform)
-      {}
-
     public:
-      static fun make(core &core, std::vector<pushSlot> push, std::vector<vertexSlot> vertex, std::vector<uniformSlot> uniform) -> info<pipeline>*;
-
+      explicit info(std::vector<pushSlot> push, std::vector<vertexSlot> vertex, std::vector<descriptorSlot> descriptor);
 
     private:
       std::vector<pushSlot> m_push;
       std::vector<vertexSlot> m_vertex;
-      std::vector<uniformSlot> m_uniform;
+      std::vector<descriptorSlot> m_descriptor;
 
       std::vector<vk::VertexInputBindingDescription> vk_vib;
       std::vector<vk::VertexInputAttributeDescription> vk_via;
 
       std::vector<vk::PushConstantRange> vk_PushConstant;
-      vk::PipelineVertexInputStateCreateInfo vk_VertexInput;
-      std::vector<vk::DescriptorSetLayoutBinding> vk_UniformBindings;
+      std::vector<vk::DescriptorSetLayoutBinding> vk_DescriptorBindings;
       
 
     public:
       inline fun push() { return m_push; }
       inline fun vertex() { return m_vertex; }
-      inline fun uniform() { return m_uniform; }
+      inline fun descriptor() { return m_descriptor; }
 
       inline fun& vkPushConstant() { return vk_PushConstant; }
-      inline fun& vkVertexInput() { return vk_VertexInput; }
-      inline fun& vkUniformBindings() { return vk_UniformBindings; }
+      inline fun  vkVertexInput() { return vk::PipelineVertexInputStateCreateInfo({}, vk_vib, vk_via); }
+      inline fun& vkDescriptorBindings() { return vk_DescriptorBindings; }
   };
 
 

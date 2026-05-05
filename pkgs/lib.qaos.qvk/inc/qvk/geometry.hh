@@ -202,9 +202,7 @@ namespace qvk
         requires std::is_arithmetic_v<J>
       inline constexpr vec4(vec4<J> V): X(V.X), Y(V.Y), Z(V.Z), W(V.W) {}
 
-      template <typename J>
-        requires std::is_arithmetic_v<J>
-      inline constexpr vec4(vec3<J> V, J nW): X(V.X), Y(V.Y), Z(V.Z), W(nW) {}
+      inline constexpr vec4(vec3<T> V, T nW): X(V.X), Y(V.Y), Z(V.Z), W(nW) {}
 
     public:
       [[nodiscard]] inline constexpr fun dot() const noexcept -> T { return (X*X) + (Y*Y) + (Z*Z) +(W*W); }
@@ -276,8 +274,7 @@ namespace qvk
       explicit inline quaternion() {}
       inline quaternion(T nW, T nX, T nY, T nZ): W(nW), X(nX), Y(nY), Z(nZ) {}
 
-      [[nodiscard]] inline static fun fromAxisAngle(T angle, const vec3<T>& axis) -> quaternion
-      {
+      [[nodiscard]] inline static fun fromAxisAngle(T angle, const vec3<T> &axis) -> quaternion {
         T halfAngle = angle *0.5f;
         T s = std::sin(halfAngle);
 
@@ -289,8 +286,7 @@ namespace qvk
         );
       }
 
-      [[nodiscard]] inline static fun fromTwoVector(vec3<T> u, vec3<T> v) -> quaternion 
-      {
+      [[nodiscard]] inline static fun fromTwoVector(vec3<T> u, vec3<T> v) -> quaternion  {
         u = u.normalize();
         v = v.normalize();
         
@@ -316,8 +312,7 @@ namespace qvk
         ).normalize();
       }
 
-      [[nodiscard]] inline static fun lookAt(const vec3<T> &pos, const vec3<T> &target, const vec3<T> &up) -> quaternion
-      {
+      [[nodiscard]] inline static fun lookAt(const vec3<T> &pos, const vec3<T> &target, const vec3<T> &up) -> quaternion  {
         vec3<T> forward = (target - pos).normalize();
         
         vec3<T> right = forward.cross(up).normalize();
@@ -332,8 +327,7 @@ namespace qvk
         return q2 * q1;
       }
 
-      [[nodiscard]] inline static fun slerp(quaternion q1, quaternion q2, T t) -> quaternion 
-      {
+      [[nodiscard]] inline static fun slerp(quaternion q1, quaternion q2, T t) -> quaternion  {
         q1 = q1.normalize();
         q2 = q2.normalize();
 
@@ -370,8 +364,7 @@ namespace qvk
 
 
     public:
-      inline fun operator*(const quaternion& it) const -> quaternion
-      {
+      inline fun operator*(const quaternion &it) const -> quaternion {
         return quaternion(
           W *it.W - X *it.X - Y *it.Y - Z *it.Z,  // w
           W *it.X + X *it.W + Y *it.Z - Z *it.Y,  // x
@@ -382,8 +375,7 @@ namespace qvk
 
       
     public:
-      [[nodiscard]] inline fun rotate(const vec3<T>& v) const -> vec3<T>
-      {
+      [[nodiscard]] inline fun rotate(const vec3<T> &v) const -> vec3<T> {
         vec3<T> u{X,Y,Z};
 
         vec3<T> t = u.cross(v) *2; 
@@ -391,13 +383,11 @@ namespace qvk
         return v + (t *W) +u.cross(t);
       }
 
-      [[nodiscard]] inline fun conjugate() const -> quaternion
-      {
+      [[nodiscard]] inline fun conjugate() const -> quaternion {
         return quaternion(W, -X, -Y, -Z);
       }
 
-      [[nodiscard]] inline fun normalize() const -> quaternion
-      {
+      [[nodiscard]] inline fun normalize() const -> quaternion {
         T len = std::sqrt(W*W + X*X + Y*Y + Z*Z);
         if (len > 0) {
           T invLen = 1.0 / len;
@@ -460,7 +450,7 @@ namespace qvk
       union {
         T SwVec[4][4];
         vec4<T> SwVec4[4];
-        vec<T, 4> HwVec[4];
+        vec<T,4> HwVec[4];
       };
 
       using ST = SimdTraits<T>;
@@ -479,8 +469,7 @@ namespace qvk
 
     
     public:
-      inline fun operator*(const mat4 &it) const -> mat4
-      {
+      inline fun operator*(const mat4 &it) const -> mat4 {
         mat4 result;
         for (int i{}; i < 4; i++)
         {
@@ -499,8 +488,7 @@ namespace qvk
         return result;
       }
 
-      inline fun operator*(const vec4<T> &v) const -> vec4<T>
-      {
+      inline fun operator*(const vec4<T> &v) const -> vec4<T> {
         return vec4<T>(
           SwVec[0][0] * v.X + SwVec[0][1] * v.Y + SwVec[0][2] * v.Z + SwVec[0][3] * v.W,
           SwVec[1][0] * v.X + SwVec[1][1] * v.Y + SwVec[1][2] * v.Z + SwVec[1][3] * v.W,
@@ -511,8 +499,7 @@ namespace qvk
 
 
     public:
-      inline fun setZero() -> void
-      {
+      inline fun setZero() -> void {
         vec<T, 4> zero{};
         HwVec[0] = HwVec[1] = HwVec[2] = HwVec[3] = zero;
       }
@@ -526,7 +513,7 @@ namespace qvk
           arows[i] = ST::identity_row(i);
         }
 
-        T tmp alignas(32) [8]; // AVX f32 için 8 slot
+        T tmp alignas(32) [8];
         const T EPS = static_cast<T>(1e-12);
 
         for (int k = 0; k < 4; k++) {
@@ -568,8 +555,7 @@ namespace qvk
         return dest;
       }
 
-      inline fun rotation(vec3<T> deg) -> mat4
-      {
+      inline fun rotation(vec3<T> deg) -> mat4 {
         T cx = cosf(deg.X); T sx = sinf(deg.X);
         T cy = cosf(deg.Y); T sy = sinf(deg.Y);
         T cz = cosf(deg.Z); T sz = sinf(deg.Z);
@@ -592,10 +578,9 @@ namespace qvk
         return (*this)*res;
       }
 
-    public:
 
-      static inline fun perspective(T fovDeg, T aspect, T nearZ, T farZ) -> mat4
-      {
+    public:
+      static inline fun perspective(T fovDeg, T aspect, T nearZ, T farZ) -> mat4 {
         mat4 res;
         res.setZero();
         
@@ -611,8 +596,7 @@ namespace qvk
         return res;
       }
 
-      static inline fun lookAt(vec3<T> eye, vec3<T> center, vec3<T> up) -> mat4
-      {
+      static inline fun lookAt(vec3<T> eye, vec3<T> center, vec3<T> up) -> mat4 {
         // F (Forward): Center - Eye
         auto f = (center-eye).normalize();
 
@@ -652,8 +636,7 @@ namespace qvk
         return res;
       }
 
-      static inline fun model(vec3<T> position, quaternion<T> rotate, vec3<T> scale) -> mat4
-      {
+      static inline fun model(vec3<T> position, quaternion<T> rotate, vec3<T> scale) -> mat4 {
         auto q = rotate.normalize();
 
         T xx = q.X * q.X;
@@ -668,39 +651,40 @@ namespace qvk
 
         // MATRİSİN SATIRLARI (Sütun Öncelikli Matematik İçin)
         return mat4(
-            // Satır 0
-            {
-                (1.0f - 2.0f * (yy + zz)) * scale.X, // R00
-                (2.0f * (xy - wz)) * scale.Y,        // R01
-                (2.0f * (xz + wy)) * scale.Z,        // R02
-                position.X                           // Sütun 3 (Öteleme X)
-            },
+          // Satır 0
+          {
+            (1.0f - 2.0f * (yy + zz)) * scale.X, // R00
+            (2.0f * (xy - wz)) * scale.Y,        // R01
+            (2.0f * (xz + wy)) * scale.Z,        // R02
+            position.X                           // Sütun 3 (Öteleme X)
+          },
 
-            // Satır 1
-            {
-                (2.0f * (xy + wz)) * scale.X,        // R10
-                (1.0f - 2.0f * (xx + zz)) * scale.Y, // R11
-                (2.0f * (yz - wx)) * scale.Z,        // R12
-                position.Y                           // Sütun 3 (Öteleme Y)
-            },
+          // Satır 1
+          {
+            (2.0f * (xy + wz)) * scale.X,        // R10
+            (1.0f - 2.0f * (xx + zz)) * scale.Y, // R11
+            (2.0f * (yz - wx)) * scale.Z,        // R12
+            position.Y                           // Sütun 3 (Öteleme Y)
+          },
 
-            // Satır 2
-            {
-                (2.0f * (xz - wy)) * scale.X,        // R20
-                (2.0f * (yz + wx)) * scale.Y,        // R21
-                (1.0f - 2.0f * (xx + yy)) * scale.Z, // R22
-                position.Z                           // Sütun 3 (Öteleme Z)
-            },
+          // Satır 2
+          {
+            (2.0f * (xz - wy)) * scale.X,        // R20
+            (2.0f * (yz + wx)) * scale.Y,        // R21
+            (1.0f - 2.0f * (xx + yy)) * scale.Z, // R22
+            position.Z                           // Sütun 3 (Öteleme Z)
+          },
 
-            // Satır 3 (Perspektif Yuvaları)
-            {
-                0.0f,
-                0.0f,
-                0.0f,
-                1.0f
-            }
+          // Satır 3 (Perspektif Yuvaları)
+          {
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f
+          }
         );
       }
+
 
   };
 

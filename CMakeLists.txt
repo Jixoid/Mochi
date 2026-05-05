@@ -23,8 +23,10 @@ add_compile_definitions(_QVK_debug_ownership)
 
 
 # Sanitizer
-add_compile_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
-add_link_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
+if(NOT WIN32)
+  add_compile_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
+  add_link_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
+endif()
 
 
 # LTO

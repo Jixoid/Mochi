@@ -1,0 +1,22 @@
+Licensing Information
+
+This project contains files licensed under different licenses depending on
+their type:
+
+  Source code files written in C, C++, Pascal, Assembly, LLVM and QLang
+  (*.c, *.h, *.cpp, *.hpp, etc.) are
+  licensed under the GNU General Public License (GPL).
+
+  Build system files, including Makefile, are licensed under
+  the GNU Lesser General Public License (LGPL).
+  
+
+Each file contains a header specifying the applicable license.
+Users and contributors are encouraged to review these licenses carefully.
+
+For full license texts and details, please visit the following official
+pages or LICENSES folder:
+
+  GPL License
+  LGPL License
+

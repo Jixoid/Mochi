@@ -10,225 +10,202 @@
 */
 
 
-#include <cstring>
+#include <GLFW/glfw3.h>
 #include <stdexcept>
 #include <iostream>
-#include <utility>
-#include "Basis.h"
-#include "qvk/entity/pipeline.hh"
-#include "qvk/entity/object.hh"
-#include "qvk/shader.hh"
 #include "qvk/core.hh"
-#include "qvk/geometry.hh"
+#include "qvk/entity/camera.hh"
+#include "qvk/entity/light.hh"
+#include "qvk/entity/mesh.hh"
+#include "qvk/entity/node.hh"
+#include "qvk/entity/pipeline.hh"
+#include "qvk/entity/visual.hh"
+#include "qvk/shader.hh"
 #include "vulkan/vulkan.hpp"
-
 
 
 using namespace qvk;
 
 
-struct vertex
-{
-  vec3<f32> pos;
-  vec3<f32> color;
-  vec3<f32> inNormal;
-  vec2<f32> uv;
-  f32 __pad;
-};
-
-std::vector<vertex> cube_vertices {
-  // Yüz 1 (Üst - Y eksenine bakar: 0, 1, 0)
-  {{ 1.0f,  1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, { 0.0f,  1.0f,  0.0f}, {0.625f, 0.5f}},
-  {{-1.0f,  1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, { 0.0f,  1.0f,  0.0f}, {0.875f, 0.5f}},
-  {{-1.0f,  1.0f,  1.0f}, {1.0f, 0.0f, 0.0f}, { 0.0f,  1.0f,  0.0f}, {0.875f, 0.75f}},
-  {{ 1.0f,  1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, { 0.0f,  1.0f,  0.0f}, {0.625f, 0.5f}},
-  {{-1.0f,  1.0f,  1.0f}, {1.0f, 0.0f, 0.0f}, { 0.0f,  1.0f,  0.0f}, {0.875f, 0.75f}},
-  {{ 1.0f,  1.0f,  1.0f}, {1.0f, 0.0f, 0.0f}, { 0.0f,  1.0f,  0.0f}, {0.625f, 0.75f}},
-
-  // Yüz 2 (Sağ - X eksenine bakar: 1, 0, 0)  *(Not: Pozisyonlara göre aslında Z eksenine bakıyor)*
-  {{ 1.0f, -1.0f,  1.0f}, {0.0f, 1.0f, 0.0f},  { 0.0f,  0.0f,  1.0f}, {0.375f, 0.75f}},
-  {{ 1.0f,  1.0f,  1.0f}, {0.0f, 1.0f, 0.0f},  { 0.0f,  0.0f,  1.0f}, {0.625f, 0.75f}},
-  {{-1.0f,  1.0f,  1.0f}, {0.0f, 1.0f, 0.0f},  { 0.0f,  0.0f,  1.0f}, {0.625f, 1.0f}},
-  {{ 1.0f, -1.0f,  1.0f}, {0.0f, 1.0f, 0.0f},  { 0.0f,  0.0f,  1.0f}, {0.375f, 0.75f}},
-  {{-1.0f,  1.0f,  1.0f}, {0.0f, 1.0f, 0.0f}, { 0.0f,  0.0f,  1.0f}, {0.625f, 1.0f}},
-  {{-1.0f, -1.0f,  1.0f}, {0.0f, 1.0f, 0.0f}, { 0.0f,  0.0f,  1.0f}, {0.375f, 1.0f}},
-
-  // Yüz 3 (Arka - Negatif X eksenine bakar: -1, 0, 0)
-  {{-1.0f, -1.0f,  1.0f}, {0.0f, 0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}, {0.375f, 0.0f}},
-  {{-1.0f,  1.0f,  1.0f}, {0.0f, 0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}, {0.625f, 0.0f}},
-  {{-1.0f,  1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}, {0.625f, 0.25f}},
-  {{-1.0f, -1.0f,  1.0f}, {0.0f, 0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}, {0.375f, 0.0f}},
-  {{-1.0f,  1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}, {0.625f, 0.25f}},
-  {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}, {0.375f, 0.25f}},
-
-  // Yüz 4 (Sol - Negatif Y eksenine bakar: 0, -1, 0)
-  {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 0.0f}, { 0.0f, -1.0f,  0.0f}, {0.125f, 0.5f}},
-  {{ 1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 0.0f}, { 0.0f, -1.0f,  0.0f}, {0.375f, 0.5f}},
-  {{ 1.0f, -1.0f,  1.0f}, {1.0f, 1.0f, 0.0f}, { 0.0f, -1.0f,  0.0f}, {0.375f, 0.75f}},
-  {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 0.0f}, { 0.0f, -1.0f,  0.0f}, {0.125f, 0.5f}},
-  {{ 1.0f, -1.0f,  1.0f}, {1.0f, 1.0f, 0.0f}, { 0.0f, -1.0f,  0.0f}, {0.375f, 0.75f}},
-  {{-1.0f, -1.0f,  1.0f}, {1.0f, 1.0f, 0.0f}, { 0.0f, -1.0f,  0.0f}, {0.125f, 0.75f}},
-
-  // Yüz 5 (Alt - Pozitif X eksenine bakar: 1, 0, 0) *(Pozisyonlara göre)*
-  {{ 1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  0.0f,  0.0f}, {0.375f, 0.5f}},
-  {{ 1.0f,  1.0f, -1.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  0.0f,  0.0f}, {0.625f, 0.5f}},
-  {{ 1.0f,  1.0f,  1.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  0.0f,  0.0f}, {0.625f, 0.75f}},
-  {{ 1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  0.0f,  0.0f}, {0.375f, 0.5f}},
-  {{ 1.0f,  1.0f,  1.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  0.0f,  0.0f}, {0.625f, 0.75f}},
-  {{ 1.0f, -1.0f,  1.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  0.0f,  0.0f}, {0.375f, 0.75f}},
-
-  // Yüz 6 (Ön - Negatif Z eksenine bakar: 0, 0, -1) *(Pozisyonlara göre)*
-  {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f, 1.0f}, { 0.0f,  0.0f, -1.0f}, {0.125f, 0.25f}},
-  {{-1.0f,  1.0f, -1.0f}, {0.0f, 1.0f, 1.0f}, { 0.0f,  0.0f, -1.0f}, {0.375f, 0.25f}},
-  {{ 1.0f,  1.0f, -1.0f}, {0.0f, 1.0f, 1.0f}, { 0.0f,  0.0f, -1.0f}, {0.375f, 0.5f}},
-  {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f, 1.0f}, { 0.0f,  0.0f, -1.0f}, {0.125f, 0.25f}},
-  {{ 1.0f,  1.0f, -1.0f}, {0.0f, 1.0f, 1.0f}, { 0.0f,  0.0f, -1.0f}, {0.375f, 0.5f}},
-  {{ 1.0f, -1.0f, -1.0f}, {0.0f, 1.0f, 1.0f}, { 0.0f,  0.0f, -1.0f}, {0.125f, 0.5f}},
-};
-
-
-
   
 int Main()
 {
-  core core(
-    [](vk::raii::PhysicalDevices devices) -> vk::raii::PhysicalDevice {
+  qvk::vec3<f32> cam_pos{0,0,4};
+  qvk::vec3<f32> cam_front{-1};
+  cam_front = cam_front.normalize();
+  qvk::vec3<f32> cam_up{0,1,0};
+  f32 cam_speed = 10;
+  f32 yaw = -135;
+  f32 pitch = -35; 
+  f64 last_x = 400, last_y = 300;
+  bool first_mouse = true;
+  f32 mouse_sensitivity = 0.1;
 
+  camera *cam{};
+  
+
+  core eng(
+    [](vk::raii::PhysicalDevices devices) -> vk::raii::PhysicalDevice
+    {
       if (devices.empty())
         throw std::runtime_error("Vulkan destekli bir grafik birimi bulunamadı.");
 
       return devices[0];
     },
-    []()
+    [&](f32 dt)
     {
-      //auto dir = (vec3<f32>{-10,-10,-10} - vec3<f32>{0,0,0}).normalize();
-      //
-      //cam->rot() = quaternion<f32>::fromAxisAngle(0.05, dir) * cam->rot();
-      //cam->recalc();
+      if (!cam) return;
+
+      auto win = eng.sub<qvk::window>().glfw();
+
+
+      auto is_key_pressed = [win](int key) { return glfwGetKey(win, key) == GLFW_PRESS; };
+      auto disable_cursor = [win]() { glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED); };
+      auto enable_cursor = [win]() { glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_NORMAL); };
+      auto get_cursor_pos = [win](f64 &x, f64 &y) { glfwGetCursorPos(win, &x, &y); };
+
+
+      static bool cursor_locked = false;
+      static bool esc_pressed_last_frame = false;
+      
+      bool esc_pressed = is_key_pressed(GLFW_KEY_ESCAPE);
+      
+      
+      if (esc_pressed && !esc_pressed_last_frame) {
+        cursor_locked = !cursor_locked;
+        
+        if (cursor_locked) {
+          disable_cursor();
+          first_mouse = true;
+        } else {
+          enable_cursor();
+        }
+      }
+      esc_pressed_last_frame = esc_pressed;
+
+    
+      double xpos, ypos;
+      get_cursor_pos(xpos, ypos);
+
+      if (first_mouse) {
+        last_x = xpos;
+        last_y = ypos;
+        first_mouse = false;
+      }
+
+      float xoffset = xpos - last_x;
+      float yoffset = last_y - ypos; 
+      last_x = xpos;
+      last_y = ypos;
+
+      
+      if (cursor_locked) {
+        xoffset *= mouse_sensitivity;
+        yoffset *= mouse_sensitivity;
+
+        yaw += xoffset;
+        pitch += yoffset;
+
+        if (pitch > 89.0f) pitch = 89.0f;
+        if (pitch < -89.0f) pitch = -89.0f;
+        
+        qvk::vec3<f32> front;
+        front.X = std::cos(yaw * (M_PI / 180.0f)) * std::cos(pitch * (M_PI / 180.0f));
+        front.Y = std::sin(pitch * (M_PI / 180.0f));
+        front.Z = std::sin(yaw * (M_PI / 180.0f)) * std::cos(pitch * (M_PI / 180.0f));
+        cam_front = front.normalize();
+      }
+
+      
+      qvk::vec3<f32> cam_right = cam_front.cross(cam_up).normalize();
+
+      bool moved = false;
+      
+      
+      if (is_key_pressed(GLFW_KEY_W)) { cam_pos += cam_front * (cam_speed * dt); moved = true; }
+      if (is_key_pressed(GLFW_KEY_S)) { cam_pos -= cam_front * (cam_speed * dt); moved = true; }
+      if (is_key_pressed(GLFW_KEY_A)) { cam_pos -= cam_right * (cam_speed * dt); moved = true; }
+      if (is_key_pressed(GLFW_KEY_D)) { cam_pos += cam_right * (cam_speed * dt); moved = true; }
+      
+      if (is_key_pressed(GLFW_KEY_SPACE)) { cam_pos += cam_up * (cam_speed * dt); moved = true; }
+      if (is_key_pressed(GLFW_KEY_LEFT_SHIFT)) { cam_pos -= cam_up * (cam_speed * dt); moved = true; }
+
+      if (moved || cursor_locked) {
+        auto view_matrix = qvk::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
+        cam->setModel(view_matrix.inverse());
+      }
     }
   );
 
 
-  auto vertex_i = info<buffer>::make(core,
-    sizeof(vertex),
-    gt::make_list<
-      vec3<f32>, // pos
-      vec3<f32>, // color
-      vec3<f32>, // inNormal
-      vec2<f32>  // uv
-    >()
-  );
 
-  auto object_i = info<buffer>::make(core,
-    sizeof(mat4<f32>),
-    gt::make_list<
-      mat4<f32> // model
-    >()
-  );
+
+  node scene(Nil, {});
   
-  auto ucam_i = info<buffer>::make(core,
-    sizeof(mat4<f32>)*2,
-    gt::make_list<
-      mat4<f32>, // view
-      mat4<f32>  // proj
-    >()
+  cam = new camera(eng, &scene,
+    qvk::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up).inverse(),
+    90, 0.1, 1000
   );
 
-  auto pbr_i = info<pipeline>::make(core,
+  light lig1(eng, &scene,
+    mat4<f32>::model({4,0,0}, quaternion<f32>{}, {1}),
+    {1,0,0},
+    10
+  );
+
+  light lig2(eng, &scene,
+    mat4<f32>::model({0,4,0}, quaternion<f32>{}, {1}),
+    {0,1,0},
+    10
+  );
+
+  light lig3(eng, &scene,
+    mat4<f32>::model({-4,0,0}, quaternion<f32>{}, {1}),
+    {0,0,1},
+    10
+  );
+
+  light lig4(eng, &scene,
+    mat4<f32>::model({0,-4,0}, quaternion<f32>{}, {1}),
+    {1,1,0},
+    10
+  );
+
+
+  mesh m3d(eng, "/home/alforce/Masaüstü/Untitled.obj");
+
+
+  qvk::info<qvk::pipeline> pbr_i(
     {
-      //{gt::make<mat4<f32>>(), vk::ShaderStageFlagBits::eVertex},
+      {qvk::gt::make<qvk::mat4<f32>>(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
     },
     {
-      {vertex_i, vk::VertexInputRate::eVertex},
-      {object_i, vk::VertexInputRate::eInstance},
+      {&qvk::vertex_i, vk::VertexInputRate::eVertex},
     },
     {
-      {ucam_i, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      {&qvk::camera_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      {&qvk::light_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
     }
   );
-
-  core.sub<meta>().compile();
-
 
 
   std::vector<shaderSlot> shaders;
-  shaders.push_back(shaderSlot{vk::ShaderStageFlagBits::eVertex,   shader(core, "pkgs/com.test.qvk/res/cube.vert.spv", "main")});
-  shaders.push_back(shaderSlot{vk::ShaderStageFlagBits::eFragment, shader(core, "pkgs/com.test.qvk/res/cube.frag.spv", "main")});
+  shaders.push_back({vk::ShaderStageFlagBits::eVertex, shader(eng, "pkgs/lib.qaos.qvk/.qcache/pbr.vert.spv", "main")});
+  shaders.push_back({vk::ShaderStageFlagBits::eFragment, shader(eng, "pkgs/lib.qaos.qvk/.qcache/pbr.frag.spv", "main")});
   
-  auto pbr = pipeline::make(core, pbr_i,
-    std::move(shaders)
-  );
+  auto pipe = pipeline::make(eng, &pbr_i, std::move(shaders));
 
-  auto vertexs = core.sub<memory>().load_VertexBuffer(
-    vertex_i,
-    cube_vertices.size(),
-    [](void *dest) -> void
-    {
-      memcpy(dest, cube_vertices.data(), sizeof(vertex) * cube_vertices.size());
-    }
-  );
-
-  auto objects = core.sub<memory>().load_VertexBuffer(
-    object_i,
-    2,
-    [](void *dest) -> void
-    {
-      auto models = (mat4<f32>*)dest;
-
-
-      models[0] = mat4<f32>::model(
-        {10, 10, 10},
-        quaternion<f32>{},
-        {1,1,1}
-      );
-      
-      models[1] = mat4<f32>::model(
-        {0, 0, 0},
-        quaternion<f32>{},
-        {1,1,1}
-      );
-
-    }
-  );
-
-  auto cam = core.sub<memory>().load_UniformBuffer(
-    ucam_i,
-    1,
-    [](void *dest) -> void
-    {
-      auto models = (mat4<f32>*)dest;
-
-
-      vec3<f32> cameraPos   = {20, 20, 20};
-      vec3<f32> cameraTarget = {0, 0, 0};
-      vec3<f32> cameraUp    = {0, 1, 0};
-
-      models[0] = mat4<f32>::lookAt(cameraPos, cameraTarget, cameraUp);
-
-      models[1] = mat4<f32>::perspective(
-        45,
-        800.0/600.0,
-        0.1,
-        1000
-      );
-    }
-  );
-  
- 
-  auto acube = object::make(core, pbr,
-    {
-      {vertexs, vk::VertexInputRate::eVertex},
-      {objects, vk::VertexInputRate::eInstance},
-    },
-    {
-      {cam, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-    },
-    cube_vertices.size(), 2
+  auto obj = visual::make(eng,
+    &scene,
+    mat4<f32>::model({}, quaternion<f32>(), {1}),
+    &m3d,
+    pipe
   );
 
 
-
-  core.run();
+  eng.scene() = &scene;
+  eng.camera() = cam;
+  eng.run();
 
   return 0;
 }

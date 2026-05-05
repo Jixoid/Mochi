@@ -17,8 +17,6 @@
 #include "qvk/module/swapchain.hh"
 #include "qvk/entity/pipeline.hh"
 #include "qvk/entity/buffer.hh"
-#include "qvk/geometry.hh"
-#include "qvk/entity/object.hh"
 #include <chrono>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -29,7 +27,7 @@ namespace qvk
 
   core::core(
     std::function<vk::raii::PhysicalDevice (vk::raii::PhysicalDevices)> GpuPicker,
-    std::function<void ()> Idle
+    std::function<void (f32 dt)> Idle
   )
     : m_bridge("QVK Test", {1,0,0,0})
     , m_window(m_bridge, "QVK Test", 800, 600)
@@ -37,7 +35,6 @@ namespace qvk
     , m_swapchain(m_device, m_window)
     , m_renderer(m_device, m_swapchain)
     , m_memory(m_device, m_renderer)
-    , m_meta(m_memory)
 
     , m_idle(Idle)
   {}
@@ -65,7 +62,7 @@ namespace qvk
       // update_physics();
       // update_camera();
 
-      m_idle();
+      m_idle(dt);
 
       draw();
     }
@@ -83,38 +80,43 @@ namespace qvk
     cmd.setScissor(0, {vk::Rect2D({0, 0}, extent)});
 
     // --- BİRDEN FAZLA NESNEYİ ÇİZME DÖNGÜSÜ ---
-    qvk::pipeline* last_pipeline{};
-    //qvk::buffer* last_buffer{};
+    qvk::pipeline *last_pipeline{};
+    qvk::buffer   *last_buffer{};
 
-    for (const auto &obj: sub<memory>().list<object>())
+
+    // --- YENİ: DESCRIPTOR SET (UBO) BAĞLAMA ---
+    for (const auto &obj: sub<memory>().list<visual>())
     {
       // 1. Pipeline Bağla
-      if (obj->pipeline() != last_pipeline) {
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *obj->pipeline()->get());
-        last_pipeline = obj->pipeline();
+      if (obj->getPipeline() != last_pipeline) {
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *obj->getPipeline()->get());
+        last_pipeline = obj->getPipeline();
       }
 
       // 2. Vertex ve Instance Buffer'ları Bağla
-      u32 i{};
-      for (auto &X: obj->vertexs()) {
-        // Vulkan array proxy beklediği için süslü parantez içine alıyoruz
-        cmd.bindVertexBuffers(i, {*X.buf()->get()}, {0}); 
-        i++;
+      if (obj->getMesh()->data() != last_buffer) {
+        cmd.bindVertexBuffers(0, {*obj->getMesh()->data()->get()}, {0}); 
+        last_buffer = obj->getMesh()->data();
       }
 
-      // --- YENİ: DESCRIPTOR SET (UBO) BAĞLAMA ---
-      if (!obj->uniforms().empty()) {
-        cmd.bindDescriptorSets(
-          vk::PipelineBindPoint::eGraphics,
-          *obj->pipeline()->layout(),
-          0,                       // firstSet (0'dan başlıyor)
-          {*obj->desc_sets()[0]},  // Bizim hazırladığımız paket
-          {}                       // dynamicOffsets (boş)
-        );
-      }
+      cmd.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        *obj->getPipeline()->layout(),
+        0,                       // firstSet (0'dan başlıyor)
+        {*obj->getDescSets()[0], },  // Bizim hazırladığımız paket
+        {}                       // dynamicOffsets (boş)
+      );
 
-      // 3. Draw Komutu (Dinamik)
-      cmd.draw(obj->vertex_count(), obj->instance_count(), 0, 0);
+      auto model_mat = obj->getModel();
+      cmd.pushConstants<qvk::mat4<f32>>(
+        *last_pipeline->layout(),
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+        0,                                // Offset
+        model_mat                         // Verinin kendisi
+      );
+
+      // 3. Draw Komutu
+      cmd.draw(obj->getMesh()->data()->size() / vertex_i.stride(), 1, 0, 0);
     }
 
     // 3. Tuvali Kapat ve Ekrana Gönder

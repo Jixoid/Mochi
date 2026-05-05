@@ -40,6 +40,7 @@ namespace qvk
 
 
     public:
+      inline fun  glfw() { return m_window; }
       inline fun& surface() { return vk_surface; }
       inline fun  width()  { return m_width; }
       inline fun  height() { return m_height; }

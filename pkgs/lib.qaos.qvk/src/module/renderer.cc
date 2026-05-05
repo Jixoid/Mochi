@@ -28,14 +28,12 @@ namespace qvk
     // Command Pool
     vk::CommandPoolCreateInfo pool_info(
       vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 
-      0 // Not: Buraya cihazından bulduğun grafik kuyruğu indisini vermelisin
+      0
     );
     m_cmd_pool = vk::raii::CommandPool(m_device.vdevice(), pool_info);
 
     
-    // Command Buffer 
-    auto image_count = m_swapchain.image_count();
-
+    // Command Buffer
     vk::CommandBufferAllocateInfo alloc_info(*m_cmd_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT);
     m_cmd_buffers = vk::raii::CommandBuffers(m_device.vdevice(), alloc_info);
 
@@ -50,7 +48,7 @@ namespace qvk
       m_in_flight_fences.push_back(vk::raii::Fence(m_device.vdevice(), fence_info));
     }
 
-    for (u32 i{}; i < image_count; i++) {
+    for (u32 i{}; i < m_swapchain.image_count(); i++) {
       m_render_finished_sems.push_back(vk::raii::Semaphore(m_device.vdevice(), sem_info));
     }
   }
@@ -69,7 +67,7 @@ namespace qvk
     );
 
     vk::ImageMemoryBarrier depth_barrier(
-      {}, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+      vk::AccessFlagBits::eNone, vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead,
       vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal,
       VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
       *m_swapchain.depth_image(), 
@@ -100,9 +98,9 @@ namespace qvk
       *m_swapchain.depth_view(),
       vk::ImageLayout::eDepthAttachmentOptimal,
       vk::ResolveModeFlagBits::eNone, nullptr, vk::ImageLayout::eUndefined,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare, clear_depth_val
+      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_depth_val
     );
-         
+    
     // 5. Dynamic Rendering Başlat
     vk::RenderingInfo render_info(
       {}, {{0, 0}, m_swapchain.extent()}, 

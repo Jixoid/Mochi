@@ -10,26 +10,19 @@
 */
 
 
-#pragma once
-
-#include "qvk/types.hh"
+#include "qvk/entity/node.hh"
+#include <vulkan/vulkan_raii.hpp>
+#include <vulkan/vulkan.h>
 
 
 
 namespace qvk
 {
 
-  struct meta
+  node::node(node *parent, mat4<f32> model)
+    : m_model(model)
   {
-    public:
-      explicit meta(qvk::memory &memory);
-
-    private:
-      memory &m_memory;
-
-    public:
-      fun compile() -> void;
-
-  };
+    setParent(parent);
+  }
 
 }
