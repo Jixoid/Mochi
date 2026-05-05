@@ -10,9 +10,9 @@
 */
 
 
-#include "qvk/entity/node.hh"
-#include "qvk/entity/light.hh"
-#include "qvk/entity/buffer.hh"
+#include "qvk/world/node.hh"
+#include "qvk/world/light.hh"
+#include "qvk/rhi/buffer.hh"
 #include "qvk/geometry.hh"
 #include "qvk/core.hh"
 #include "qvk/types.hh"
@@ -26,7 +26,7 @@ namespace qvk
 
   info<buffer> light_i = info<buffer>(
     sizeof(light_t),
-    gt::make_list<
+    vt::make_list<
       vec4<f32>, // position
       vec4<f32>  // color
     >()
@@ -35,7 +35,7 @@ namespace qvk
   
   light::light(core &core, node *parent, mat4<f32> model, vec3<f32> color, f32 intensity)
     : node(parent, model)
-    , m_memory(core.sub<memory>())
+    , m_memory(core.sub<module::memory>())
     , m_color(color)
     , m_intensity(intensity)
   {

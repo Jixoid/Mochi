@@ -15,8 +15,8 @@
 #include "qvk/module/device.hh"
 #include "qvk/module/memory.hh"
 #include "qvk/module/swapchain.hh"
-#include "qvk/entity/pipeline.hh"
-#include "qvk/entity/buffer.hh"
+#include "qvk/rhi/pipeline.hh"
+#include "qvk/rhi/buffer.hh"
 #include <chrono>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -85,7 +85,7 @@ namespace qvk
 
 
     // --- YENİ: DESCRIPTOR SET (UBO) BAĞLAMA ---
-    for (const auto &obj: sub<memory>().list<visual>())
+    for (const auto &obj: sub<module::memory>().list<visual>())
     {
       // 1. Pipeline Bağla
       if (obj->getPipeline() != last_pipeline) {

@@ -22,13 +22,21 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
+  /** @brief Represents a system window and its Vulkan surface. */
   struct window
   {
     public:
-      explicit window(qvk::bridge &bridge, std::string_view title, int width, int height);
+      /**
+       * @brief Initialize a new window.
+       * @param bridge The Vulkan bridge instance.
+       * @param title The title of the window.
+       * @param width The initial width of the window.
+       * @param height The initial height of the window.
+       */
+      explicit window(module::bridge &bridge, std::string_view title, int width, int height);
 
 
     private:
@@ -40,13 +48,21 @@ namespace qvk
 
 
     public:
+      /** @brief Access the underlying GLFW window pointer. */
       inline fun  glfw() { return m_window; }
+      /** @brief Access the Vulkan RAII surface. */
       inline fun& surface() { return vk_surface; }
+      /** @brief Get the current width of the window. */
       inline fun  width()  { return m_width; }
+      /** @brief Get the current height of the window. */
       inline fun  height() { return m_height; }
 
       
     public:
+      /**
+       * @brief Get the required Vulkan extensions for GLFW.
+       * @return A vector of extension names.
+       */
       static inline fun extensions() -> std::vector<const char*> {
         u32 glfwExtensionCount{};
         const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -55,9 +71,19 @@ namespace qvk
 
 
     private:
+      /**
+       * @brief Callback for window resize events.
+       * @param win The GLFW window.
+       * @param width New width.
+       * @param height New height.
+       */
       static void framebuffer_resize_callback(GLFWwindow* win, int width, int height);
 
     public:
+      /**
+       * @brief Process window events.
+       * @return True if the window should stay open, false if it should close.
+       */
       fun proc_events() -> bool;
 
   };

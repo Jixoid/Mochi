@@ -11,6 +11,7 @@
 
 
 #include "qvk/module/window.hh"
+#include "Basis.hh"
 #include "qvk/module/bridge.hh"
 #include <GLFW/glfw3.h>
 #include <string>
@@ -18,7 +19,7 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
   fun __attribute__((constructor())) window_init() { glfwInit(); }
@@ -26,15 +27,15 @@ namespace qvk
 
 
 
-  window::window(qvk::bridge &bridge, std::string_view title, int width, int height)
-    : vk_surface(Nil)
+  window::window(bridge &bridge, std::string_view title, int width, int height)
+    : vk_surface(nil)
   {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     m_window = glfwCreateWindow(
       width, height,
       std::string(title).c_str(),
-      nullptr, nullptr
+      nil, nil
     );
 
     glfwGetFramebufferSize(m_window, &m_width, &m_height);
@@ -44,7 +45,7 @@ namespace qvk
     glfwSetFramebufferSizeCallback(m_window, framebuffer_resize_callback);
 
     VkSurfaceKHR rawSurface;
-    if (glfwCreateWindowSurface(*bridge.inst(), m_window, nullptr, &rawSurface) != VK_SUCCESS)
+    if (glfwCreateWindowSurface(*bridge.inst(), m_window, nil, &rawSurface) != VK_SUCCESS)
       throw std::runtime_error("Yüzey oluşturulamadı!");
     
     vk_surface = vk::raii::SurfaceKHR(bridge.inst(), rawSurface);
@@ -55,7 +56,7 @@ namespace qvk
   void window::framebuffer_resize_callback(GLFWwindow* win, int width, int height)
   {
     // GLFW penceresinin içine gömdüğümüz "this" pointer'ını geri çıkartıyoruz
-    auto app = reinterpret_cast<qvk::window*>(glfwGetWindowUserPointer(win));
+    auto app = reinterpret_cast<window*>(glfwGetWindowUserPointer(win));
     
     // Artık sınıfın private üyelerine erişebiliriz!
     app->m_resized = true;

@@ -22,9 +22,16 @@
 namespace qvk
 {
 
+  /** @brief Represents a Vulkan shader module and its entry point. */
   struct shader
   {
     public:
+      /** 
+       * @brief Construct a new shader from a file path.
+       * @param core The QVK core instance.
+       * @param fpath The file path to the shader bytecode (e.g., SPIR-V).
+       * @param entry The entry point name of the shader.
+       */
       explicit shader(qvk::core &core, std::string_view fpath, std::string_view entry);
       
 
@@ -33,7 +40,9 @@ namespace qvk
       std::string m_entry;
 
     public:
+      /** @brief Access the underlying Vulkan shader module. */
       inline fun& module() { return vk_module; }
+      /** @brief Access the shader entry point string. */
       inline fun& entry() { return m_entry; }
   };
 

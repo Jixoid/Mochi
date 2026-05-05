@@ -1,0 +1,17 @@
+# Doxyfile 1.16.1
+
+DOXYFILE_ENCODING = UTF-8
+
+PROJECT_NAME = "QVK"
+
+EXTRACT_ALL = YES
+
+INPUT = .
+
+FILE_PATTERNS = *.h *.hh *.c *.cc
+
+RECURSIVE = YES
+
+EXCLUDE = .cache .vscode build LICENSES
+
+EXCLUDE_PATTERNS = */src/*

@@ -19,12 +19,18 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
+  /** @brief Manages the Vulkan context and instance. */
   struct bridge
   {
     public:
+      /**
+       * @brief Initialize the Vulkan bridge.
+       * @param appName The name of the application.
+       * @param appVer The version of the application (Major, Minor, Patch, Tweak).
+       */
       explicit bridge(std::string_view appName, std::array<u32, 4> appVer);
 
 
@@ -33,11 +39,17 @@ namespace qvk
       vk::raii::Instance vk_inst;
 
     public:
+      /** @brief Access the Vulkan RAII context. */
       inline fun& ctx() { return vk_ctx; }
+      /** @brief Access the Vulkan RAII instance. */
       inline fun& inst() { return vk_inst; }
 
 
     public:
+      /**
+       * @brief Get a list of available physical devices.
+       * @return vk::raii::PhysicalDevices collection of available GPUs.
+       */
       inline fun physicalDevices() -> vk::raii::PhysicalDevices {
         return vk::raii::PhysicalDevices(inst());
       }

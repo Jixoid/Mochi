@@ -3,6 +3,9 @@
 .remote
 /build
 .cache
+html
+latex
+xml
 
 
 # Compiled

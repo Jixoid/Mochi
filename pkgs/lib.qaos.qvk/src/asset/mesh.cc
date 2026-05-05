@@ -11,7 +11,7 @@
 
 
 #include "Basis.hh"
-#include "qvk/entity/mesh.hh"
+#include "qvk/asset/mesh.hh"
 #include "qvk/module/memory.hh"
 #include "qvk/reader/reader.hh"
 #include "qvk/types.hh"
@@ -29,7 +29,7 @@ namespace qvk
   
   qvk::info<qvk::buffer> vertex_i = qvk::info<qvk::buffer>(
     sizeof(vertex_t),
-    gt::make_list<
+    vt::make_list<
       vec3<f32>, // position
       vec3<f32>, // normal
       vec3<f32>, // color
@@ -107,7 +107,7 @@ namespace qvk
     
     auto vtx = build_vertices(raw);
     
-    m_data = core.sub<memory>().load_VertexBuffer(&vertex_i, vtx.size(),
+    m_data = core.sub<module::memory>().load_VertexBuffer(&vertex_i, vtx.size(),
       [&vtx](void* _data)
       {
         memcpy(_data, vtx.data(), vertex_i.stride()*vtx.size());
@@ -120,7 +120,7 @@ namespace qvk
   {
     auto obj = new mesh(data);
 
-    core.sub<memory>().push(obj);
+    core.sub<module::memory>().push(obj);
     return obj;
   }
 
@@ -128,7 +128,7 @@ namespace qvk
   {
     auto obj = new mesh(core, fpath);
 
-    core.sub<memory>().push(obj);
+    core.sub<module::memory>().push(obj);
     return obj;
   }
 

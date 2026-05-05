@@ -18,10 +18,10 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
-  swapchain::swapchain(qvk::device &device, qvk::window &window)
+  swapchain::swapchain(device &device, window &window)
   {
     // Assess their abilities
     auto caps = device.phys_dev().getSurfaceCapabilitiesKHR(window.surface());

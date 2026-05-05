@@ -15,11 +15,11 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
   device::device(vk::raii::PhysicalDevice phys_dev)
-    : vk_phys_dev(phys_dev), vk_device(Nil)
+    : vk_phys_dev(phys_dev), vk_device(nil)
   {
     // Find families
     auto props = phys_dev.getQueueFamilyProperties();

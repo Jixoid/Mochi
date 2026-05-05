@@ -42,7 +42,7 @@ namespace qvk
 		fstat(fd, &st);
 		size = st.st_size;
 
-		data = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
+		data = mmap(nil, size, PROT_READ, MAP_PRIVATE, fd, 0);
 		if (data == MAP_FAILED)
 			throw std::system_error(errno, std::generic_category());
 	}
@@ -96,5 +96,5 @@ namespace qvk
 	}
 
 	#endif
-
+	
 }

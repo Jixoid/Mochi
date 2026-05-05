@@ -13,11 +13,10 @@
 #pragma once
 
 
-#include "Basis.h"
 #include "Basis.hh"
 #include "vulkan/vulkan.hpp"
 #include <string_view>
-#include <sys/mman.h>
+#include <type_traits>
 
 #define ef else if
 
@@ -26,50 +25,78 @@
 namespace qvk
 {
 
+  /** @brief Core instance. */
   struct core;
   
-  struct bridge;
-  struct window;
-  struct device;
-  struct swapchain;
-  struct renderer;
-  struct memory;
 
+  namespace module
+  {
+    /** @brief Bridge for graphics operations. */
+    struct bridge;
+    /** @brief Window instance. */
+    struct window;
+    /** @brief Logical device instance. */
+    struct device;
+    /** @brief Swapchain instance. */
+    struct swapchain;
+    /** @brief Renderer instance. */
+    struct renderer;
+    /** @brief Memory allocator. */
+    struct memory;
+  }
 
+  
+  
 
   /// Entities
+  
+  /** @brief Graphics pipeline instance. */
   struct pipeline;
+  /** @brief Data buffer instance. */
   struct buffer;
+  /** @brief Shader module instance. */
   struct shader;
 
+  /** @brief Scene node. */
   struct node;
+  /** @brief Camera node. */
   struct camera;
+  /** @brief Light node. */
   struct light;
 
+  /** @brief 3D Mesh object. */
   struct mesh;
 
+  /** @brief Information structure for a type. */
   template <typename T>
   struct info;
 
   
 
+
   /// Geometry
+  
+  /** @brief 2D Vector structure. */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct vec2;
 
+  /** @brief 3D Vector structure. */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct vec3;
 
+  /** @brief 4D Vector structure. */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct vec4;
 
+  /** @brief Quaternion structure. */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct quaternion;
 
+  /** @brief 4x4 Matrix structure. */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
   struct mat4;
@@ -77,11 +104,22 @@ namespace qvk
 
 
 
-  /// GTypes
-  struct gt
+  /// Vulkan Types
+  
+  /** 
+   * @brief Helper structure for mapping C++ types to Vulkan formats. 
+   */
+  struct vt
   {
     private:
-      gt(u64 size, u64 align, vk::Format format, u8 count = 1)
+      /** 
+       * @brief Construct a new vt object.
+       * @param size Size in bytes.
+       * @param align Alignment in bytes.
+       * @param format Vulkan format.
+       * @param count Vulkan sub count (default is 1).
+       */
+      vt(u64 size, u64 align, vk::Format format, u8 count = 1)
         : m_size(size)
         , m_align(align)
         , m_format(format)
@@ -90,8 +128,13 @@ namespace qvk
 
 
     public:
+      /**
+       * @brief Create a vt instance mapped to the specified type T.
+       * @tparam T The C++ type to map.
+       * @return vt The mapped Vulkan type info.
+       */
       template <typename T>
-      static inline fun make() -> gt {
+      static inline fun make() -> vt {
         // primitive
         if constexpr (std::is_same_v<T, u8>)  return {1, 1, vk::Format::eR8Uint};
         ef constexpr (std::is_same_v<T, u16>) return {2, 2, vk::Format::eR16Uint};
@@ -188,9 +231,14 @@ namespace qvk
       }
 
 
+      /**
+       * @brief Create a list of vt instances for the given types.
+       * @tparam Ts The C++ types to map.
+       * @return std::vector<vt> The list of mapped Vulkan type infos.
+       */
       template <typename... Ts>
-      static inline fun make_list() -> std::vector<gt> {
-        return { gt::make<Ts>()... };
+      static inline fun make_list() -> std::vector<vt> {
+        return { vt::make<Ts>()... };
       }
 
 
@@ -200,23 +248,41 @@ namespace qvk
       u8 m_count;
 
     public:
+      /** @brief Get the size in bytes. */
       inline fun size() { return m_size; }
+      /** @brief Get the alignment in bytes. */
       inline fun align() { return m_align; }
+      /** @brief Get the Vulkan format. */
       inline fun format() { return m_format; }
+      /** @brief Get the Vulkan sub count. */
       inline fun count() { return m_count; }
   };
 
 
 
+
   /// Mapped Memory
+  
+  /** 
+   * @brief Helper structure for memory-mapped files. 
+   */
   struct mappedFile
   {
     public:
+      /** 
+       * @brief Construct a new mappedFile object.
+       * @param fpath The path to the file to map.
+       */
       explicit mappedFile(std::string fpath);
 
+      /** @brief Destroy the mappedFile object and unmap memory. */
       ~mappedFile();
 
     public:
+      /**
+       * @brief Get a string view of the mapped file data.
+       * @return std::string_view View of the file data.
+       */
       inline fun view() const -> std::string_view {
         return {static_cast<const char*>(data), size};
       }
@@ -224,7 +290,7 @@ namespace qvk
     private:
       #if defined(__unix__) || defined(__APPLE__)
       int fd{-1};
-      void *data{MAP_FAILED};
+      void *data{(void*)(-1)};
       #elif defined(_WIN32)
       void* hFile;
       void* hMapping;

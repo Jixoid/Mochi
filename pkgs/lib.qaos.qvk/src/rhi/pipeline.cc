@@ -10,10 +10,11 @@
 */
 
 
-#include "qvk/entity/pipeline.hh"
+#include "qvk/rhi/pipeline.hh"
+#include "qvk/module/device.hh"
 #include "qvk/module/swapchain.hh"
 #include "qvk/core.hh"
-#include "qvk/shader.hh"
+#include "qvk/rhi/shader.hh"
 #include "qvk/types.hh"
 #include <vulkan/vulkan_raii.hpp>
 
@@ -80,7 +81,7 @@ namespace qvk
         d.kind(),
         1,
         d.shaderStage(),
-        nullptr
+        nil
       ));
     
   }
@@ -89,21 +90,21 @@ namespace qvk
 
 
   pipeline::pipeline(core &core, qvk::info<pipeline> *info, std::vector<shaderSlot> shaders)
-    : m_info(info), vk_layout(Nil), vk_pipeline(Nil)
+    : m_info(info), vk_layout(nil), vk_pipeline(nil)
   {
     bool is_compute = (shaders.size() == 1 && shaders[0].shaderStage() == vk::ShaderStageFlagBits::eCompute);
 
     // Descriptor & Layout
     vk::DescriptorSetLayoutCreateInfo set_info({}, info->vkDescriptorBindings());
-    vk_desc_layout = vk::raii::DescriptorSetLayout(core.sub<device>().vdevice(), set_info);
+    vk_desc_layout = vk::raii::DescriptorSetLayout(core.sub<module::device>().vdevice(), set_info);
 
     
     vk::DescriptorPoolSize pool_size(vk::DescriptorType::eUniformBuffer, 100);
     vk::DescriptorPoolCreateInfo pool_info(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 100, pool_size);
-    vk_desc_pool = vk::raii::DescriptorPool(core.sub<device>().vdevice(), pool_info);
+    vk_desc_pool = vk::raii::DescriptorPool(core.sub<module::device>().vdevice(), pool_info);
 
     vk::PipelineLayoutCreateInfo layout_info({}, *vk_desc_layout, info->vkPushConstant());
-    vk_layout = vk::raii::PipelineLayout(core.sub<device>().vdevice(), layout_info);
+    vk_layout = vk::raii::PipelineLayout(core.sub<module::device>().vdevice(), layout_info);
 
 
     // Pipeline
@@ -116,7 +117,7 @@ namespace qvk
       vk::ComputePipelineCreateInfo compute_info({}, compute_stage, *vk_layout);
       
       // Compute pipeline
-      vk_pipeline = vk::raii::Pipeline(core.sub<device>().vdevice(), nullptr, compute_info);
+      vk_pipeline = vk::raii::Pipeline(core.sub<module::device>().vdevice(), nil, compute_info);
     } 
     else 
     {
@@ -132,7 +133,7 @@ namespace qvk
       vk::PipelineDynamicStateCreateInfo dynamic_info({}, dynamic_states);
 
       vk::PipelineInputAssemblyStateCreateInfo input_assembly({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
-      vk::PipelineViewportStateCreateInfo      viewport_state({}, 1, nullptr, 1, nullptr);
+      vk::PipelineViewportStateCreateInfo      viewport_state({}, 1, nil, 1, nil);
       vk::PipelineMultisampleStateCreateInfo   multisampling({}, vk::SampleCountFlagBits::e1, VK_FALSE);
 
       vk::PipelineRasterizationStateCreateInfo rasterizer(
@@ -153,22 +154,22 @@ namespace qvk
         VK_FALSE, VK_FALSE, {}, {}, 0.0f, 1.0f
       );
 
-      vk::Format depth_format = core.sub<swapchain>().depth_format();
+      vk::Format depth_format = core.sub<module::swapchain>().depth_format();
       vk::PipelineRenderingCreateInfo rendering_info(
-        0, 1, &core.sub<swapchain>().format(),
+        0, 1, &core.sub<module::swapchain>().format(),
         depth_format, vk::Format::eUndefined
       );
 
       auto VertexInput = info->vkVertexInput();
       vk::GraphicsPipelineCreateInfo pipeline_info(
-        {}, shader_stages, &VertexInput, &input_assembly, nullptr,
+        {}, shader_stages, &VertexInput, &input_assembly, nil,
         &viewport_state, &rasterizer, &multisampling, &depth_stencil,
         &color_blending, &dynamic_info, *vk_layout
       );
       pipeline_info.pNext = &rendering_info;
 
       // Graphics Pipeline
-      vk_pipeline = vk::raii::Pipeline(core.sub<device>().vdevice(), nullptr, pipeline_info);
+      vk_pipeline = vk::raii::Pipeline(core.sub<module::device>().vdevice(), nil, pipeline_info);
     }
   }
   
@@ -178,7 +179,7 @@ namespace qvk
   {
     auto obj = new pipeline(core, info, std::move(shaders));
 
-    core.sub<memory>().push<pipeline>(obj);
+    core.sub<module::memory>().push<pipeline>(obj);
     return obj;
   }
 

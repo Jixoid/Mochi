@@ -10,7 +10,7 @@
 */
 
 
-#include "qvk/entity/node.hh"
+#include "qvk/world/node.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
 

@@ -10,7 +10,7 @@
 */
 
 
-#include "qvk/entity/buffer.hh"
+#include "qvk/rhi/buffer.hh"
 #include "qvk/module/device.hh"
 #include "qvk/module/memory.hh"
 #include "vulkan/vulkan.hpp"
@@ -20,10 +20,10 @@
 namespace qvk
 {
 
-  buffer::buffer(device &device, qvk::memory &memory, qvk::info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
+  buffer::buffer(module::device &device, module::memory &memory, qvk::info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
     : m_info(info)
-    , m_buffer(Nil)
-    , m_memory(Nil)
+    , m_buffer(nil)
+    , m_memory(nil)
     , m_size(info->stride() * count)
   {
     // Create Buffer

@@ -11,13 +11,13 @@
 
 
 #include "Basis.hh"
-#include "qvk/entity/camera.hh"
-#include "qvk/entity/light.hh"
+#include "qvk/world/camera.hh"
+#include "qvk/world/light.hh"
 #include "qvk/geometry.hh"
 #include "qvk/module/renderer.hh"
 #include "qvk/module/device.hh"
 #include "qvk/module/memory.hh"
-#include "qvk/entity/buffer.hh"
+#include "qvk/rhi/buffer.hh"
 #include "qvk/types.hh"
 #include <cstring>
 #include <vulkan/vulkan.hpp>
@@ -25,10 +25,10 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
-  memory::memory(qvk::device &device, qvk::renderer &renderer)
+  memory::memory(device &device, renderer &renderer)
     : m_device(device)
     , m_renderer(renderer)
   {
@@ -245,7 +245,7 @@ namespace qvk
       temp_cmd.end();
 
       vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
-      m_device.transfer_q().best().submit(submit_info, nullptr);
+      m_device.transfer_q().best().submit(submit_info, nil);
       m_device.transfer_q().best().waitIdle();
     }
     
@@ -312,7 +312,7 @@ namespace qvk
       temp_cmd.end();
 
       vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
-      m_device.transfer_q().best().submit(submit_info, nullptr);
+      m_device.transfer_q().best().submit(submit_info, nil);
       m_device.transfer_q().best().waitIdle();
     }
     

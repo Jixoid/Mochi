@@ -20,11 +20,17 @@
 namespace qvk
 {
 
+  /** @brief Supported file types for reading. */
   enum ftype
   {
+    /** @brief Wavefront OBJ format. */
     ft_wavefront,
   };
 
+  /** 
+   * @brief Generic read function template. 
+   * @tparam T The file type to read.
+   */
   template <ftype T>
   fun read();
 
@@ -33,26 +39,43 @@ namespace qvk
 
   /// Wavefront
 
+  /** @brief Wavefront OBJ indices for a single vertex. */
   struct wf_index {
-    i32 v_idx{-1};  // Pozisyon (Vertex) indeksi
-    i32 vt_idx{-1}; // Kaplama (UV / Texture) indeksi
-    i32 vn_idx{-1}; // Normal (Yüzey yönü) indeksi
+    /** @brief Position (Vertex) index. */
+    i32 v_idx{-1};
+    /** @brief Texture (UV) index. */
+    i32 vt_idx{-1};
+    /** @brief Normal index. */
+    i32 vn_idx{-1};
   };
 
+  /** @brief Wavefront OBJ face, consisting of multiple vertices. */
   struct wf_face {
+    /** @brief List of indices forming the face. */
     std::vector<wf_index> vertices; 
   };
 
+  /** @brief Complete Wavefront OBJ model data. */
   struct wf_obj {
-    std::vector<qvk::vec3<f32>> v;  // Pozisyonlar
-    std::vector<qvk::vec2<f32>> vt; // UV'ler
-    std::vector<qvk::vec3<f32>> vn; // Normaller
-    std::vector<wf_face> f;  // Yüzeyler (İndeks bağlantıları)
+    /** @brief Vertex positions. */
+    std::vector<qvk::vec3<f32>> v;
+    /** @brief Texture coordinates (UVs). */
+    std::vector<qvk::vec2<f32>> vt;
+    /** @brief Vertex normals. */
+    std::vector<qvk::vec3<f32>> vn;
+    /** @brief Faces (index connections). */
+    std::vector<wf_face> f;
   };
 
 
+  /** 
+   * @brief read function for Wavefront OBJ.
+   * @tparam T Must be ft_wavefront.
+   * @param input Raw data of the OBJ file.
+   * @return A parsed Wavefront OBJ model.
+   */
   template <ftype T>
     requires (T == ftype::ft_wavefront)
-  fun read(data) -> wf_obj;
+  fun read(data input) -> wf_obj;
 
 }

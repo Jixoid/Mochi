@@ -11,6 +11,7 @@
 
 
 #include "qvk/module/renderer.hh"
+#include "Basis.hh"
 #include "qvk/module/device.hh"
 #include <iostream>
 #include <vulkan/vulkan_raii.hpp>
@@ -19,11 +20,11 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
   renderer::renderer(device &device, swapchain &swapchain)
-    : m_device(device), m_swapchain(swapchain), m_cmd_pool(Nil)
+    : m_device(device), m_swapchain(swapchain), m_cmd_pool(nil)
   {
     // Command Pool
     vk::CommandPoolCreateInfo pool_info(
@@ -89,7 +90,7 @@ namespace qvk
     vk::RenderingAttachmentInfo color_attachment(
       *m_swapchain.image_views()[m_image_index], 
       vk::ImageLayout::eColorAttachmentOptimal,
-      vk::ResolveModeFlagBits::eNone, nullptr, vk::ImageLayout::eUndefined,
+      vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_color_val
     );
 
@@ -97,14 +98,14 @@ namespace qvk
     vk::RenderingAttachmentInfo depth_attachment(
       *m_swapchain.depth_view(),
       vk::ImageLayout::eDepthAttachmentOptimal,
-      vk::ResolveModeFlagBits::eNone, nullptr, vk::ImageLayout::eUndefined,
+      vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_depth_val
     );
     
     // 5. Dynamic Rendering Başlat
     vk::RenderingInfo render_info(
       {}, {{0, 0}, m_swapchain.extent()}, 
-      1, 0, 1, &color_attachment, &depth_attachment, nullptr
+      1, 0, 1, &color_attachment, &depth_attachment, nil
     );
     cmd.beginRendering(render_info);
   }
@@ -143,7 +144,7 @@ namespace qvk
     auto [result, img_idx] = m_swapchain.get().acquireNextImage(
       UINT64_MAX, 
       *m_image_available_sems[m_current_frame], 
-      nullptr
+      nil
     );
     m_image_index = img_idx;
 

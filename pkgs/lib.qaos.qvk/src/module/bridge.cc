@@ -16,11 +16,11 @@
 
 
 
-namespace qvk
+namespace qvk::module
 {
 
   bridge::bridge(std::string_view appName, std::array<u32, 4> appVer)
-    : vk_ctx(), vk_inst(Nil)
+    : vk_ctx(), vk_inst(nil)
   {
     // AppInfo
     vk::ApplicationInfo appInfo {
@@ -33,7 +33,7 @@ namespace qvk
 
     // Layers & Extensions
     auto layers = std::vector<const char*>{ "VK_LAYER_KHRONOS_validation" };
-    auto extensions = qvk::window::extensions();
+    auto extensions = window::extensions();
 
     // Create Instance
     vk::InstanceCreateInfo createInfo({}, &appInfo, layers, extensions);

@@ -13,7 +13,7 @@
 #include "qvk/module/device.hh"
 #include "qvk/core.hh"
 #include "qvk/types.hh"
-#include "qvk/shader.hh"
+#include "qvk/rhi/shader.hh"
 #include <string>
 #include <string_view>
 #include <vulkan/vulkan_raii.hpp>
@@ -24,7 +24,7 @@ namespace qvk
 {
 
   shader::shader(core &core, std::string_view fpath, std::string_view entry)
-    : vk_module(Nil)
+    : vk_module(nil)
     , m_entry(entry)
   {
     mappedFile mfile((std::string)fpath);
@@ -33,7 +33,7 @@ namespace qvk
     // Load Shader
     vk::ShaderModuleCreateInfo info({}, mfile.view().size(), (u32*)mfile.view().data());
       
-    vk_module = vk::raii::ShaderModule(core.sub<device>().vdevice(), info);
+    vk_module = vk::raii::ShaderModule(core.sub<module::device>().vdevice(), info);
   }
 
 }

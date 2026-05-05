@@ -14,13 +14,14 @@
 #include <stdexcept>
 #include <iostream>
 #include "qvk/core.hh"
-#include "qvk/entity/camera.hh"
-#include "qvk/entity/light.hh"
-#include "qvk/entity/mesh.hh"
-#include "qvk/entity/node.hh"
-#include "qvk/entity/pipeline.hh"
-#include "qvk/entity/visual.hh"
-#include "qvk/shader.hh"
+#include "qvk/module/window.hh"
+#include "qvk/world/node.hh"
+#include "qvk/world/camera.hh"
+#include "qvk/world/light.hh"
+#include "qvk/world/visual.hh"
+#include "qvk/asset/mesh.hh"
+#include "qvk/rhi/pipeline.hh"
+#include "qvk/rhi/shader.hh"
 #include "vulkan/vulkan.hpp"
 
 
@@ -56,7 +57,7 @@ int Main()
     {
       if (!cam) return;
 
-      auto win = eng.sub<qvk::window>().glfw();
+      auto win = eng.sub<module::window>().glfw();
 
 
       auto is_key_pressed = [win](int key) { return glfwGetKey(win, key) == GLFW_PRESS; };
@@ -140,7 +141,7 @@ int Main()
 
 
 
-  node scene(Nil, {});
+  node scene(nil, {});
   
   cam = new camera(eng, &scene,
     qvk::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up).inverse(),
@@ -177,7 +178,7 @@ int Main()
 
   qvk::info<qvk::pipeline> pbr_i(
     {
-      {qvk::gt::make<qvk::mat4<f32>>(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      {qvk::vt::make<qvk::mat4<f32>>(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
     },
     {
       {&qvk::vertex_i, vk::VertexInputRate::eVertex},

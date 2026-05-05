@@ -11,8 +11,8 @@
 
 
 #include "Basis.hh"
-#include "qvk/entity/camera.hh"
-#include "qvk/entity/node.hh"
+#include "qvk/world/camera.hh"
+#include "qvk/world/node.hh"
 #include "qvk/module/memory.hh"
 #include "qvk/module/window.hh"
 #include "qvk/geometry.hh"
@@ -28,7 +28,7 @@ namespace qvk
 
   info<buffer> camera_i = info<buffer>(
     sizeof(camera_t),
-    gt::make_list<
+    vt::make_list<
       mat4<f32>, // view
       mat4<f32>  // proj
     >()
@@ -38,8 +38,8 @@ namespace qvk
 
   camera::camera(core &core, node *parent, mat4<f32> model, f32 fov, f32 near, f32 far)
     : node(parent, model)
-    , m_memory(core.sub<memory>())
-    , m_window(core.sub<window>())
+    , m_memory(core.sub<module::memory>())
+    , m_window(core.sub<module::window>())
     , m_fov(fov), m_near(near), m_far(far)
   {
     m_memory.push(this);

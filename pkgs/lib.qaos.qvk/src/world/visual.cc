@@ -11,13 +11,13 @@
 
 
 #include "Basis.hh"
-#include "qvk/entity/visual.hh"
-#include "qvk/entity/camera.hh"
-#include "qvk/entity/mesh.hh"
-#include "qvk/entity/node.hh"
-#include "qvk/entity/node.hh"
-#include "qvk/entity/pipeline.hh"
+#include "qvk/world/node.hh"
+#include "qvk/world/visual.hh"
+#include "qvk/world/camera.hh"
+#include "qvk/asset/mesh.hh"
+#include "qvk/rhi/pipeline.hh"
 #include "qvk/core.hh"
+#include "qvk/module/device.hh"
 #include "qvk/types.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
@@ -29,7 +29,7 @@ namespace qvk
   
   info<pipeline> pbr_i(
     {
-      {gt::make<mat4<f32>>(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      {vt::make<mat4<f32>>(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
     },
     {
       {&vertex_i, vk::VertexInputRate::eVertex},
@@ -48,11 +48,11 @@ namespace qvk
     , m_pipeline(pipeline)
   {
     vk::DescriptorSetAllocateInfo alloc_info(*m_pipeline->desc_pool(), *m_pipeline->desc_layout());
-    m_desc_sets = vk::raii::DescriptorSets(core.sub<device>().vdevice(), alloc_info);
+    m_desc_sets = vk::raii::DescriptorSets(core.sub<module::device>().vdevice(), alloc_info);
 
     // 2. Memory modülünden güncel Kamera UBO'sunu çek
-    buffer* cam_ubo = core.sub<memory>().camera_ubo();
-    buffer* lig_ubo = core.sub<memory>().light_ubo();
+    buffer* cam_ubo = core.sub<module::memory>().camera_ubo();
+    buffer* lig_ubo = core.sub<module::memory>().light_ubo();
 
     // 3. GPU'ya "Benim descriptor set'imin 0. slotuna bu buffer'ı bağla" komutunu hazırla
     vk::DescriptorBufferInfo cam_buffer_info(*cam_ubo->get(), 0, camera_i.stride());
@@ -65,9 +65,9 @@ namespace qvk
       0, // Binding Index (pbr_i'deki sıraya göre 0. binding kamera UBO'su)
       0, 1, 
       vk::DescriptorType::eUniformBuffer, 
-      nullptr, 
+      nil, 
       &cam_buffer_info, 
-      nullptr
+      nil
     ));
 
     writes.push_back(vk::WriteDescriptorSet(
@@ -75,13 +75,13 @@ namespace qvk
       1, // Binding Index (pbr_i'deki sıraya göre 0. binding kamera UBO'su)
       0, 1, 
       vk::DescriptorType::eUniformBuffer, 
-      nullptr, 
+      nil, 
       &lig_buffer_info, 
-      nullptr
+      nil
     ));
 
     // 4. Bağlantıyı GPU'ya yaz
-    core.sub<device>().vdevice().updateDescriptorSets(writes, nullptr);
+    core.sub<module::device>().vdevice().updateDescriptorSets(writes, nil);
   }
 
 
@@ -89,7 +89,7 @@ namespace qvk
   {
     auto obj = new visual(core, parent, model, mesh, pipeline);
 
-    core.sub<memory>().push<visual>(obj);
+    core.sub<module::memory>().push<visual>(obj);
     return obj;
   }
 
