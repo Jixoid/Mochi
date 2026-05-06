@@ -1,22 +1,19 @@
-A minimalist Vulkan-based graphics engine and framework written in C++. QAOS focuses on a clean, layered architecture to simplify low-level graphics programming.
+## Mochi
 
-## Features
+A minimalist Vulkan-based graphics engine and framework written in C++.
+QAOS focuses on a clean, layered architecture to simplify low-level graphics programming.
 
-- **Vulkan RHI:** Wrapper for Vulkan objects (Buffers, Pipelines, Shaders) utilizing `vulkan_raii`.
-- **Dynamic Rendering:** Built-in support for Vulkan dynamic rendering (no RenderPass/Framebuffer boilerplate).
-- **PBR Pipeline:** Physically Based Rendering support with GGX and Schlick-Beckmann models.
-- **Scene Graph:** A hierarchical node system for managing world objects.
-- **Asset Management:** Wavefront (.obj) mesh loading support.
-- **UBO Synchronization:** Automated management and synchronization of Uniform Buffer Objects for cameras and lights.
-- **Cross-Platform Design:** Architecture separated into interfaces (.hh) and platform-specific implementations (.cc) via CMake.
+Other languages: [tr](Readme.tr.md)
+
 
 ## Architecture
 
 The project is divided into three core layers:
 
-1. **RHI (Render Hardware Interface):** Low-level GPU resource management (Buffers, Pipelines).
+1. **RHI (Render Hardware Interface):** Low-level GPU resource management.
 2. **World:** Scene objects including Nodes, Cameras, Lights, and Visuals.
 3. **Asset:** High-level data structures like Meshes.
+
 
 ## Visuals
 
@@ -27,12 +24,13 @@ The project is divided into three core layers:
 ## Building
 
 The project uses CMake for build configuration.
+You can also compile it simply as follows:
 
 ```bash
-mkdir build && cd build
-cmake ..
-make
+scripts/configure.sh
+scripts/build.sh
 ```
+
 
 ## License
 
@@ -41,6 +39,6 @@ This project is licensed under the GNU General Public License version 3 (GPL3). 
 Copyright (c) 2025-2026 Kadir Aydın.
 
 
-### QAOS
+## QAOS
 
 Built with ❤️ by the open source community.

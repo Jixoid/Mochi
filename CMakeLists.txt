@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(QVK C CXX)
+project(Mochi C CXX)
 
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -19,7 +19,7 @@ add_compile_options(-gdwarf-4)
 
 # Debug
 add_compile_definitions($<$<CONFIG:Debug>:_DBG> $<$<CONFIG:RelWithDebInfo>:_DBG>)
-add_compile_definitions(_QVK_debug_ownership)
+add_compile_definitions(_mochi_debug_ownership)
 
 
 # Sanitizer
