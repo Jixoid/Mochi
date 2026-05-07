@@ -89,13 +89,13 @@ namespace mochi
   /** @brief Complete glTF model data. */
   struct gltf_obj {
     std::vector<asset::vertex_t> vertices; 
-    std::vector<u32> indices; // glTF genellikle indeksli çizim (Indexed Draw) kullanır
+    std::vector<u32> indices; // glTF typically uses Indexed Draw
   };
 
 
   /** 
    * @brief read function for glTF.
-   * @tparam T Must be ft_wavefront.
+   * @tparam T Must be ft_gltf.
    * @param input Raw data of the glTF file.
    * @return A parsed glTF model.
    */

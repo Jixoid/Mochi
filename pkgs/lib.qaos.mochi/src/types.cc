@@ -11,8 +11,9 @@
 
 
 #include "mochi/types.hh"
+#include "mochi/world/components.hh"
 #include <filesystem>
-#include <stdexcept>
+#include "mochi/except.hh"
 #include <string>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -32,17 +33,33 @@
 namespace mochi
 {
 
-  /// Mapped Memory
+  rhi::info<rhi::buffer> camera_i = rhi::info<rhi::buffer>(
+    sizeof(camera_t),
+    vt::make_list<
+      mat4<f32>, // View
+      mat4<f32>  // Projection
+    >()
+  );
+
+  rhi::info<rhi::buffer> light_i = rhi::info<rhi::buffer>(
+    sizeof(light_t),
+    vt::make_list<
+      vec4<f32>, // Position
+      vec4<f32>  // Color
+    >()
+  );
+
+
 	#if defined(__unix__) || defined(__APPLE__)
 
 	mappedFile::mappedFile(std::string fpath) {
 		
 		if (!std::filesystem::is_regular_file(fpath))
-			throw std::runtime_error("file not found: "+fpath+".");
+			throw mochi::io_error("file not found: "+fpath+".");
 
 		fd = open(fpath.c_str(), O_RDONLY);
 		if (fd == -1)
-			throw std::system_error(errno, std::generic_category());
+			throw mochi::io_error("System error: " + std::to_string(errno));
 
 		struct stat st;
 		fstat(fd, &st);
@@ -50,7 +67,7 @@ namespace mochi
 
 		data = mmap(nil, size, PROT_READ, MAP_PRIVATE, fd, 0);
 		if (data == MAP_FAILED)
-			throw std::system_error(errno, std::generic_category());
+			throw mochi::io_error("System error: " + std::to_string(errno));
 	}
 
 	mappedFile::~mappedFile() {
@@ -63,7 +80,7 @@ namespace mochi
 	mappedFile::mappedFile(std::string fpath) {
 
 		if (!std::filesystem::is_regular_file(fpath))
-			throw std::runtime_error("file not found: "+fpath+".");
+			throw mochi::io_error("file not found: "+fpath+".");
 		
 		hFile = CreateFileA(
 			std::string(fpath).c_str(), 
@@ -76,26 +93,26 @@ namespace mochi
 		);
 
 		if (hFile == INVALID_HANDLE_VALUE)
-			throw std::runtime_error("Shader dosyası açılamadı.");
+			throw mochi::io_error("Could not open shader file.");
 
 		LARGE_INTEGER fileSize;
 		if (!GetFileSizeEx(hFile, &fileSize)) {
 			CloseHandle(hFile);
-			throw std::runtime_error("Dosya boyutu alınamadı.");
+			throw mochi::io_error("Could not get file size.");
 		}
 		size = static_cast<size_t>(fileSize.QuadPart);
 
 		hMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
 		if (hMapping == NULL) {
 			CloseHandle(hFile);
-			throw std::runtime_error("Shader dosya eşleme nesnesi oluşturulamadı.");
+			throw mochi::io_error("Could not create shader file mapping object.");
 		}
 
 		data = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
 		if (data == NULL) {
 			CloseHandle(hMapping);
 			CloseHandle(hFile);
-			throw std::runtime_error("Shader dosyası belleğe eşlenemedi.");
+			throw mochi::io_error("Could not map shader file to memory.");
 		}
 	}
 

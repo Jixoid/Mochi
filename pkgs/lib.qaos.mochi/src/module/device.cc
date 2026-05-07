@@ -21,7 +21,7 @@ namespace mochi::module
   device::device(vk::raii::PhysicalDevice phys_dev)
     : vk_phys_dev(phys_dev), vk_device(nil)
   {
-    // Find families
+    // Allocate one queue per available queue family with default priority
     auto props = phys_dev.getQueueFamilyProperties();
     
     std::vector<std::vector<f32>> all_priorities(props.size());
@@ -39,26 +39,20 @@ namespace mochi::module
     }
 
 
-
-    // Extensions & Features & pNext
     std::vector<const char*> extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
     vk::PhysicalDeviceFeatures features;
     features.samplerAnisotropy = VK_TRUE;
-    //features.sampleRateShading = VK_TRUE;
+
     
     vk::PhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeature;
     dynamicRenderingFeature.dynamicRendering = VK_TRUE;
 
-    
 
-    // Create Device
     vk::DeviceCreateInfo dev_info({}, queue_infos, {}, extensions, &features, &dynamicRenderingFeature);
     vk_device = vk::raii::Device(phys_dev, dev_info);
 
 
-
-    // Open Queue
     for (u32 i{}; i < props.size(); i++)
     {
       auto flags = props[i].queueFlags;
@@ -66,11 +60,10 @@ namespace mochi::module
 
       for (u32 q_idx{}; q_idx < count; q_idx++)
       {
-        // GRAPHICS
         if (flags & vk::QueueFlagBits::eGraphics)
           graphics_q().m_primary.push_back(vk::raii::Queue(vk_device, i, q_idx));
         
-        // COMPUTE
+
         if (flags & vk::QueueFlagBits::eCompute) {
           if (!(flags & vk::QueueFlagBits::eGraphics))
             compute_q().m_primary.push_back(vk::raii::Queue(vk_device, i, q_idx));
@@ -78,7 +71,7 @@ namespace mochi::module
             compute_q().m_secondary.push_back(vk::raii::Queue(vk_device, i, q_idx));
         }
 
-        // TRANSFER
+
         if (flags & vk::QueueFlagBits::eTransfer) {
           if (!(flags & vk::QueueFlagBits::eGraphics) && !(flags & vk::QueueFlagBits::eCompute))
             transfer_q().m_primary.push_back(vk::raii::Queue(vk_device, i, q_idx));

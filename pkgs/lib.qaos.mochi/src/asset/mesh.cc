@@ -30,10 +30,10 @@ namespace mochi::asset
   rhi::info<rhi::buffer> vertex_i = rhi::info<rhi::buffer>(
     sizeof(vertex_t),
     vt::make_list<
-      vec3<f32>, // position
-      vec3<f32>, // normal
-      vec3<f32>, // color
-      vec2<f32>  // uv
+      vec3<f32>, // Position
+      vec3<f32>, // Normal
+      vec3<f32>, // Color
+      vec2<f32>  // Uv
     >()
   );
 
@@ -69,17 +69,17 @@ namespace mochi::asset
           vertex_t v{};
           v.color = {1,1,1};
 
-          // 1. Pozisyon
+
           if (tri_indices[j].v_idx >= 0 && tri_indices[j].v_idx < raw_data.v.size())
             v.position = raw_data.v[tri_indices[j].v_idx];
 
-          // 2. UV
+
           if (tri_indices[j].vt_idx >= 0 && tri_indices[j].vt_idx < raw_data.vt.size())
             v.uv = raw_data.vt[tri_indices[j].vt_idx];
           else
             v.uv = {0.0f, 0.0f};
 
-          // 3. Normal
+
           if (tri_indices[j].vn_idx >= 0 && tri_indices[j].vn_idx < raw_data.vn.size())
             v.normal = raw_data.vn[tri_indices[j].vn_idx];
           else
@@ -95,7 +95,7 @@ namespace mochi::asset
 
 
 
-  mesh::mesh(rhi::buffer *data)
+  mesh::mesh(sptr<rhi::buffer> data)
     : m_data(data)
   {}
 
@@ -116,26 +116,20 @@ namespace mochi::asset
 
     m_data = core.sub<module::memory>().load_VertexBuffer(&vertex_i, final_vertices.size(),
       [&final_vertices](void* _data) {
-        memcpy(_data, final_vertices.data(), vertex_i.stride() * final_vertices.size()); //[cite: 2]
+        memcpy(_data, final_vertices.data(), vertex_i.stride() * final_vertices.size());
       }
     );
   }
 
 
-  fun mesh::make(core &core, rhi::buffer *data) -> mesh*
+  fun mesh::make(core &core, sptr<rhi::buffer> data) -> sptr<mesh>
   {
-    auto obj = new mesh(data);
-
-    core.sub<module::memory>().push(obj);
-    return obj;
+    return make_sptr<mesh>(data);
   }
 
-  fun mesh::make(core &core, std::string_view fpath) -> mesh*
+  fun mesh::make(core &core, std::string_view fpath) -> sptr<mesh>
   {
-    auto obj = new mesh(core, fpath);
-
-    core.sub<module::memory>().push(obj);
-    return obj;
+    return make_sptr<mesh>(core, fpath);
   }
 
 }

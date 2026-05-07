@@ -3,7 +3,7 @@
 C++ ile yazılmış Vulkan tabanlı, minimalistik bir grafik motoru ve framework'ü.
 QAOS, düşük seviyeli grafik programlamayı basitleştirmek için temiz, katmanlı bir mimariye odaklanmaktadır.
 
-Diğer diller: [en](Readme.md)
+Diğer diller: [en](README.md)
 
 
 ## Mimari

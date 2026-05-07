@@ -17,6 +17,7 @@
 #include "mochi/types.hh"
 #include "mochi/geometry.hh"
 #include <string_view>
+#include <memory>
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
 
@@ -51,7 +52,7 @@ namespace mochi::asset
        * @brief Construct a mesh directly from an existing buffer.
        * @param data The buffer containing vertex data.
        */
-      explicit mesh(rhi::buffer *data);
+      explicit mesh(sptr<rhi::buffer> data);
       
       /**
        * @brief Construct a mesh by loading a 3D model file from disk.
@@ -67,7 +68,7 @@ namespace mochi::asset
        * @param data The buffer containing vertex data.
        * @return Pointer to the newly created mesh.
        */
-      static fun make(core &core, rhi::buffer *data) -> mesh*;
+      static fun make(core &core, sptr<rhi::buffer> data) -> sptr<mesh>;
       
       /**
        * @brief Factory method to load and create a mesh from a file.
@@ -75,11 +76,11 @@ namespace mochi::asset
        * @param fpath The file path to the 3D model.
        * @return Pointer to the newly created mesh.
        */
-      static fun make(core &core, std::string_view fpath) -> mesh*;
+      static fun make(core &core, std::string_view fpath) -> sptr<mesh>;
       
 
     private:
-      rhi::buffer *m_data{nil};
+      sptr<rhi::buffer> m_data{nil};
 
     public:
       /** @brief Access the underlying buffer holding the mesh vertex data. */

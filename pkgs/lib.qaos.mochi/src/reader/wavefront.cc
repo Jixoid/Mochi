@@ -79,11 +79,11 @@ namespace mochi
       }
       else if (prefix == "o") {
         std::string cac;
-        iss >> cac; // data.object_name;
+        iss >> cac;
       }
       else if (prefix == "usemtl") {
         std::string cac;
-        iss >> cac; //data.material_name;
+        iss >> cac;
       }
     }
 

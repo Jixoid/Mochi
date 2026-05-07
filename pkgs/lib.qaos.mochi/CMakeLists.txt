@@ -60,6 +60,9 @@ target_link_libraries(${TARGET_NAME}_shared PUBLIC
   glfw_
   Vulkan::Vulkan
   ext_cgltf
+  ext_stb
+  ext_vma
+  ext_entt
 )
 
 set_target_properties(${TARGET_NAME}_shared PROPERTIES 
@@ -76,6 +79,9 @@ target_link_libraries(${TARGET_NAME}_static PUBLIC
   glfw_
   Vulkan::Vulkan
   ext_cgltf
+  ext_stb
+  ext_vma
+  ext_entt
 )
 
 set_target_properties(${TARGET_NAME}_static PROPERTIES 

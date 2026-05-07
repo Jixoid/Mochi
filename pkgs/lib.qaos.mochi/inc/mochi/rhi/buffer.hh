@@ -16,6 +16,7 @@
 #include "mochi/types.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
+#include "vk_mem_alloc.h"
 
 
 
@@ -55,9 +56,7 @@ namespace mochi::rhi
   /** @brief Represents a Vulkan buffer with associated memory. */
   struct buffer
   {
-    friend struct module::memory;
-
-    private:
+    public:
       /**
        * @brief Construct a new buffer. Typically called by the memory allocator.
        * @param device The logical device.
@@ -67,7 +66,7 @@ namespace mochi::rhi
        * @param usage Buffer usage flags.
        * @param properties Memory property flags.
        */
-      explicit buffer(module::device &device, module::memory &memory, info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
+      explicit buffer(module::device &device, module::memory &memory, info<buffer> *info, u64 count, vk::BufferUsageFlags usage, const VmaAllocationCreateInfo &alloc_info);
 
     public:
       /** @brief Destructor. Automatically cleans up resources. */
@@ -76,22 +75,22 @@ namespace mochi::rhi
 
     private:
       info<buffer> *m_info{};
-      vk::raii::Buffer m_buffer;
-      vk::raii::DeviceMemory m_memory;
-      vk::DeviceSize m_size;
+      VmaAllocator m_allocator{nil};
+      VkBuffer m_buffer{nil};
+      VmaAllocation m_allocation{nil};
+      VmaAllocationInfo m_alloc_info{};
+      vk::DeviceSize m_size{};
       void* m_mapped{};
 
     public:
       /** @brief Get the buffer info structure. */
-      inline fun  info() { return m_info; }
+      inline fun info() { return m_info; }
       /** @brief Access the underlying Vulkan RAII buffer. */
-      inline fun& get() { return m_buffer; }
-      /** @brief Access the underlying Vulkan RAII device memory. */
-      inline fun& memory() const { return m_memory; }
+      inline fun get() const { return m_buffer; }
       /** @brief Get the total size of the buffer in bytes. */
-      inline fun  size() const { return m_size; }
+      inline fun size() const { return m_size; }
       /** @brief Get the mapped host memory pointer, if any. */
-      inline fun  mapped() const { return m_mapped; }
+      inline fun mapped() const { return m_mapped; }
   };
 
 }

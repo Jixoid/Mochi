@@ -27,10 +27,12 @@ layout(set = 0, binding = 1) uniform LightBuffer
 	
 } light;
 
+layout(binding = 2) uniform sampler2D texSampler;
+
 
 
 const float METALLIC  = 0.0;
-const float ROUGHNESS = 0.9;
+const float ROUGHNESS = 0.5;
 const float AMBIENT   = 0.03;
 
 const float PI = 3.14159265359;
@@ -67,11 +69,14 @@ vec3 FresnelSchlick(float cosTheta, vec3 F0)
 
 void main()
 {
-	vec3 albedo = fragColor;
+	vec4 albedo = texture(texSampler, fragUV);
+
+
+
 	vec3 N      = normalize(fragNormalWorld);
 	vec3 camPos = -transpose(mat3(camera.view)) * camera.view[3].xyz;
 	vec3 V      = normalize(camPos - fragPosWorld);
-	vec3 F0     = mix(vec3(0.04), albedo, METALLIC);
+	vec3 F0     = mix(vec3(0.04), albedo.xyz, METALLIC);
 
 	vec3 Lo = vec3(0.0);
 
@@ -93,10 +98,10 @@ void main()
 		vec3  specular = (NDF * G * F) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001);
 		vec3 kD = (1.0 - F) * (1.0 - METALLIC);
 
-		Lo += (kD * albedo / PI + specular) * radiance * max(dot(N, L), 0.0);
+		Lo += (kD * albedo.xyz / PI + specular) * radiance * max(dot(N, L), 0.0);
 	}
 
-	vec3 color = AMBIENT * albedo + Lo;
+	vec3 color = AMBIENT * albedo.xyz + Lo;
 	color = color / (color + vec3(1.0));
 	color = pow(color, vec3(1.0 / 2.2));
 

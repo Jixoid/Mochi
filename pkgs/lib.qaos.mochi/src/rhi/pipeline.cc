@@ -30,7 +30,6 @@ namespace mochi::rhi
     , m_vertex(vertex)
     , m_descriptor(descriptor)
   {
-    /// Push Constants
     u64 off{};
     for (auto typ: push) {
       off = align_size(off, typ.type().align());
@@ -41,12 +40,11 @@ namespace mochi::rhi
         typ.type().size() * typ.type().count()
       ));
 
-      // DÜZELTME: Sadece size değil, count kadar atlamalıyız!
       off += typ.type().size() * typ.type().count();
     }
 
 
-    /// Vertex Buffers
+
     u32 binding_idx{}, location_idx{};
     for (auto ibuf: vertex) {
       u32 v_offset{};
@@ -73,7 +71,7 @@ namespace mochi::rhi
     }
   
     
-    // Descriptors
+
     u32 desc_binding_idx{};
     for (auto d: descriptor)
       vk_DescriptorBindings.push_back(vk::DescriptorSetLayoutBinding(
@@ -94,20 +92,29 @@ namespace mochi::rhi
   {
     bool is_compute = (shaders.size() == 1 && shaders[0].shaderStage() == vk::ShaderStageFlagBits::eCompute);
 
-    // Descriptor & Layout
+
     vk::DescriptorSetLayoutCreateInfo set_info({}, info->vkDescriptorBindings());
     vk_desc_layout = vk::raii::DescriptorSetLayout(core.sub<module::device>().vdevice(), set_info);
 
     
-    vk::DescriptorPoolSize pool_size(vk::DescriptorType::eUniformBuffer, 100);
-    vk::DescriptorPoolCreateInfo pool_info(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 100, pool_size);
+    std::array<vk::DescriptorPoolSize, 2> pool_sizes = {
+      vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 100),
+      vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 100)
+    };
+
+    vk::DescriptorPoolCreateInfo pool_info(
+      vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 
+      100, 
+      pool_sizes
+    );
     vk_desc_pool = vk::raii::DescriptorPool(core.sub<module::device>().vdevice(), pool_info);
+
 
     vk::PipelineLayoutCreateInfo layout_info({}, *vk_desc_layout, info->vkPushConstant());
     vk_layout = vk::raii::PipelineLayout(core.sub<module::device>().vdevice(), layout_info);
 
 
-    // Pipeline
+
     if (is_compute) 
     {
       vk::PipelineShaderStageCreateInfo compute_stage(
@@ -116,7 +123,7 @@ namespace mochi::rhi
 
       vk::ComputePipelineCreateInfo compute_info({}, compute_stage, *vk_layout);
       
-      // Compute pipeline
+
       vk_pipeline = vk::raii::Pipeline(core.sub<module::device>().vdevice(), nil, compute_info);
     } 
     else 
@@ -138,7 +145,7 @@ namespace mochi::rhi
 
       vk::PipelineRasterizationStateCreateInfo rasterizer(
         {}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, 
-        vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, // Düzeltilmiş hali
+        vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise,
         VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f
       );
 
@@ -168,19 +175,16 @@ namespace mochi::rhi
       );
       pipeline_info.pNext = &rendering_info;
 
-      // Graphics Pipeline
+
       vk_pipeline = vk::raii::Pipeline(core.sub<module::device>().vdevice(), nil, pipeline_info);
     }
   }
   
 
 
-  fun pipeline::make(core &core, rhi::info<pipeline> *info, std::vector<shaderSlot> shaders) -> pipeline*
+  fun pipeline::make(core &core, rhi::info<pipeline> *info, std::vector<shaderSlot> shaders) -> sptr<pipeline>
   {
-    auto obj = new pipeline(core, info, std::move(shaders));
-
-    core.sub<module::memory>().push<pipeline>(obj);
-    return obj;
+    return make_sptr<pipeline>(core, info, std::move(shaders));
   }
 
 }

@@ -15,6 +15,7 @@
 #include "Basis.hh"
 #include "mochi/types.hh"
 #include "mochi/rhi/shader.hh"
+#include <memory>
 #include "vulkan/vulkan.hpp"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.hpp>
@@ -190,7 +191,7 @@ namespace mochi::rhi
   /** @brief Represents a Vulkan graphics pipeline. */
   struct pipeline
   {
-    private:
+    public:
       /**
        * @brief Construct a new pipeline.
        * @param core The mochi core instance.
@@ -207,7 +208,7 @@ namespace mochi::rhi
        * @param shaders List of shader slots for this pipeline.
        * @return Pointer to the newly created pipeline.
        */
-      static fun make(core &core, info<pipeline> *info, std::vector<shaderSlot> shaders) -> pipeline*;
+      static fun make(core &core, info<pipeline> *info, std::vector<shaderSlot> shaders) -> sptr<pipeline>;
     
 
     private:

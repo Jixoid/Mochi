@@ -10,11 +10,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_COMPILER clang++)
-set(CMAKE_C_COMPILER clang)
-
 add_compile_options(-gdwarf-4)
 
+set(FETCHCONTENT_QUIET OFF)
 
 
 # Debug
@@ -47,8 +45,13 @@ foreach(child ${childs})
     IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}" AND
     EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}/CMakeLists.txt"
   )
+
+    if(child MATCHES "^ext\\.")
+      message(STATUS "Ext Project Added: ${child}")
+    else()
+      message(STATUS "Sub Project Added: ${child}")
+    endif()
     
-    message(STATUS "Sub Project Added: ${child}")
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}")
       
   endif()

@@ -13,50 +13,50 @@
 #include "mochi/rhi/buffer.hh"
 #include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
+#include "mochi/except.hh"
 #include "vulkan/vulkan.hpp"
+#include "vk_mem_alloc.h"
+#include "vk_mem_alloc.h"
 
 
 
 namespace mochi::rhi
 {
 
-  buffer::buffer(module::device &device, module::memory &memory, rhi::info<buffer> *info, u64 count, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
+  buffer::buffer(module::device &device, module::memory &memory, rhi::info<buffer> *info, u64 count, vk::BufferUsageFlags usage, const VmaAllocationCreateInfo &alloc_info)
     : m_info(info)
     , m_buffer(nil)
-    , m_memory(nil)
     , m_size(info->stride() * count)
+    , m_allocator(memory.allocator())
   {
-    // Create Buffer
-    vk::BufferCreateInfo buffer_info(
-      {},
-      m_size,
-      usage,
-      vk::SharingMode::eExclusive
+    VkBufferCreateInfo buffer_create_info = {};
+    buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_create_info.size = m_size;
+    buffer_create_info.usage = static_cast<VkBufferUsageFlags>(usage);
+    buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    auto res = vmaCreateBuffer(
+      m_allocator, 
+      &buffer_create_info, 
+      &alloc_info, 
+      &m_buffer, 
+      &m_allocation, 
+      &m_alloc_info
     );
-    m_buffer = vk::raii::Buffer(device.vdevice(), buffer_info);
 
-    vk::MemoryRequirements mem_reqs = m_buffer.getMemoryRequirements();
+    if (res != VK_SUCCESS)
+      throw mochi::rhi_error("Failed to create VMA Buffer! Error code: " + std::to_string(res));
 
-
-    // Find Suitable Memory
-    vk::MemoryAllocateInfo alloc_info(
-      mem_reqs.size,
-      memory.find_memory_type(mem_reqs.memoryTypeBits, properties)
-    );
-    m_memory = vk::raii::DeviceMemory(device.vdevice(), alloc_info);
-
-
-    // Bind Buffer
-    m_buffer.bindMemory(*m_memory, 0);
-
-    // Maping
-    m_mapped = m_memory.mapMemory(0, m_size, {});
+    
+    if (alloc_info.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT)
+      m_mapped = m_alloc_info.pMappedData;
   }
 
 
   buffer::~buffer()
   {
-    m_memory.unmapMemory();
+    if (m_buffer)
+      vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);
   }
 
 }

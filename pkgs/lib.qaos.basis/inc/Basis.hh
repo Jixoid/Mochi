@@ -376,7 +376,18 @@ using uptr = std::unique_ptr<T>;
 
 /** @brief Helper function to create a unique pointer. */
 template <typename T>
-fun make_uptr(T* obj) -> uptr<T> { return uptr<T>(obj); }
+inline fun make_uptr(T* obj) -> uptr<T> { return uptr<T>(obj); }
+
+/**
+ * @brief Creates a shared pointer for a new instance of type T.
+ * @tparam T The type of object to construct.
+ * @tparam args The types of the arguments passed to the constructor.
+ * @param __args The arguments forwarded to the constructor of T.
+ * @return A shared pointer (uptr) managing the newly created object.
+ */
+template<typename T, typename... args>
+inline fun make_uptr(args&&... __args) -> uptr<T> { return uptr<T>(new T(std::forward<args>(__args)...)); }
+
 
 
 /** @brief Shared pointer alias. */
@@ -389,7 +400,18 @@ using sptr = std::shared_ptr<T>;
 
 /** @brief Helper function to create a shared pointer. */
 template <typename T>
-fun make_sptr(T* obj) -> sptr<T> { return sptr<T>(obj); }
+inline fun make_sptr(T* obj) -> sptr<T> { return sptr<T>(obj); }
+
+/**
+ * @brief Creates a shared pointer for a new instance of type T.
+ * @tparam T The type of object to construct.
+ * @tparam args The types of the arguments passed to the constructor.
+ * @param __args The arguments forwarded to the constructor of T.
+ * @return A shared pointer (sptr) managing the newly created object.
+ */
+template<typename T, typename... args>
+inline fun make_sptr(args&&... __args) -> sptr<T> { return sptr<T>(new T(std::forward<args>(__args)...)); }
+
 
 
 /** @brief Weak pointer alias. */
@@ -399,3 +421,13 @@ using wptr = std::__weak_ptr<T, std::_Lock_policy::_S_single>;
 #else
 using wptr = std::weak_ptr<T>;
 #endif
+
+
+/** @brief Weak pointer extension. */
+template <typename T>
+#ifdef __GLIBCXX__
+using wptr_from = std::__enable_shared_from_this<T, std::_Lock_policy::_S_single>;
+#else
+using wptr_from = std::enable_shared_from_this<T>;
+#endif
+

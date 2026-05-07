@@ -11,15 +11,12 @@
 
 
 #include "Basis.hh"
-#include "mochi/world/camera.hh"
-#include "mochi/world/light.hh"
-#include "mochi/geometry.hh"
+#include "mochi/module/bridge.hh"
 #include "mochi/module/renderer.hh"
 #include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
-#include <cstring>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -28,8 +25,9 @@
 namespace mochi::module
 {
 
-  memory::memory(device &device, renderer &renderer)
-    : m_device(device)
+  memory::memory(bridge &bridge, device &device, renderer &renderer)
+    : m_bridge(bridge)
+    , m_device(device)
     , m_renderer(renderer)
   {
     auto props = device.phys_dev().getProperties();
@@ -63,8 +61,6 @@ namespace mochi::module
           visible_vram = heap_size;
       }
 
-
-
     if (props.deviceType == vk::PhysicalDeviceType::eIntegratedGpu)
       m_sharedMemory = true;
     else
@@ -72,176 +68,114 @@ namespace mochi::module
 
 
 
-    prepare_light(0);
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.physicalDevice = *device.phys_dev();
+    allocatorInfo.device = *device.vdevice();
+    allocatorInfo.instance = *bridge.inst();
+    allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
+
+    vmaCreateAllocator(&allocatorInfo, &m_allocator);
   }
 
-
-
-  fun memory::prepare_camera(u32 count) -> void
+  memory::~memory()
   {
-    if (!m_camera_ubo && count)
-      m_camera_ubo = load_UniformBuffer(&camera_i, count, [](void*){});
-
-    
-    if (m_camera_ubo && (m_camera_ubo->size() / camera_i.stride()) != count) {
-
-      auto bak = m_camera_ubo;
-      m_camera_ubo = load_UniformBuffer(&camera_i, count, [](void*){});
-
-      memcpy(m_camera_ubo->mapped(), bak->mapped(), std::min(bak->size(), m_camera_ubo->size()));
-    }
+    vmaDestroyAllocator(m_allocator);
   }
 
-
-  fun memory::find_camera(camera *cam) -> u64
-  {
-    auto cams = list<camera>();
-
-    auto it = std::find(cams.begin(), cams.end(), cam);
-    if (it == cams.end())
-      throw std::runtime_error("Kamera mochi::memory ye kayıtlı değil.");
-
-      
-    return (it - cams.begin());
-  }
-
-  fun memory::sync_camera(camera *cam) -> void
-  {
-    auto &mem = ((camera_t*)m_camera_ubo->mapped())[find_camera(cam)];
-
-    mem.view = cam->view();
-    mem.proj = cam->proj();
-  }
-
-
-
-  fun memory::prepare_light(u32 count) -> void
-  {
-    if (!m_light_ubo)
-      m_light_ubo = load_UniformBuffer(&light_i, 33, [&count](void*){});
-
-
-    *((u32*)m_light_ubo->mapped()) = count;
-
-    
-    //if (m_light_ubo && (m_light_ubo->size() / light_i.stride()) != count) {
-    //
-    //  auto bak = m_light_ubo;
-    //  m_light_ubo = load_UniformBuffer(&light_i, count+1, [](void*){});
-    //
-    //  memcpy(m_light_ubo->mapped(), bak->mapped(), std::min(bak->size(), m_light_ubo->size()));
-    //  //*((u32*)m_light_ubo->mapped()) = count;
-    //}
-  }
-
-
-  fun memory::find_light(light *cam) -> u64
-  {
-    auto cams = list<light>();
-
-    auto it = std::find(cams.begin(), cams.end(), cam);
-    if (it == cams.end())
-      throw std::runtime_error("Kamera mochi::memory ye kayıtlı değil.");
-
-      
-    return (it - cams.begin())+1;
-  }
-
-  fun memory::sync_light(light *cam) -> void
-  {
-    auto &mem = ((light_t*)m_light_ubo->mapped())[find_light(cam)];
-
-    mem.position = {cam->getWorldPos(), 0};
-    mem.color = {cam->getColor(), cam->getIntensity()};
-  }
-
-
-
-
-  fun memory::find_memory_type(u32 type_filter, vk::MemoryPropertyFlags properties) -> u32
-  {
-    auto mem_props = m_device.phys_dev().getMemoryProperties();
-
-    for (u32 i{}; i < mem_props.memoryTypeCount; i++)
-      if ((type_filter & (1 << i)) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties) {
-        return i;
-      }
-    
-    throw std::runtime_error("Uygun GPU bellek türü bulunamadı!");
-  }
-
-
-
-  fun memory::load_UMA_UniformBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> rhi::buffer*
-  {
-    auto ret = new rhi::buffer(
-      m_device, *this, info, count, 
-      vk::BufferUsageFlagBits::eUniformBuffer,
-      vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
-    );
-
-    if (data) data(ret->mapped());
-
-    std::get<std::vector<rhi::buffer*>>(m_owned).push_back(ret);
-    return ret;
-  }
-
-  fun memory::load_DISC_UniformBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> rhi::buffer*
-  {
-    auto ret = new rhi::buffer(
-      m_device, *this, info, count, 
-      vk::BufferUsageFlagBits::eUniformBuffer,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
-    );
-
-    if (data) data(ret->mapped());
-
-    std::get<std::vector<rhi::buffer*>>(m_owned).push_back(ret);
-    return ret;
-  }
   
 
 
-  fun memory::load_UMA_StorageBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> rhi::buffer*
+
+
+  
+
+
+  fun memory::load_UMA_UniformBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    auto ret = new rhi::buffer(
-      m_device, *this, info, count,
-      vk::BufferUsageFlagBits::eStorageBuffer,
-      vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+    auto ret = make_sptr<rhi::buffer>(
+      m_device, *this, info, count, 
+      vk::BufferUsageFlagBits::eUniformBuffer,
+      alloc_info
     );
 
-    if (data) data(ret->mapped());
+    if (data && ret->mapped()) data(ret->mapped());
 
-    std::get<std::vector<rhi::buffer*>>(m_owned).push_back(ret);
     return ret;
   }
 
-  fun memory::load_DISC_StorageBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> rhi::buffer*
+  fun memory::load_DISC_UniformBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    auto ret = new rhi::buffer(
-      m_device, *this, info, count,
-      vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, 
-      vk::MemoryPropertyFlagBits::eDeviceLocal
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+    auto ret = make_sptr<rhi::buffer>(
+      m_device, *this, info, count, 
+      vk::BufferUsageFlagBits::eUniformBuffer,
+      alloc_info
     );
 
+    if (data && ret->mapped()) data(ret->mapped());
+
+    return ret;
+  }
+
+
+  
+  fun memory::load_UMA_StorageBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  {
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+    auto ret = make_sptr<rhi::buffer>(
+      m_device, *this, info, count,
+      vk::BufferUsageFlagBits::eStorageBuffer,
+      alloc_info
+    );
+
+    if (data && ret->mapped()) data(ret->mapped());
+
+    return ret;
+  }
+
+  fun memory::load_DISC_StorageBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  {
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    auto ret = make_sptr<rhi::buffer>(
+      m_device, *this, info, count,
+      vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, 
+      alloc_info
+    );
 
     if (data) {
-      // Host Buffer
+      // Create a temporary staging buffer to transfer data to Vram
+      VmaAllocationCreateInfo staging_alloc_info = {};
+      staging_alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+      staging_alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
       auto host_buffer = rhi::buffer(
         m_device, *this, info, count,
         vk::BufferUsageFlagBits::eTransferSrc, 
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+        staging_alloc_info
       );
       data(host_buffer.mapped());
 
 
-      // Transfer
-      vk::CommandBufferAllocateInfo alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
-      vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), alloc_info).front());
+      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
+      vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), cmd_alloc_info).front());
+      
+
       vk::BufferCopy copy_region(0, 0, ret->size());
 
       temp_cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      temp_cmd.copyBuffer(*host_buffer.get(), ret->get(), copy_region);
+      temp_cmd.copyBuffer(host_buffer.get(), ret->get(), copy_region);
       temp_cmd.end();
 
       vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
@@ -249,48 +183,55 @@ namespace mochi::module
       m_device.transfer_q().best().waitIdle();
     }
     
-    std::get<std::vector<rhi::buffer*>>(m_owned).push_back(ret);
     return ret;
   }
 
+  
 
-
-  fun memory::load_UMA_VertexBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> rhi::buffer*
+  fun memory::load_UMA_VertexBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    auto ret = new rhi::buffer(
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+    auto ret = make_sptr<rhi::buffer>(
       m_device, *this, info, count,
       vk::BufferUsageFlagBits::eVertexBuffer,
-      vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+      alloc_info
     );
 
-    if (data) data(ret->mapped());
+    if (data && ret->mapped()) data(ret->mapped());
 
-    std::get<std::vector<rhi::buffer*>>(m_owned).push_back(ret);
     return ret;
   }
 
-  fun memory::load_DISC_VertexBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> rhi::buffer*
+  fun memory::load_DISC_VertexBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    auto ret = new rhi::buffer(
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    auto ret = make_sptr<rhi::buffer>(
       m_device, *this, info, count,
       vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, 
-      vk::MemoryPropertyFlagBits::eDeviceLocal
+      alloc_info
     );
 
-
     if (data) {
-      // Host Buffer
+      // Create a temporary staging buffer to transfer data to Vram
+      VmaAllocationCreateInfo staging_alloc_info = {};
+      staging_alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+      staging_alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
       auto host_buffer = rhi::buffer(
         m_device, *this, info, count,
         vk::BufferUsageFlagBits::eTransferSrc, 
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+        staging_alloc_info
       );
       data(host_buffer.mapped());
 
 
-      // Transfer
-      vk::CommandBufferAllocateInfo alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
-      vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), alloc_info).front());
+      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
+      vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), cmd_alloc_info).front());
       vk::BufferCopy copy_region(0, 0, ret->size());
       vk::MemoryBarrier memory_barrier(
         vk::AccessFlagBits::eTransferWrite,
@@ -298,7 +239,7 @@ namespace mochi::module
       );
 
       temp_cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      temp_cmd.copyBuffer(*host_buffer.get(), ret->get(), copy_region);
+      temp_cmd.copyBuffer(host_buffer.get(), ret->get(), copy_region);
 
       temp_cmd.pipelineBarrier(
         vk::PipelineStageFlagBits::eTransfer,
@@ -316,7 +257,6 @@ namespace mochi::module
       m_device.transfer_q().best().waitIdle();
     }
     
-    std::get<std::vector<rhi::buffer*>>(m_owned).push_back(ret);
     return ret;
   }
 

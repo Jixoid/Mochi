@@ -75,6 +75,9 @@ namespace mochi
   {
     /** @brief 3D Mesh object. */
     struct mesh;
+
+    /** @brief 2D Texture object. */
+    struct texture2;
   }
 
 

@@ -22,6 +22,8 @@
 #include <cassert>
 #include <functional>
 #include <vulkan/vulkan_raii.hpp>
+#include "src/entt/entt.hpp"
+#include "mochi/world/components.hh"
 
 
 
@@ -49,14 +51,11 @@ namespace mochi
 
     // Properties
     private:
-      camera *m_camera{};
-      node *m_scene{};
+      entt::registry m_registry;
 
     public:
-      /** @brief Access the active camera pointer. */
-      inline fun& camera() { return m_camera; }
-      /** @brief Access the root scene node pointer. */
-      inline fun& scene() { return m_scene; }
+      /** @brief Access the active ECS registry. */
+      inline fun& registry() { return m_registry; }
       
 
 
@@ -93,6 +92,10 @@ namespace mochi
       template <typename T>
         requires std::is_same_v<T, module::swapchain>
       inline fun& sub() { return m_swapchain; }
+
+      template <typename T>
+        requires std::is_same_v<T, module::renderer>
+      inline fun& sub() { return m_renderer; }
 
 
     // Functions

@@ -493,6 +493,7 @@ namespace mochi
   template <typename T>
   struct SimdTraits;
 
+  /** @brief SIMD traits specialization for 64-bit floating point. */
   template <>
   struct SimdTraits<f64> {
     using reg_t = __m256d;
@@ -511,6 +512,7 @@ namespace mochi
   };
 
   
+  /** @brief SIMD traits specialization for 32-bit floating point. */
   template <>
   struct SimdTraits<f32> {
     using reg_t = __m128;
@@ -666,7 +668,7 @@ namespace mochi
 
         mat4 res = mat4();
 
-        // Birleşik Rotasyon Matrisi (Z * Y * X)
+        // Combined Rotation Matrix (Z * Y * X)
         res.SwVec[0][0] = cy * cz;
         res.SwVec[0][1] = sx * sy * cz - cx * sz;
         res.SwVec[0][2] = cx * sy * cz + sx * sz;
@@ -772,33 +774,33 @@ namespace mochi
         T wy = q.W * q.Y;
         T wz = q.W * q.Z;
 
-        // MATRİSİN SATIRLARI (Sütun Öncelikli Matematik İçin)
+        // MATRIX ROWS (For Column-Major Math)
         return mat4(
-          // Satır 0
+          // Row 0
           {
             (1.0f - 2.0f * (yy + zz)) * scale.X, // R00
             (2.0f * (xy - wz)) * scale.Y,        // R01
             (2.0f * (xz + wy)) * scale.Z,        // R02
-            position.X                           // Sütun 3 (Öteleme X)
+            position.X                           // Column 3 (Translation X)
           },
 
-          // Satır 1
+          // Row 1
           {
             (2.0f * (xy + wz)) * scale.X,        // R10
             (1.0f - 2.0f * (xx + zz)) * scale.Y, // R11
             (2.0f * (yz - wx)) * scale.Z,        // R12
-            position.Y                           // Sütun 3 (Öteleme Y)
+            position.Y                           // Column 3 (Translation Y)
           },
 
-          // Satır 2
+          // Row 2
           {
             (2.0f * (xz - wy)) * scale.X,        // R20
             (2.0f * (yz + wx)) * scale.Y,        // R21
             (1.0f - 2.0f * (xx + yy)) * scale.Z, // R22
-            position.Z                           // Sütun 3 (Öteleme Z)
+            position.Z                           // Column 3 (Translation Z)
           },
 
-          // Satır 3 (Perspektif Yuvaları)
+          // Row 3 (Perspective Slots)
           {
             0.0f,
             0.0f,

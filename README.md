@@ -3,7 +3,7 @@
 A minimalist Vulkan-based graphics engine and framework written in C++.
 QAOS focuses on a clean, layered architecture to simplify low-level graphics programming.
 
-Other languages: [tr](Readme.tr.md)
+Other languages: [tr](README.tr.md)
 
 
 ## Architecture

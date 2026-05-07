@@ -6,6 +6,9 @@ FetchContent_Declare(
   cgltf_fetch
   GIT_REPOSITORY https://github.com/jkuhlmann/cgltf.git
   GIT_TAG        v1.15
+  GIT_SHALLOW    TRUE
+  GIT_PROGRESS   TRUE
+  USES_TERMINAL_DOWNLOAD TRUE
 )
 
 FetchContent_MakeAvailable(cgltf_fetch)

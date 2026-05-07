@@ -28,9 +28,7 @@ namespace mochi::rhi
     , m_entry(entry)
   {
     mappedFile mfile((std::string)fpath);
-    
 
-    // Load Shader
     vk::ShaderModuleCreateInfo info({}, mfile.view().size(), (u32*)mfile.view().data());
       
     vk_module = vk::raii::ShaderModule(core.sub<module::device>().vdevice(), info);

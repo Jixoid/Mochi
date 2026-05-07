@@ -11,24 +11,27 @@
 
 
 #include <GLFW/glfw3.h>
-#include <stdexcept>
 #include <iostream>
+#include "mochi/asset/texture.hh"
 #include "mochi/core.hh"
+#include "mochi/except.hh"
 #include "mochi/module/window.hh"
-#include "mochi/world/node.hh"
-#include "mochi/world/camera.hh"
-#include "mochi/world/light.hh"
-#include "mochi/world/visual.hh"
+#include "mochi/module/device.hh"
+#include "mochi/module/memory.hh"
+#include "mochi/world/components.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/shader.hh"
+#include "mochi/entity/camera_3d.hh"
+#include "mochi/entity/omni_light_3d.hh"
+#include "mochi/entity/mesh_instance_3d.hh"
 #include "vulkan/vulkan.hpp"
 
 
 using namespace mochi;
 
 
-  
+
 int Main()
 {
   mochi::vec3<f32> cam_pos{0,0,4};
@@ -42,20 +45,20 @@ int Main()
   bool first_mouse = true;
   f32 mouse_sensitivity = 0.1;
 
-  camera *cam{};
-  
+  sptr<entity::Camera3D> camera;
+  std::vector<sptr<entity::Node>> scene_nodes;  
 
   core eng(
     [](vk::raii::PhysicalDevices devices) -> vk::raii::PhysicalDevice
     {
       if (devices.empty())
-        throw std::runtime_error("Vulkan destekli bir grafik birimi bulunamadı.");
+        throw mochi::rhi_error("Vulkan supported graphics unit not found.");
 
       return devices[0];
     },
     [&](f32 dt)
     {
-      if (!cam) return;
+      if (!camera) return;
 
       auto win = eng.sub<module::window>().glfw();
 
@@ -133,7 +136,7 @@ int Main()
 
       if (moved || cursor_locked) {
         auto view_matrix = mochi::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
-        cam->setModel(view_matrix.inverse());
+        eng.registry().get<CameraComponent>(camera->entity()).view = view_matrix;
       }
     }
   );
@@ -141,39 +144,35 @@ int Main()
 
 
 
-  node scene(nil, {});
+
+  auto &reg = eng.registry();
+
+  camera = make_sptr<entity::Camera3D>(eng);
+  camera->set_fov(90.0f);
+  camera->set_near(0.1f);
+  camera->set_far(1000.0f);
   
-  cam = new camera(eng, &scene,
-    mochi::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up).inverse(),
-    90, 0.1, 1000
-  );
-
-  light lig1(eng, &scene,
-    mat4<f32>::model({4,0,0}, quaternion<f32>{}, {1}),
-    {1,0,0},
-    10
-  );
-
-  light lig2(eng, &scene,
-    mat4<f32>::model({0,4,0}, quaternion<f32>{}, {1}),
-    {0,1,0},
-    10
-  );
-
-  light lig3(eng, &scene,
-    mat4<f32>::model({-4,0,0}, quaternion<f32>{}, {1}),
-    {0,0,1},
-    10
-  );
-
-  light lig4(eng, &scene,
-    mat4<f32>::model({0,-4,0}, quaternion<f32>{}, {1}),
-    {1,1,0},
-    10
-  );
+  auto &cam_comp = reg.get<CameraComponent>(camera->entity());
+  cam_comp.view = mochi::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
+  cam_comp.proj = mochi::mat4<f32>::perspective(camera->get_fov(), 800.0f / 600.0f, camera->get_near(), camera->get_far());
 
 
-  asset::mesh m3d(eng, "/home/alforce/Masaüstü/Untitled.glb");
+  auto make_light = [&](vec3<f32> pos) {
+    auto light = make_sptr<entity::OmniLight3D>(eng);
+    light->set_position(pos);
+    light->set_color({1,1,1});
+    light->set_intensity(10.0f);
+    return light;
+  };
+  scene_nodes.push_back(make_light({4,0,0}));
+  scene_nodes.push_back(make_light({0,4,0}));
+  scene_nodes.push_back(make_light({-4,0,0}));
+  scene_nodes.push_back(make_light({0,-4,0}));
+
+
+
+  auto m3d = asset::mesh::make(eng, "/home/alforce/Masaüstü/Untitled.glb");
+  auto txt = asset::texture2::make(eng, "/home/alforce/Masaüstü/Untitled.png");
 
 
   rhi::info<rhi::pipeline> pbr_i(
@@ -186,6 +185,7 @@ int Main()
     {
       {&mochi::camera_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       {&mochi::light_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      {nil, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
     }
   );
 
@@ -196,16 +196,43 @@ int Main()
   
   auto pipe = rhi::pipeline::make(eng, &pbr_i, std::move(shaders));
 
-  auto obj = visual::make(eng,
-    &scene,
-    mat4<f32>::model({}, quaternion<f32>(), {1}),
-    &m3d,
-    pipe
-  );
+
+  // Pre-allocate uniform buffers to accommodate all entities
+  auto &mem = eng.sub<module::memory>();
+  mem.m_camera_ubo = mem.load_UniformBuffer(&camera_i, 10, [](void*){});
+  mem.m_light_ubo = mem.load_UniformBuffer(&light_i, 100, [](void*){});
+
+  
+
+  auto mesh_instance = make_sptr<entity::MeshInstance3D>(eng);
+  mesh_instance->set_position({0,0,0});
+  mesh_instance->set_mesh(m3d);
+  mesh_instance->set_material(pipe, txt);
+  scene_nodes.push_back(mesh_instance);
+
+  vk::DescriptorSetAllocateInfo alloc_info(*pipe->desc_pool(), *pipe->desc_layout());
+  
+  auto &rend = reg.get<RenderableComponent>(mesh_instance->entity());
+  rend.desc_sets = make_sptr<vk::raii::DescriptorSets>(eng.sub<module::device>().vdevice(), alloc_info);
+
+  vk::DescriptorBufferInfo cam_buffer_info(mem.m_camera_ubo->get(), 0, camera_i.stride());
+  vk::DescriptorBufferInfo lig_buffer_info(mem.m_light_ubo->get(), 0, mem.m_light_ubo->size());
+  vk::DescriptorImageInfo image_info(*txt->data()->sampler(), *txt->data()->view(), vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  std::vector<vk::WriteDescriptorSet> writes;
+  writes.push_back(vk::WriteDescriptorSet(
+    *(*rend.desc_sets)[0], 0, 0, 1, vk::DescriptorType::eUniformBuffer, nil, &cam_buffer_info, nil
+  ));
+  writes.push_back(vk::WriteDescriptorSet(
+    *(*rend.desc_sets)[0], 1, 0, 1, vk::DescriptorType::eUniformBuffer, nil, &lig_buffer_info, nil
+  ));
+  writes.push_back(vk::WriteDescriptorSet(
+    *(*rend.desc_sets)[0], 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image_info, nil, nil
+  ));
+
+  eng.sub<module::device>().vdevice().updateDescriptorSets(writes, nil);
 
 
-  eng.scene() = &scene;
-  eng.camera() = cam;
   eng.run();
 
   return 0;
@@ -219,11 +246,15 @@ int main()
   try { return Main(); }
   
   catch (const vk::SystemError &e) {
-    std::cerr << "Vulkan Hatasi: " << e.what() << std::endl;
+    std::cerr << "Vulkan Error: " << e.what() << std::endl;
+    return -1;
+  }
+  catch (const mochi::except &e) {
+    std::cerr << "Mochi Error: " << e.what() << std::endl;
     return -1;
   }
   catch (const std::exception &e) {
-    std::cerr << "Standart Hata: " << e.what() << std::endl;
+    std::cerr << "Standard Error: " << e.what() << std::endl;
     return -1;
   }
 

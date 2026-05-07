@@ -13,6 +13,7 @@
 #include "Basis.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/reader/reader.hh"
+#include "mochi/except.hh"
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
@@ -30,15 +31,15 @@ namespace mochi
     cgltf_data* data = NULL;
     
     
-    // Read File
+
     if (cgltf_parse(&options, src.ptr(), src.size(), &data) != cgltf_result_success)
-      throw std::runtime_error("glTF file cannot parsed.");
+      throw mochi::asset_error("glTF file cannot parsed.");
 
     
-    // Binary
+
     if (cgltf_load_buffers(&options, data, nullptr) != cgltf_result_success) {
       cgltf_free(data);
-      throw std::runtime_error("glTF buffers cannot loaded.");
+      throw mochi::asset_error("glTF buffers cannot loaded.");
     }
 
     
@@ -50,14 +51,14 @@ namespace mochi
       {
         cgltf_primitive *prim = &mesh->primitives[j];
 
-        // 1. Önce bu parçadaki benzersiz (unique) noktaları geçici bir diziye al
+        // Extract unique vertices
         cgltf_size vertex_count = prim->attributes[0].data->count;
         std::vector<asset::vertex_t> temp_vertices(vertex_count);
 
-        // Her vertex için renkleri başta beyaz yapalım
+
         for (auto& v : temp_vertices) v.color = {1.0f, 1.0f, 1.0f};
 
-        // Nitelikleri (Position, Normal, UV) bul ve kopyala
+        // Extract attributes
         for (cgltf_size a = 0; a < prim->attributes_count; ++a) {
           cgltf_attribute* attr = &prim->attributes[a];
           

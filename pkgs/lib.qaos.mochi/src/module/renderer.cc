@@ -14,6 +14,7 @@
 #include "Basis.hh"
 #include "mochi/module/device.hh"
 #include "mochi/module/window.hh"
+#include "mochi/except.hh"
 #include <vulkan/vulkan_raii.hpp>
 
 #define ef else if
@@ -29,21 +30,18 @@ namespace mochi::module
     , m_swapchain(swapchain)
     , m_cmd_pool(nil)
   {
-    // Command Pool
     vk::CommandPoolCreateInfo pool_info(
       vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 
       0
     );
     m_cmd_pool = vk::raii::CommandPool(m_device.vdevice(), pool_info);
 
-    
-    // Command Buffer
+
     vk::CommandBufferAllocateInfo alloc_info(*m_cmd_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT);
     m_cmd_buffers = vk::raii::CommandBuffers(m_device.vdevice(), alloc_info);
 
 
 
-    // Synchronize
     vk::SemaphoreCreateInfo sem_info{};
     vk::FenceCreateInfo fence_info(vk::FenceCreateFlagBits::eSignaled);
 
@@ -84,12 +82,12 @@ namespace mochi::module
       {}, {}, {}, {color_barrier, depth_barrier}
     );
 
-    // 2. Renk ve Derinlik Temizleme (Clear) Değerleri
+
     vk::ClearValue clear_color_val(clear_color);
     vk::ClearValue clear_depth_val;
-    clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0); // 1.0 = En uzak
+    clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
 
-    // 3. Renk Eklentisi (Mevcut olan)
+
     vk::RenderingAttachmentInfo color_attachment(
       *m_swapchain.image_views()[m_image_index], 
       vk::ImageLayout::eColorAttachmentOptimal,
@@ -97,7 +95,7 @@ namespace mochi::module
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_color_val
     );
 
-    // 4. Derinlik Eklentisi (YENİ)
+
     vk::RenderingAttachmentInfo depth_attachment(
       *m_swapchain.depth_view(),
       vk::ImageLayout::eDepthAttachmentOptimal,
@@ -105,7 +103,7 @@ namespace mochi::module
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_depth_val
     );
     
-    // 5. Dynamic Rendering Başlat
+
     vk::RenderingInfo render_info(
       {}, {{0, 0}, m_swapchain.extent()}, 
       1, 0, 1, &color_attachment, &depth_attachment, nil
@@ -115,10 +113,9 @@ namespace mochi::module
 
   fun renderer::end_swapchain_rendering(vk::raii::CommandBuffer &cmd) -> void
   {
-    // 1. Dynamic Rendering Bitir
     cmd.endRendering();
 
-    // 2. Resmi Ekrana Hazırla (ColorAttachment -> PresentSrc)
+    // Transition color attachment to present layout
     vk::ImageMemoryBarrier img_barrier(
       vk::AccessFlagBits::eColorAttachmentWrite, {},
       vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
@@ -140,10 +137,9 @@ namespace mochi::module
     vk::Result err = m_device.vdevice().waitForFences({*m_in_flight_fences[m_current_frame]}, VK_TRUE, UINT64_MAX);
 
     if (err != vk::Result::eSuccess)
-      throw std::runtime_error("GPU beklenirken hata oluştu veya cihaz kaybedildi!");
+      throw mochi::rhi_error("Error waiting for GPU or device lost!");
     
 
-    // Request a new image from Swapchain
     auto [result, img_idx] = m_swapchain.get().acquireNextImage(
       UINT64_MAX, 
       *m_image_available_sems[m_current_frame], 
@@ -152,11 +148,9 @@ namespace mochi::module
     m_image_index = img_idx;
 
 
-    // Close the fence
     m_device.vdevice().resetFences({*m_in_flight_fences[m_current_frame]});
 
 
-    // Reset the command prompt and start typing
     vk::raii::CommandBuffer& cmd = m_cmd_buffers[m_current_frame];
     cmd.reset();
     cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
@@ -168,7 +162,7 @@ namespace mochi::module
   {
     cmd.end();
 
-    // GPU Submit
+
     vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
     
     vk::SubmitInfo submit_info(
@@ -180,7 +174,6 @@ namespace mochi::module
     m_device.graphics_q().best().submit(submit_info, *m_in_flight_fences[m_current_frame]);
 
 
-    // Screen Present
     vk::PresentInfoKHR present_info(
       1, &*m_render_finished_sems[m_image_index],
       1, &*m_swapchain.get(),
@@ -188,7 +181,7 @@ namespace mochi::module
     );
 
 
-    // Send Output
+
     auto err = m_device.graphics_q().best().presentKHR(present_info);
 
     if (err == vk::Result::eErrorOutOfDateKHR || err == vk::Result::eSuboptimalKHR || m_window.resized())
@@ -196,10 +189,9 @@ namespace mochi::module
       m_swapchain.recreate();
     }
     ef (err != vk::Result::eSuccess)
-      throw std::runtime_error("Ekrana goruntu basilirken kritik hata olustu!");
+      throw mochi::rhi_error("Critical error while presenting image to screen!");
 
 
-    // Next Frame
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
 

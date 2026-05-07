@@ -22,7 +22,6 @@ namespace mochi::module
   bridge::bridge(std::string_view appName, std::array<u32, 4> appVer)
     : vk_ctx(), vk_inst(nil)
   {
-    // AppInfo
     vk::ApplicationInfo appInfo {
       appName.data(),
       VK_MAKE_API_VERSION(appVer[0], appVer[1], appVer[2], appVer[3]),
@@ -31,11 +30,9 @@ namespace mochi::module
       vk::ApiVersion14
     };
 
-    // Layers & Extensions
     auto layers = std::vector<const char*>{ "VK_LAYER_KHRONOS_validation" };
     auto extensions = window::extensions();
 
-    // Create Instance
     vk::InstanceCreateInfo createInfo({}, &appInfo, layers, extensions);
     vk_inst = vk::raii::Instance(ctx(), createInfo);
   }
