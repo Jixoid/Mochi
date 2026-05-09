@@ -11,7 +11,8 @@
 
 
 #include "mochi/entity/omni_light_3d.hh"
-#include "mochi/world/components.hh"
+#include "mochi/ecs/omni_light_3d.hh"
+#include "mochi/core.hh"
 
 
 
@@ -20,27 +21,27 @@ namespace mochi::entity
 
   OmniLight3D::OmniLight3D(core &eng): Node3D(eng)
   {
-    m_core.registry().emplace<LightComponent>(m_entity);
-    update_component();
+    m_core.registry().emplace<ecs::OmniLight3D>(m_entity);
+    updateComponent();
   }
 
-  fun OmniLight3D::update_component() -> void
+  fun OmniLight3D::updateComponent() -> void
   {
-    auto& lc = m_core.registry().get<LightComponent>(m_entity);
+    auto& lc = m_core.registry().get<ecs::OmniLight3D>(m_entity);
     lc.color = m_color;
     lc.intensity = m_intensity;
   }
 
-  fun OmniLight3D::set_color(const vec3<f32> &color) -> void
+  fun OmniLight3D::setColor(const vec3<f32> &color) -> void
   {
     m_color = color;
-    update_component();
+    updateComponent();
   }
 
-  fun OmniLight3D::set_intensity(f32 intensity) -> void
+  fun OmniLight3D::setIntensity(f32 intensity) -> void
   {
     m_intensity = intensity;
-    update_component();
+    updateComponent();
   }
 
 }

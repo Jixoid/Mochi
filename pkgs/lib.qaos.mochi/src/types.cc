@@ -11,7 +11,6 @@
 
 
 #include "mochi/types.hh"
-#include "mochi/world/components.hh"
 #include <filesystem>
 #include "mochi/except.hh"
 #include <string>
@@ -32,23 +31,6 @@
 
 namespace mochi
 {
-
-  rhi::info<rhi::buffer> camera_i = rhi::info<rhi::buffer>(
-    sizeof(camera_t),
-    vt::make_list<
-      mat4<f32>, // View
-      mat4<f32>  // Projection
-    >()
-  );
-
-  rhi::info<rhi::buffer> light_i = rhi::info<rhi::buffer>(
-    sizeof(light_t),
-    vt::make_list<
-      vec4<f32>, // Position
-      vec4<f32>  // Color
-    >()
-  );
-
 
 	#if defined(__unix__) || defined(__APPLE__)
 

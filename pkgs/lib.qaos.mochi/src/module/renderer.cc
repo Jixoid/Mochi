@@ -11,10 +11,10 @@
 
 
 #include "mochi/module/renderer.hh"
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/module/device.hh"
-#include "mochi/module/window.hh"
 #include "mochi/except.hh"
+#include "vulkan/vulkan.hpp"
 #include <vulkan/vulkan_raii.hpp>
 
 #define ef else if
@@ -24,10 +24,8 @@
 namespace mochi::module
 {
 
-  renderer::renderer(device &device, window &window, swapchain &swapchain)
+  renderer::renderer(device &device)
     : m_device(device)
-    , m_window(window)
-    , m_swapchain(swapchain)
     , m_cmd_pool(nil)
   {
     vk::CommandPoolCreateInfo pool_info(
@@ -49,78 +47,82 @@ namespace mochi::module
       m_image_available_sems.push_back(vk::raii::Semaphore(m_device.vdevice(), sem_info));
       m_in_flight_fences.push_back(vk::raii::Fence(m_device.vdevice(), fence_info));
     }
-
-    for (u32 i{}; i < m_swapchain.image_count(); i++) {
-      m_render_finished_sems.push_back(vk::raii::Semaphore(m_device.vdevice(), sem_info));
-    }
   }
 
 
   
 
-  fun renderer::begin_swapchain_rendering(vk::raii::CommandBuffer &cmd, const std::array<float, 4> &clear_color) -> void
+  fun renderer::begin_pass(vk::raii::CommandBuffer &cmd, const rhi::render_target &target, const std::array<float, 4> &clear_color) -> void
   {
-    vk::ImageMemoryBarrier color_barrier(
+    std::vector<vk::ImageMemoryBarrier> barriers;
+
+    barriers.push_back(vk::ImageMemoryBarrier(
       {}, vk::AccessFlagBits::eColorAttachmentWrite,
       vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal,
       VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-      m_swapchain.images()[m_image_index], 
+      target.color_image, 
       {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
-    );
+    ));
 
-    vk::ImageMemoryBarrier depth_barrier(
-      vk::AccessFlagBits::eNone, vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead,
-      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal,
-      VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-      *m_swapchain.depth_image(), 
-      {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
-    );
+    if (target.depth_image) {
+      barriers.push_back(vk::ImageMemoryBarrier(
+        vk::AccessFlagBits::eNone, vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal,
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+        target.depth_image,
+        {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
+      ));
+    }
 
     cmd.pipelineBarrier(
       vk::PipelineStageFlagBits::eTopOfPipe, 
       vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
-      {}, {}, {}, {color_barrier, depth_barrier}
+      {}, {}, {}, barriers
     );
 
 
     vk::ClearValue clear_color_val(clear_color);
-    vk::ClearValue clear_depth_val;
-    clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
-
 
     vk::RenderingAttachmentInfo color_attachment(
-      *m_swapchain.image_views()[m_image_index], 
+      target.color_view, 
       vk::ImageLayout::eColorAttachmentOptimal,
       vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_color_val
     );
 
-
-    vk::RenderingAttachmentInfo depth_attachment(
-      *m_swapchain.depth_view(),
-      vk::ImageLayout::eDepthAttachmentOptimal,
-      vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_depth_val
-    );
+    vk::RenderingAttachmentInfo depth_attachment;
+    vk::RenderingAttachmentInfo* p_depth_attachment = nullptr;
     
+    if (target.depth_view) {
+      vk::ClearValue clear_depth_val;
+      clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
+
+      depth_attachment = vk::RenderingAttachmentInfo(
+        target.depth_view,
+        vk::ImageLayout::eDepthAttachmentOptimal,
+        vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
+        vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_depth_val
+      );
+      p_depth_attachment = &depth_attachment;
+    }
 
     vk::RenderingInfo render_info(
-      {}, {{0, 0}, m_swapchain.extent()}, 
-      1, 0, 1, &color_attachment, &depth_attachment, nil
+      {}, {{0, 0}, target.extent}, 
+      1, 0, 1, &color_attachment, p_depth_attachment, nil
     );
     cmd.beginRendering(render_info);
   }
 
-  fun renderer::end_swapchain_rendering(vk::raii::CommandBuffer &cmd) -> void
+  fun renderer::end_pass(vk::raii::CommandBuffer &cmd, const rhi::render_target &target) -> void
   {
     cmd.endRendering();
 
-    // Transition color attachment to present layout
+    // Transition color attachment to final layout
     vk::ImageMemoryBarrier img_barrier(
       vk::AccessFlagBits::eColorAttachmentWrite, {},
-      vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
+      vk::ImageLayout::eColorAttachmentOptimal, target.final_layout,
       VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-      m_swapchain.images()[m_image_index], 
+      target.color_image, 
       {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
     );
     
@@ -140,14 +142,6 @@ namespace mochi::module
       throw mochi::rhi_error("Error waiting for GPU or device lost!");
     
 
-    auto [result, img_idx] = m_swapchain.get().acquireNextImage(
-      UINT64_MAX, 
-      *m_image_available_sems[m_current_frame], 
-      nil
-    );
-    m_image_index = img_idx;
-
-
     m_device.vdevice().resetFences({*m_in_flight_fences[m_current_frame]});
 
 
@@ -158,38 +152,20 @@ namespace mochi::module
     return cmd;
   }
 
-  fun renderer::end_frame(vk::raii::CommandBuffer &cmd) -> void
+  fun renderer::end_frame(vk::raii::CommandBuffer &cmd, std::span<vk::Semaphore> wait_sems, std::span<vk::Semaphore> signal_sems) -> void
   {
     cmd.end();
 
 
-    vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    std::vector<vk::PipelineStageFlags> wait_stages(wait_sems.size(), vk::PipelineStageFlagBits::eColorAttachmentOutput);
     
     vk::SubmitInfo submit_info(
-      1, &*m_image_available_sems[m_current_frame], &wait_stage,
+      wait_sems.size(), wait_sems.data(), wait_stages.data(),
       1, &*cmd,
-      1, &*m_render_finished_sems[m_image_index]
+      signal_sems.size(), signal_sems.data()
     );
 
-    m_device.graphics_q().best().submit(submit_info, *m_in_flight_fences[m_current_frame]);
-
-
-    vk::PresentInfoKHR present_info(
-      1, &*m_render_finished_sems[m_image_index],
-      1, &*m_swapchain.get(),
-      &m_image_index
-    );
-
-
-
-    auto err = m_device.graphics_q().best().presentKHR(present_info);
-
-    if (err == vk::Result::eErrorOutOfDateKHR || err == vk::Result::eSuboptimalKHR || m_window.resized())
-    {
-      m_swapchain.recreate();
-    }
-    ef (err != vk::Result::eSuccess)
-      throw mochi::rhi_error("Critical error while presenting image to screen!");
+    m_device.graphics_q().best().queue.submit(submit_info, *m_in_flight_fences[m_current_frame]);
 
 
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;

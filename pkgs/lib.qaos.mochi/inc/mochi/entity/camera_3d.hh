@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "mochi/entity/node3d.hh"
+#include "mochi/entity/node_3d.hh"
 
 
 
@@ -31,18 +31,17 @@ namespace mochi::entity
       f32 m_near{0.1};
       f32 m_far{1000};
 
-      fun update_component() -> void;
+      fun updateComponent() -> void;
 
     public:
-      inline fun get_fov() const { return m_fov; }
-      inline fun get_near() const { return m_near; }
-      inline fun get_far() const { return m_far; }
+      inline fun getFov() const { return m_fov; }
+      fun setFov(f32 fov) -> void;
 
-      fun set_fov(f32 fov) -> void;
-      fun set_near(f32 n) -> void;
-      fun set_far(f32 f) -> void;
-      
-      fun make_current() -> void; // Could be used later to set active camera
+      inline fun getNear() const { return m_near; }
+      fun setNear(f32 n) -> void;
+
+      inline fun getFar() const { return m_far; }
+      fun setFar(f32 f) -> void;
   };
 
 }

@@ -10,7 +10,7 @@
 */
 
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/reader/reader.hh"
 #include <span>
 #include <spanstream>

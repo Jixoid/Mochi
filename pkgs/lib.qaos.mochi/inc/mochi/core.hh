@@ -12,18 +12,17 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/module/bridge.hh"
-#include "mochi/module/window.hh"
+#include "mochi/module/display.hh"
 #include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
-#include "mochi/module/swapchain.hh"
 #include "mochi/module/renderer.hh"
 #include <cassert>
 #include <functional>
+#include <tuple>
 #include <vulkan/vulkan_raii.hpp>
 #include "src/entt/entt.hpp"
-#include "mochi/world/components.hh"
 
 
 
@@ -57,19 +56,19 @@ namespace mochi
       /** @brief Access the active ECS registry. */
       inline fun& registry() { return m_registry; }
       
+    private:
+      std::function<void (f32 dt)> m_idle;
 
 
     // Sub Module
     private:
-      module::bridge    m_bridge;
-      module::window    m_window;
-      module::device    m_device;
-      module::memory    m_memory;
-      module::swapchain m_swapchain;
-      module::renderer  m_renderer;
-
-      std::function<void (f32 dt)> m_idle;
-
+      std::tuple<
+        uptr<module::bridge>,
+        uptr<module::device>,
+        uptr<module::memory>,
+        uptr<module::display>,
+        uptr<module::renderer>
+      > m_modules;
 
     public:
       /**
@@ -78,24 +77,7 @@ namespace mochi
        * @return Reference to the sub-module.
        */
       template <typename T>
-        requires std::is_same_v<T, module::window>
-      inline fun& sub() { return m_window; }
-
-      template <typename T>
-        requires std::is_same_v<T, module::device>
-      inline fun& sub() { return m_device; }
-
-      template <typename T>
-        requires std::is_same_v<T, module::memory>
-      inline fun& sub() { return m_memory; }
-
-      template <typename T>
-        requires std::is_same_v<T, module::swapchain>
-      inline fun& sub() { return m_swapchain; }
-
-      template <typename T>
-        requires std::is_same_v<T, module::renderer>
-      inline fun& sub() { return m_renderer; }
+      inline fun& sub() { return *std::get<uptr<T>>(m_modules); } 
 
 
     // Functions

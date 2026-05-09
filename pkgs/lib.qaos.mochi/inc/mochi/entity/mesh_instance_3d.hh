@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "mochi/entity/node3d.hh"
+#include "mochi/entity/node_3d.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/asset/texture.hh"
 #include "mochi/rhi/pipeline.hh"
@@ -35,15 +35,15 @@ namespace mochi::entity
       sptr<asset::texture2> m_texture;
       sptr<rhi::pipeline> m_pipeline;
       
-      fun update_component() -> void;
+      fun updateComponent() -> void;
 
     public:
-      inline fun get_mesh() const { return m_mesh; }
-      inline fun get_texture() const { return m_texture; }
-      inline fun get_pipeline() const { return m_pipeline; }
+      inline fun getMesh() const { return m_mesh; }
+      fun setMesh(sptr<asset::mesh> mesh) -> void;
 
-      fun set_mesh(sptr<asset::mesh> mesh) -> void;
-      fun set_material(sptr<rhi::pipeline> pipeline, sptr<asset::texture2> texture) -> void;
+      inline fun getTexture() const { return m_texture; }
+      inline fun getPipeline() const { return m_pipeline; }
+      fun setMaterial(sptr<rhi::pipeline> pipeline, sptr<asset::texture2> texture) -> void;
   };
 
 }

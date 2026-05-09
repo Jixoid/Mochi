@@ -14,11 +14,13 @@
 #include <iostream>
 #include "mochi/asset/texture.hh"
 #include "mochi/core.hh"
+#include "mochi/ecs/camera_3d.hh"
+#include "mochi/ecs/mesh_instance_3d.hh"
+#include "mochi/ecs/omni_light_3d.hh"
 #include "mochi/except.hh"
-#include "mochi/module/window.hh"
 #include "mochi/module/device.hh"
+#include "mochi/module/display.hh"
 #include "mochi/module/memory.hh"
-#include "mochi/world/components.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/shader.hh"
@@ -60,7 +62,7 @@ int Main()
     {
       if (!camera) return;
 
-      auto win = eng.sub<module::window>().glfw();
+      auto win = eng.sub<module::display>().glfw();
 
 
       auto is_key_pressed = [win](int key) { return glfwGetKey(win, key) == GLFW_PRESS; };
@@ -136,7 +138,7 @@ int Main()
 
       if (moved || cursor_locked) {
         auto view_matrix = mochi::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
-        eng.registry().get<CameraComponent>(camera->entity()).view = view_matrix;
+        eng.registry().get<ecs::Camera3D>(camera->entity()).view = view_matrix;
       }
     }
   );
@@ -148,20 +150,20 @@ int Main()
   auto &reg = eng.registry();
 
   camera = make_sptr<entity::Camera3D>(eng);
-  camera->set_fov(90.0f);
-  camera->set_near(0.1f);
-  camera->set_far(1000.0f);
+  camera->setFov(90.0f);
+  camera->setNear(0.1f);
+  camera->setFar(1000.0f);
   
-  auto &cam_comp = reg.get<CameraComponent>(camera->entity());
+  auto &cam_comp = reg.get<ecs::Camera3D>(camera->entity());
   cam_comp.view = mochi::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
-  cam_comp.proj = mochi::mat4<f32>::perspective(camera->get_fov(), 800.0f / 600.0f, camera->get_near(), camera->get_far());
+  cam_comp.proj = mochi::mat4<f32>::perspective(camera->getFov(), 800.0f / 600.0f, camera->getNear(), camera->getFar());
 
 
   auto make_light = [&](vec3<f32> pos) {
     auto light = make_sptr<entity::OmniLight3D>(eng);
-    light->set_position(pos);
-    light->set_color({1,1,1});
-    light->set_intensity(10.0f);
+    light->setPosition(pos);
+    light->setColor({1,1,1});
+    light->setIntensity(10.0f);
     return light;
   };
   scene_nodes.push_back(make_light({4,0,0}));
@@ -183,8 +185,8 @@ int Main()
       {&asset::vertex_i, vk::VertexInputRate::eVertex},
     },
     {
-      {&mochi::camera_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-      {&mochi::light_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      {&ecs::camera3d_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      {&ecs::omni_light3d_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       {nil, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
     }
   );
@@ -199,23 +201,23 @@ int Main()
 
   // Pre-allocate uniform buffers to accommodate all entities
   auto &mem = eng.sub<module::memory>();
-  mem.m_camera_ubo = mem.load_UniformBuffer(&camera_i, 10, [](void*){});
-  mem.m_light_ubo = mem.load_UniformBuffer(&light_i, 100, [](void*){});
+  mem.m_camera_ubo = mem.load_UniformBuffer(&ecs::camera3d_i, 10, [](void*){});
+  mem.m_light_ubo = mem.load_UniformBuffer(&ecs::omni_light3d_i, 100, [](void*){});
 
   
 
   auto mesh_instance = make_sptr<entity::MeshInstance3D>(eng);
-  mesh_instance->set_position({0,0,0});
-  mesh_instance->set_mesh(m3d);
-  mesh_instance->set_material(pipe, txt);
+  mesh_instance->setPosition({0,0,0});
+  mesh_instance->setMesh(m3d);
+  mesh_instance->setMaterial(pipe, txt);
   scene_nodes.push_back(mesh_instance);
 
   vk::DescriptorSetAllocateInfo alloc_info(*pipe->desc_pool(), *pipe->desc_layout());
   
-  auto &rend = reg.get<RenderableComponent>(mesh_instance->entity());
+  auto &rend = reg.get<ecs::MeshInstance3D>(mesh_instance->entity());
   rend.desc_sets = make_sptr<vk::raii::DescriptorSets>(eng.sub<module::device>().vdevice(), alloc_info);
 
-  vk::DescriptorBufferInfo cam_buffer_info(mem.m_camera_ubo->get(), 0, camera_i.stride());
+  vk::DescriptorBufferInfo cam_buffer_info(mem.m_camera_ubo->get(), 0, ecs::camera3d_i.stride());
   vk::DescriptorBufferInfo lig_buffer_info(mem.m_light_ubo->get(), 0, mem.m_light_ubo->size());
   vk::DescriptorImageInfo image_info(*txt->data()->sampler(), *txt->data()->view(), vk::ImageLayout::eShaderReadOnlyOptimal);
 

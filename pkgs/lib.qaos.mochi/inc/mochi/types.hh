@@ -13,7 +13,7 @@
 #pragma once
 
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "vulkan/vulkan.hpp"
 #include <string_view>
 #include <type_traits>
@@ -25,35 +25,23 @@
 namespace mochi
 {
 
-  /** @brief Core instance. */
   struct core;
   
 
   namespace module
   {
-    /** @brief Bridge for graphics operations. */
     struct bridge;
-    /** @brief Window instance. */
-    struct window;
-    /** @brief Logical device instance. */
+    struct display;
     struct device;
-    /** @brief Swapchain instance. */
-    struct swapchain;
-    /** @brief Renderer instance. */
     struct renderer;
-    /** @brief Memory allocator. */
     struct memory;
   }
 
 
-
   namespace rhi
   {
-    /** @brief Graphics pipeline instance. */
     struct pipeline;
-    /** @brief Data buffer instance. */
     struct buffer;
-    /** @brief Shader module instance. */
     struct shader;
 
     /** @brief Information structure for a type. */
@@ -62,21 +50,9 @@ namespace mochi
   }
 
 
-  /** @brief Scene node. */
-  struct node;
-  /** @brief Camera node. */
-  struct camera;
-  /** @brief Light node. */
-  struct light;
-
-
-
   namespace asset
   {
-    /** @brief 3D Mesh object. */
     struct mesh;
-
-    /** @brief 2D Texture object. */
     struct texture2;
   }
 

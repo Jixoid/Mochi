@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
 
@@ -21,14 +21,20 @@
 namespace mochi::module
 {
 
+  struct queue {
+    vk::raii::Queue queue;
+    u32 family;
+  };
+
+
   /** @brief Represents a group of Vulkan queues for a specific capability. */
   struct queue_group
   {
     friend struct device;
     
     private:
-      std::vector<vk::raii::Queue> m_primary;   // Dedicated (specialized) queues
-      std::vector<vk::raii::Queue> m_secondary; // Shared queues
+      std::vector<queue> m_primary;   // Dedicated (specialized) queues
+      std::vector<queue> m_secondary; // Shared queues
 
     public:
       /** @brief Check if any queue is available in this group. */

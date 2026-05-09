@@ -11,7 +11,9 @@
 
 
 #include "mochi/entity/mesh_instance_3d.hh"
-#include "mochi/world/components.hh"
+#include "mochi/ecs/mesh_instance_3d.hh"
+#include "mochi/core.hh"
+
 
 
 namespace mochi::entity
@@ -19,28 +21,28 @@ namespace mochi::entity
 
   MeshInstance3D::MeshInstance3D(core &eng): Node3D(eng)
   {
-    m_core.registry().emplace<RenderableComponent>(m_entity);
+    m_core.registry().emplace<ecs::MeshInstance3D>(m_entity);
   }
 
-  fun MeshInstance3D::update_component() -> void
+  fun MeshInstance3D::updateComponent() -> void
   {
-    auto &rc = m_core.registry().get<RenderableComponent>(m_entity);
+    auto &rc = m_core.registry().get<ecs::MeshInstance3D>(m_entity);
     rc.mesh = m_mesh;
     rc.texture = m_texture;
     rc.pipeline = m_pipeline;
   }
 
-  fun MeshInstance3D::set_mesh(sptr<asset::mesh> mesh) -> void
+  fun MeshInstance3D::setMesh(sptr<asset::mesh> mesh) -> void
   {
     m_mesh = mesh;
-    update_component();
+    updateComponent();
   }
 
-  fun MeshInstance3D::set_material(sptr<rhi::pipeline> pipeline, sptr<asset::texture2> texture) -> void
+  fun MeshInstance3D::setMaterial(sptr<rhi::pipeline> pipeline, sptr<asset::texture2> texture) -> void
   {
     m_pipeline = pipeline;
     m_texture = texture;
-    update_component();
+    updateComponent();
   }
 
 }

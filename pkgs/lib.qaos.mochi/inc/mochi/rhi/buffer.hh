@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/types.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -33,7 +33,7 @@ namespace mochi::rhi
        * @param stride The size of a single element/vertex in bytes.
        * @param items A list of Vulkan types describing the buffer's layout.
        */
-      explicit inline info<buffer>(u64 stride, std::vector<mochi::vt> items)
+      constexpr explicit inline info<buffer>(u64 stride, std::vector<mochi::vt> items)
         : m_stride(stride)
         , m_items(items)
       {}

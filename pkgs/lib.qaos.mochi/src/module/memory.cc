@@ -10,9 +10,8 @@
 */
 
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/module/bridge.hh"
-#include "mochi/module/renderer.hh"
 #include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/rhi/buffer.hh"
@@ -25,10 +24,9 @@
 namespace mochi::module
 {
 
-  memory::memory(bridge &bridge, device &device, renderer &renderer)
+  memory::memory(bridge &bridge, device &device)
     : m_bridge(bridge)
     , m_device(device)
-    , m_renderer(renderer)
   {
     auto props = device.phys_dev().getProperties();
     vk::PhysicalDeviceMemoryProperties mem_props = device.phys_dev().getMemoryProperties();
@@ -75,17 +73,19 @@ namespace mochi::module
     allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
 
     vmaCreateAllocator(&allocatorInfo, &m_allocator);
+
+
+    vk::CommandPoolCreateInfo pool_info(
+      vk::CommandPoolCreateFlagBits::eTransient,
+      device.transfer_q().best().family
+    );
+    m_transfer_pool = vk::raii::CommandPool(device.vdevice(), pool_info);
   }
 
   memory::~memory()
   {
     vmaDestroyAllocator(m_allocator);
   }
-
-  
-
-
-
 
   
 
@@ -168,7 +168,7 @@ namespace mochi::module
       data(host_buffer.mapped());
 
 
-      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
+      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_transfer_pool, vk::CommandBufferLevel::ePrimary, 1);
       vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), cmd_alloc_info).front());
       
 
@@ -179,8 +179,8 @@ namespace mochi::module
       temp_cmd.end();
 
       vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
-      m_device.transfer_q().best().submit(submit_info, nil);
-      m_device.transfer_q().best().waitIdle();
+      m_device.transfer_q().best().queue.submit(submit_info, nil);
+      m_device.transfer_q().best().queue.waitIdle();
     }
     
     return ret;
@@ -230,7 +230,7 @@ namespace mochi::module
       data(host_buffer.mapped());
 
 
-      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_renderer.cmd_pool(), vk::CommandBufferLevel::ePrimary, 1);
+      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_transfer_pool, vk::CommandBufferLevel::ePrimary, 1);
       vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), cmd_alloc_info).front());
       vk::BufferCopy copy_region(0, 0, ret->size());
       vk::MemoryBarrier memory_barrier(
@@ -253,8 +253,8 @@ namespace mochi::module
       temp_cmd.end();
 
       vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
-      m_device.transfer_q().best().submit(submit_info, nil);
-      m_device.transfer_q().best().waitIdle();
+      m_device.transfer_q().best().queue.submit(submit_info, nil);
+      m_device.transfer_q().best().queue.waitIdle();
     }
     
     return ret;

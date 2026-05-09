@@ -13,6 +13,7 @@
 #pragma once
 
 #include "mochi/entity/node.hh"
+#include "mochi/geometry.hh"
 #include "mochi/types.hh"
 
 
@@ -33,16 +34,17 @@ namespace mochi::entity
       quaternion<f32> m_rotation{};
       vec3<f32>       m_scale{1,1,1};
 
-      fun update_transform() -> void;
+      fun updateTransform() -> void;
 
     public:
-      inline fun get_position() const { return m_position; }
-      inline fun get_rotation() const { return m_rotation; }
-      inline fun get_scale() const { return m_scale; }
+      inline fun getPosition() const { return m_position; }
+      fun setPosition(const vec3<f32> &pos) -> void;
 
-      fun set_position(const vec3<f32> &pos) -> void;
-      fun set_rotation(const quaternion<f32> &rot) -> void;
-      fun set_scale(const vec3<f32> &scale) -> void;
+      inline fun getRotation() const { return m_rotation; }
+      fun setRotation(const quaternion<f32> &rot) -> void;
+
+      inline fun getScale() const { return m_scale; }
+      fun setScale(const vec3<f32> &scale) -> void;
   };
 
 }

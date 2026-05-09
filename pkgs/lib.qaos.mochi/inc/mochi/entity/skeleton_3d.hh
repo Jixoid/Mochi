@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "mochi/entity/node_3d.hh"
+#include "mochi/entity/node.hh"
 
 
 
@@ -20,25 +20,20 @@ namespace mochi::entity
 {
 
   /** @brief Point light object. Wraps LightComponent. */
-  class OmniLight3D: public Node3D
+  class Skeleton3D: public Node
   {
     public:
-      explicit OmniLight3D(core &eng);
-      virtual ~OmniLight3D() override = default;
+      explicit Skeleton3D(core &eng);
+      virtual ~Skeleton3D() override = default;
 
       
     private:
-      vec3<f32> m_color{1,1,1};
-      f32 m_intensity{10};
+      std::vector<mat4<f32>> m_bones;
 
       fun updateComponent() -> void;
 
     public:
-      inline fun getColor() const { return m_color; }
-      fun setColor(const vec3<f32> &color) -> void;
-
-      inline fun getIntensity() const { return m_intensity; }
-      fun setIntensity(f32 intensity) -> void;
+      inline fun& getBones() const { return m_bones; }
   };
 
 }

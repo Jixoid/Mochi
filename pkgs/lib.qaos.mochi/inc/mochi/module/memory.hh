@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
 #include <cassert>
@@ -34,18 +34,17 @@ namespace mochi::module
        * @brief Initialize the memory allocator.
        * @param bridge The mochi vulkan bridge.
        * @param device The logical device.
-       * @param renderer The renderer.
        */
-      explicit memory(module::bridge &bridge, module::device &device, module::renderer &renderer);
+      explicit memory(module::bridge &bridge, module::device &device);
 
-      /** @brief Destructor. */
       ~memory();
 
 
     private:
       module::bridge &m_bridge;
       module::device &m_device;
-      module::renderer &m_renderer;
+
+      vk::raii::CommandPool m_transfer_pool{nil};
 
       
     #pragma region Limits

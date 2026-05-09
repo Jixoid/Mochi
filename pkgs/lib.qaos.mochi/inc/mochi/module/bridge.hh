@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include <string_view>
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>

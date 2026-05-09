@@ -12,10 +12,11 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/types.hh"
 #include "mochi/module/device.hh"
-#include "mochi/module/swapchain.hh"
+#include "mochi/rhi/render_target.hh"
+#include <span>
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -34,61 +35,60 @@ namespace mochi::module
       /**
        * @brief Initialize a new renderer.
        * @param device The logical device.
-       * @param swapchain The swapchain to render to.
        */
-      explicit renderer(module::device &device, module::window &window, module::swapchain &swapchain);
+      explicit renderer(module::device &device);
 
 
     private:
-      module::device &m_device;
-      module::window &m_window;
-      module::swapchain &m_swapchain;
+      module::device  &m_device;
 
       vk::raii::CommandPool                m_cmd_pool;
       std::vector<vk::raii::CommandBuffer> m_cmd_buffers;
 
       // Synchronization Objects (per frame)
       std::vector<vk::raii::Semaphore> m_image_available_sems;
-      std::vector<vk::raii::Semaphore> m_render_finished_sems;
       std::vector<vk::raii::Fence>     m_in_flight_fences;
 
       u32 m_current_frame{}; // Current frame in flight (e.g., 0 or 1)
-      u32 m_image_index{};   // Index of the image acquired from the swapchain
 
     public:
       /** @brief Access the Vulkan RAII command pool. */
       inline fun& cmd_pool() { return m_cmd_pool; }
-      /** @brief Get the index of the currently acquired swapchain image. */
-      inline fun image_index() const { return m_image_index; }
       /** @brief Get the current frame in flight index. */
       inline fun current_frame() const { return m_current_frame; }
 
+      inline fun& get_image_available_sem(u32 frame) { return *m_image_available_sems[frame]; }
+
     public:
       /**
-       * @brief Begin a rendering pass on the swapchain image.
+       * @brief Begin a rendering pass on the given render target.
        * @param cmd The command buffer to record into.
+       * @param target The render target (framebuffer/texture)
        * @param clear_color The color used to clear the screen (RGBA).
        */
-      fun begin_swapchain_rendering(vk::raii::CommandBuffer &cmd, const std::array<float, 4> &clear_color) -> void;
+      fun begin_pass(vk::raii::CommandBuffer &cmd, const rhi::render_target &target, const std::array<float, 4> &clear_color) -> void;
       
       /**
-       * @brief End the rendering pass on the swapchain image.
+       * @brief End the rendering pass on the given render target.
        * @param cmd The command buffer being recorded.
+       * @param target The render target to transition to its final layout.
        */
-      fun end_swapchain_rendering(vk::raii::CommandBuffer &cmd) -> void;
+      fun end_pass(vk::raii::CommandBuffer &cmd, const rhi::render_target &target) -> void;
 
 
       /**
-       * @brief Start a new frame, acquiring an image and setting up synchronization.
+       * @brief Start a new frame, setting up synchronization.
        * @return Reference to the active command buffer for the frame.
        */
       fun begin_frame() -> vk::raii::CommandBuffer&;
       
       /**
-       * @brief Submit the command buffer and present the frame.
+       * @brief Submit the command buffer to the GPU.
        * @param cmd The active command buffer to submit.
+       * @param wait_sems Semaphores to wait on before execution.
+       * @param signal_sems Semaphores to signal after execution finishes.
        */
-      fun end_frame(vk::raii::CommandBuffer &cmd) -> void;
+      fun end_frame(vk::raii::CommandBuffer &cmd, std::span<vk::Semaphore> wait_sems, std::span<vk::Semaphore> signal_sems) -> void;
   };
   
 }

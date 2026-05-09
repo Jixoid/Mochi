@@ -61,22 +61,22 @@ namespace mochi::module
       for (u32 q_idx{}; q_idx < count; q_idx++)
       {
         if (flags & vk::QueueFlagBits::eGraphics)
-          graphics_q().m_primary.push_back(vk::raii::Queue(vk_device, i, q_idx));
+          graphics_q().m_primary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
         
 
         if (flags & vk::QueueFlagBits::eCompute) {
           if (!(flags & vk::QueueFlagBits::eGraphics))
-            compute_q().m_primary.push_back(vk::raii::Queue(vk_device, i, q_idx));
+            compute_q().m_primary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
           else
-            compute_q().m_secondary.push_back(vk::raii::Queue(vk_device, i, q_idx));
+            compute_q().m_secondary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
         }
 
 
         if (flags & vk::QueueFlagBits::eTransfer) {
           if (!(flags & vk::QueueFlagBits::eGraphics) && !(flags & vk::QueueFlagBits::eCompute))
-            transfer_q().m_primary.push_back(vk::raii::Queue(vk_device, i, q_idx));
+            transfer_q().m_primary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
           else
-            transfer_q().m_secondary.push_back(vk::raii::Queue(vk_device, i, q_idx));
+            transfer_q().m_secondary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
         }
       }
     }

@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/rhi/image.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>

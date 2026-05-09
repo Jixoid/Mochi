@@ -10,8 +10,9 @@
 */
 
 
-#include "mochi/entity/node3d.hh"
-#include "mochi/world/components.hh"
+#include "mochi/entity/node_3d.hh"
+#include "mochi/ecs/node_3d.hh"
+#include "mochi/core.hh"
 
 
 
@@ -20,32 +21,32 @@ namespace mochi::entity
 
   Node3D::Node3D(core &eng): Node(eng)
   {
-    m_core.registry().emplace<TransformComponent>(m_entity);
-    update_transform();
+    m_core.registry().emplace<ecs::Node3D>(m_entity);
+    updateTransform();
   }
 
-  fun Node3D::update_transform() -> void
+  fun Node3D::updateTransform() -> void
   {
-    auto& t = m_core.registry().get<TransformComponent>(m_entity);
+    auto& t = m_core.registry().get<ecs::Node3D>(m_entity);
     t.model = mat4<f32>::model(m_position, m_rotation, m_scale);
   }
 
-  fun Node3D::set_position(const vec3<f32>& pos) -> void
+  fun Node3D::setPosition(const vec3<f32>& pos) -> void
   {
     m_position = pos;
-    update_transform();
+    updateTransform();
   }
 
-  fun Node3D::set_rotation(const quaternion<f32>& rot) -> void
+  fun Node3D::setRotation(const quaternion<f32>& rot) -> void
   {
     m_rotation = rot;
-    update_transform();
+    updateTransform();
   }
 
-  fun Node3D::set_scale(const vec3<f32>& scale) -> void
+  fun Node3D::setScale(const vec3<f32>& scale) -> void
   {
     m_scale = scale;
-    update_transform();
+    updateTransform();
   }
 
 }

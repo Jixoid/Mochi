@@ -76,6 +76,12 @@ using u128 = unsigned __int128;
   using u0 = u32;
 #endif
 
+/** @brief A representation of a resource handle. */
+using handle = u0;
+
+/** @brief A representation of a resource handle. */
+using ohid = u0;
+
 
 
 

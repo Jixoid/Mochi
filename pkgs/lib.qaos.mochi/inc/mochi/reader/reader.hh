@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/geometry.hh"
 #include "mochi/asset/mesh.hh"
 

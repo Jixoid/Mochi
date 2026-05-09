@@ -12,7 +12,6 @@
 
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/module/device.hh"
-#include "mochi/module/swapchain.hh"
 #include "mochi/core.hh"
 #include "mochi/rhi/shader.hh"
 #include "mochi/types.hh"
@@ -161,9 +160,9 @@ namespace mochi::rhi
         VK_FALSE, VK_FALSE, {}, {}, 0.0f, 1.0f
       );
 
-      vk::Format depth_format = core.sub<module::swapchain>().depth_format();
+      vk::Format depth_format = core.sub<module::display>().depth_format();
       vk::PipelineRenderingCreateInfo rendering_info(
-        0, 1, &core.sub<module::swapchain>().format(),
+        0, 1, &core.sub<module::display>().format(),
         depth_format, vk::Format::eUndefined
       );
 

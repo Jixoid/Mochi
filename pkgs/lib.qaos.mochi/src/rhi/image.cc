@@ -10,7 +10,7 @@
 */
 
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/module/device.hh"
@@ -119,9 +119,9 @@ namespace mochi::rhi
 
 
     vk::SubmitInfo submit_info(nullptr, nullptr, *cmd);
-    device.graphics_q().best().submit(submit_info, nullptr);
+    device.graphics_q().best().queue.submit(submit_info, nullptr);
     
-    device.graphics_q().best().waitIdle(); 
+    device.graphics_q().best().queue.waitIdle(); 
 
 
 

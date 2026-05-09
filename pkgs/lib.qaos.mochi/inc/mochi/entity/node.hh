@@ -12,8 +12,8 @@
 
 #pragma once
 
-#include "Basis.hh"
-#include "mochi/core.hh"
+#include "basis.hh"
+#include "mochi/types.hh"
 #include "src/entt/entt.hpp"
 #include <vector>
 
@@ -39,13 +39,13 @@ namespace mochi::entity
 
     public:
       inline fun  entity() const { return m_entity; }
-      inline fun& get_core() const { return m_core; }
+      inline fun& getCore() const { return m_core; }
       
-      virtual fun add_child(sptr<Node> child) -> void;
-      virtual fun remove_child(sptr<Node> child) -> void;
+      virtual fun addChild(sptr<Node> child) -> void;
+      virtual fun remChild(sptr<Node> child) -> void;
       
-      inline fun  get_parent() const -> sptr<Node> { return m_parent.lock(); }
-      inline fun& get_children() const { return m_children; }
+      inline fun  getParent() const -> sptr<Node> { return m_parent.lock(); }
+      inline fun& getChildren() const { return m_children; }
   };
 
 }

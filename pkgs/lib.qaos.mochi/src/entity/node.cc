@@ -11,7 +11,8 @@
 
 
 #include "mochi/entity/node.hh"
-#include "mochi/world/components.hh"
+#include "mochi/ecs/node.hh"
+#include "mochi/core.hh"
 #include <algorithm>
 
 
@@ -22,7 +23,7 @@ namespace mochi::entity
   Node::Node(core &eng): m_core(eng) 
   {
     m_entity = m_core.registry().create();
-    m_core.registry().emplace<HierarchyComponent>(m_entity);
+    m_core.registry().emplace<ecs::Node>(m_entity);
   }
 
   Node::~Node() 
@@ -34,24 +35,24 @@ namespace mochi::entity
   }
 
 
-  fun Node::add_child(sptr<Node> child) -> void
+  fun Node::addChild(sptr<Node> child) -> void
   {
-    if (auto p = child->get_parent())
-      p->remove_child(child);
+    if (auto p = child->getParent())
+      p->remChild(child);
 
     
     child->m_parent = weak_from_this();
     m_children.push_back(child);
 
     // Update ECS hierarchy component
-    auto &hc = m_core.registry().get<HierarchyComponent>(m_entity);
+    auto &hc = m_core.registry().get<ecs::Node>(m_entity);
     hc.children.push_back(child->entity());
     
-    auto &child_hc = m_core.registry().get<HierarchyComponent>(child->entity());
+    auto &child_hc = m_core.registry().get<ecs::Node>(child->entity());
     child_hc.parent = m_entity;
   }
 
-  fun Node::remove_child(sptr<Node> child) -> void
+  fun Node::remChild(sptr<Node> child) -> void
   {
     auto it = std::find(m_children.begin(), m_children.end(), child);
     if (it != m_children.end()) 
@@ -60,13 +61,13 @@ namespace mochi::entity
       m_children.erase(it);
 
       // Update ECS hierarchy component
-      auto &hc = m_core.registry().get<HierarchyComponent>(m_entity);
+      auto &hc = m_core.registry().get<ecs::Node>(m_entity);
       auto ecs_it = std::find(hc.children.begin(), hc.children.end(), child->entity());
       if (ecs_it != hc.children.end()) {
         hc.children.erase(ecs_it);
       }
 
-      auto &child_hc = m_core.registry().get<HierarchyComponent>(child->entity());
+      auto &child_hc = m_core.registry().get<ecs::Node>(child->entity());
       child_hc.parent = entt::null;
     }
   }

@@ -11,7 +11,7 @@
 
 
 #include "mochi/module/bridge.hh"
-#include "mochi/module/window.hh"
+#include "mochi/module/display.hh"
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -31,7 +31,7 @@ namespace mochi::module
     };
 
     auto layers = std::vector<const char*>{ "VK_LAYER_KHRONOS_validation" };
-    auto extensions = window::extensions();
+    auto extensions = display::extensions();
 
     vk::InstanceCreateInfo createInfo({}, &appInfo, layers, extensions);
     vk_inst = vk::raii::Instance(ctx(), createInfo);

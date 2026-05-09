@@ -10,15 +10,19 @@
 */
 
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/core.hh"
 #include "mochi/asset/mesh.hh"
+#include "mochi/ecs/mesh_instance_3d.hh"
+#include "mochi/ecs/node_3d.hh"
+#include "mochi/ecs/camera_3d.hh"
+#include "mochi/ecs/omni_light_3d.hh"
 #include "mochi/module/device.hh"
+#include "mochi/module/display.hh"
 #include "mochi/module/memory.hh"
-#include "mochi/module/swapchain.hh"
+#include "mochi/module/renderer.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/buffer.hh"
-#include "mochi/world/components.hh"
 #include <chrono>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -31,19 +35,27 @@ namespace mochi
     std::function<vk::raii::PhysicalDevice (vk::raii::PhysicalDevices)> GpuPicker,
     std::function<void (f32 dt)> Idle
   )
-    : m_bridge("Mochi Test", {1,0,0,0})
-    , m_window(m_bridge, "Mochi Test", 800, 600)
-    , m_device(GpuPicker(m_bridge.physicalDevices()))
-    , m_swapchain(m_device, m_window)
-    , m_renderer(m_device, m_window, m_swapchain)
-    , m_memory(m_bridge, m_device, m_renderer)
+    : m_idle(Idle)
+  {
+    auto bridge     = make_uptr(new module::bridge("Mochi Test", {1,0,0,0}));
+    auto device     = make_uptr(new module::device(GpuPicker(bridge->physicalDevices())));
+    auto memory     = make_uptr(new module::memory(*bridge, *device));
+    auto display   = make_uptr(new module::display(*bridge, *device, *memory, "Mochi Test", 800, 600));
+    auto renderer = make_uptr(new module::renderer(*device));
 
-    , m_idle(Idle)
-  {}
+
+    m_modules = decltype(m_modules)(
+      std::move(bridge),
+      std::move(device),
+      std::move(memory),
+      std::move(display),
+      std::move(renderer)
+    );
+  }
 
   core::~core()
   {
-    m_device.vdevice().waitIdle();
+    sub<module::device>().vdevice().waitIdle();
   }
 
 
@@ -53,7 +65,7 @@ namespace mochi
   {
     auto last_time = std::chrono::high_resolution_clock::now();
     
-    while (m_window.proc_events()) {
+    while (sub<module::display>().proc_events()) {
       auto current_time = std::chrono::high_resolution_clock::now();
       float dt = std::chrono::duration<float, std::chrono::seconds::period>(current_time-last_time).count();
       last_time = current_time;
@@ -67,24 +79,35 @@ namespace mochi
 
   fun core::draw() -> void
   {
-    auto &cmd = m_renderer.begin_frame();
-    m_renderer.begin_swapchain_rendering(cmd, {0.1f, 0.1f, 0.1f, 1.0f});
+    auto &ren = sub<module::renderer>();
+    auto &disp = sub<module::display>();
+
+    auto &cmd = ren.begin_frame();
+
+    u32 current_frame = ren.current_frame();
+    vk::Semaphore wait_sem = ren.get_image_available_sem(current_frame);
+
+    u32 image_index = disp.acquire_next_image(wait_sem);
+    auto target = disp.get_render_target(image_index);
+    vk::Semaphore signal_sem = disp.get_render_finished_sem(image_index);
+
+    ren.begin_pass(cmd, target, {0.1f, 0.1f, 0.1f, 1.0f});
 
 
     auto &mem = sub<module::memory>();
 
     // Update camera system
-    auto cameras = m_registry.view<TransformComponent, CameraComponent>();
+    auto cameras = m_registry.view<ecs::Node3D, ecs::Camera3D>();
     size_t cam_count = std::distance(cameras.begin(), cameras.end());
-    if (!mem.m_camera_ubo || (mem.m_camera_ubo->size() / camera_i.stride()) < cam_count) {
-      mem.m_camera_ubo = mem.load_UniformBuffer(&camera_i, std::max<size_t>(1, cam_count), [](void*){});
+    if (!mem.m_camera_ubo || (mem.m_camera_ubo->size() / ecs::camera3d_i.stride()) < cam_count) {
+      mem.m_camera_ubo = mem.load_UniformBuffer(&ecs::camera3d_i, std::max<size_t>(1, cam_count), [](void*){});
     }
     
     if (mem.m_camera_ubo && mem.m_camera_ubo->mapped()) {
-      auto* cam_data = (camera_t*)mem.m_camera_ubo->mapped();
+      auto* cam_data = (ecs::camera3d_t*)mem.m_camera_ubo->mapped();
       u32 idx = 0;
       for (auto entity : cameras) {
-        auto &cam = cameras.get<CameraComponent>(entity);
+        auto &cam = cameras.get<ecs::Camera3D>(entity);
         cam_data[idx].view = cam.view;
         cam_data[idx].proj = cam.proj;
         idx++;
@@ -92,20 +115,20 @@ namespace mochi
     }
 
     // Update light system
-    auto lights = m_registry.view<TransformComponent, LightComponent>();
+    auto lights = m_registry.view<ecs::Node3D, ecs::OmniLight3D>();
     size_t lig_count = std::distance(lights.begin(), lights.end());
-    if (!mem.m_light_ubo || (mem.m_light_ubo->size() / light_i.stride()) < lig_count + 1) {
-      mem.m_light_ubo = mem.load_UniformBuffer(&light_i, std::max<size_t>(1, lig_count + 1), [](void*){});
+    if (!mem.m_light_ubo || (mem.m_light_ubo->size() / ecs::omni_light3d_i.stride()) < lig_count + 1) {
+      mem.m_light_ubo = mem.load_UniformBuffer(&ecs::omni_light3d_i, std::max<size_t>(1, lig_count + 1), [](void*){});
     }
 
     if (mem.m_light_ubo && mem.m_light_ubo->mapped()) {
-      auto* lig_data = (light_t*)mem.m_light_ubo->mapped();
+      auto* lig_data = (ecs::omni_light3d_t*)mem.m_light_ubo->mapped();
       *((u32*)lig_data) = lig_count; // First 4 bytes hold the count
       
       u32 idx = 1;
       for (auto entity : lights) {
-        auto &transform = lights.get<TransformComponent>(entity);
-        auto &light = lights.get<LightComponent>(entity);
+        auto &transform = lights.get<ecs::Node3D>(entity);
+        auto &light = lights.get<ecs::OmniLight3D>(entity);
         
         lig_data[idx].position = {transform.model.SwVec[0][3], transform.model.SwVec[1][3], transform.model.SwVec[2][3], 0.0f};
         lig_data[idx].color = {light.color, light.intensity};
@@ -114,7 +137,7 @@ namespace mochi
     }
 
 
-    auto extent = m_swapchain.extent(); 
+    auto extent = sub<module::display>().extent(); 
     cmd.setViewport(0, {vk::Viewport(0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f)});
     cmd.setScissor(0, {vk::Rect2D({0, 0}, extent)});
 
@@ -122,11 +145,11 @@ namespace mochi
     rhi::pipeline *last_pipeline{};
     rhi::buffer   *last_buffer{};
 
-    auto view = m_registry.view<TransformComponent, RenderableComponent>();
+    auto view = m_registry.view<ecs::Node3D, ecs::MeshInstance3D>();
     for (auto entity : view)
     {
-      auto &transform = view.get<TransformComponent>(entity);
-      auto &renderable = view.get<RenderableComponent>(entity);
+      auto &transform = view.get<ecs::Node3D>(entity);
+      auto &renderable = view.get<ecs::MeshInstance3D>(entity);
 
       if (!renderable.pipeline || !renderable.mesh || !renderable.desc_sets)
         continue;
@@ -167,8 +190,13 @@ namespace mochi
     }
 
 
-    m_renderer.end_swapchain_rendering(cmd);
-    m_renderer.end_frame(cmd);
+    ren.end_pass(cmd, target);
+
+    vk::Semaphore w[] = {wait_sem};
+    vk::Semaphore s[] = {signal_sem};
+    ren.end_frame(cmd, w, s);
+
+    disp.present(signal_sem, image_index);
   }
   
 }

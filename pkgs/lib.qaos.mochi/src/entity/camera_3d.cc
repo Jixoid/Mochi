@@ -11,7 +11,8 @@
 
 
 #include "mochi/entity/camera_3d.hh"
-#include "mochi/world/components.hh"
+#include "mochi/ecs/camera_3d.hh"
+#include "mochi/core.hh"
 
 
 
@@ -20,42 +21,34 @@ namespace mochi::entity
 
   Camera3D::Camera3D(core &eng): Node3D(eng)
   {
-    m_core.registry().emplace<CameraComponent>(m_entity);
-    update_component();
+    m_core.registry().emplace<ecs::Camera3D>(m_entity);
+    updateComponent();
   }
 
-  fun Camera3D::update_component() -> void
+  fun Camera3D::updateComponent() -> void
   {
-    auto& cc = m_core.registry().get<CameraComponent>(m_entity);
+    auto& cc = m_core.registry().get<ecs::Camera3D>(m_entity);
     cc.fov = m_fov;
     cc.near = m_near;
     cc.far = m_far;
-    
-    // Note: The main loop typically updates view and projection matrices
-    // using this camera's parameters.
   }
 
-  fun Camera3D::set_fov(f32 fov) -> void
+  fun Camera3D::setFov(f32 fov) -> void
   {
     m_fov = fov;
-    update_component();
+    updateComponent();
   }
 
-  fun Camera3D::set_near(f32 n) -> void
+  fun Camera3D::setNear(f32 n) -> void
   {
     m_near = n;
-    update_component();
+    updateComponent();
   }
 
-  fun Camera3D::set_far(f32 f) -> void
+  fun Camera3D::setFar(f32 f) -> void
   {
     m_far = f;
-    update_component();
-  }
-
-  fun Camera3D::make_current() -> void
-  {
-    // Implementation can be added if the engine tracks a "current" camera
+    updateComponent();
   }
 
 }

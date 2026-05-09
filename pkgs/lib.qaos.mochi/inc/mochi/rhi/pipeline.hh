@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/types.hh"
 #include "mochi/rhi/shader.hh"
 #include <memory>

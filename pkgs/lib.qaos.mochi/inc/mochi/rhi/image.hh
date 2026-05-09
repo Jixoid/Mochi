@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/types.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "vk_mem_alloc.h"

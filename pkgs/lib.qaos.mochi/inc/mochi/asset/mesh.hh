@@ -12,12 +12,11 @@
 
 #pragma once
 
-#include "Basis.hh"
+#include "basis.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
 #include "mochi/geometry.hh"
 #include <string_view>
-#include <memory>
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
 
