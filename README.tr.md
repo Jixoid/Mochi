@@ -34,7 +34,7 @@ scripts/build.sh
 
 ## Lisans
 
-Bu proje GNU Genel Kamu Lisansı versiyon 3 (GPL3) kapsamında lisanslanmıştır. Detaylar için LICENSE klasörüne bakın.
+Bu proje GNU Genel Kamu Lisansı versiyon 3 (GPL3) kapsamında lisanslanmıştır.
 
 Copyright (c) 2025-2026 Kadir Aydın.
 

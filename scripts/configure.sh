@@ -1,9 +1,0 @@
-cmake \
-  -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
-  -DCMAKE_BUILD_TYPE:STRING=Release \
-  -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE \
-  -DCMAKE_SYSTEM_NAME:STRING=Linux \
-  -DCMAKE_MAKE_PROGRAM:STRING=ninja \
-  -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:STRING=ON \
-  --no-warn-unused-cli \
-  -S $(dirname $0)/.. -B $(dirname $0)/../build -G Ninja

@@ -3,6 +3,7 @@
 .remote
 /build
 .cache
+.qcache
 html
 latex
 xml

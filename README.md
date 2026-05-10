@@ -34,7 +34,7 @@ scripts/build.sh
 
 ## License
 
-This project is licensed under the GNU General Public License version 3 (GPL3). See the LICENSE file for details.
+This project is licensed under the GNU General Public License version 3 (GPL3).
 
 Copyright (c) 2025-2026 Kadir Aydın.
 
