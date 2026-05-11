@@ -17,6 +17,12 @@ Proje 3 temel katmana ayrılmıştır:
 
 ## Görseller
 
+![Su Şişesi 3D Model](/images/WaterBottle.png)
+*PBR (Fizik Tabanlı Render) render testi.*
+
+![Avakado 3D Modeli](/images/Avacado.png)
+*PBR (Fizik Tabanlı Render) render testi.*
+
 ![Suzanne 3D Modeli](/images/Suzanne.png)
 *PBR (Fizik Tabanlı Render) render testi.*
 

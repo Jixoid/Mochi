@@ -17,19 +17,14 @@ The project is divided into three core layers:
 
 ## Visuals
 
-![Suzanne 3D Model](/images/Suzanne.png)
+![WaterBottle 3D Model](/images/WaterBottle.png)
 *PBR rendering test.*
 
+![Avacado 3D Model](/images/Avacado.png)
+*PBR rendering test.*
 
-## Building
-
-The project uses CMake for build configuration.
-You can also compile it simply as follows:
-
-```bash
-scripts/configure.sh
-scripts/build.sh
-```
+![Suzanne 3D Model](/images/Suzanne.png)
+*PBR rendering test.*
 
 
 ## License
