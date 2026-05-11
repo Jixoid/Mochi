@@ -15,6 +15,7 @@
 #include "mochi/geometry.hh"
 #include "mochi/rhi/buffer.hh"
 #include <vulkan/vulkan_raii.hpp>
+#include "mochi/rhi/vtype.hh"
 #include "src/entt/entt.hpp"
 
 
@@ -22,9 +23,9 @@
 namespace mochi::ecs
 {
 
-  rhi::info<rhi::buffer> point_light_i(
+  auto point_light_i = rhi::info<rhi::buffer>::make(
     sizeof(point_light_t),
-    vt::make_list<
+    rhi::vt::make_list<
       vec4<f32>, // Position
       vec4<f32>  // Color
     >()

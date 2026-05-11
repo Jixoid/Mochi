@@ -11,62 +11,38 @@
 
 
 #include "mochi/asset/material.hh"
+#include "mochi/except.hh"
 #include "mochi/module/resource.hh"
-#include "mochi/module/device.hh"
-#include "mochi/rhi/pipeline.hh"
+#include <variant>
 
 
 
 namespace mochi::asset
 {
 
-  material::material(core &core, sptr<rhi::pipeline> pip)
+  material::material(core &core)
     : m_core(core)
-    , m_pipeline(std::move(pip))
-  {
-    m_desc_set = m_core.sub<module::resource>().allocate_descriptor_set(*m_pipeline->desc_layout());
-  }
+  {}
+
 
   
-
-  fun material::bind_uniform(u32 binding, const mochi::rhi::buffer &buf) -> void
+  fun material::desc(rhi::render_target &target) -> sptr<module::material_desc>
   {
-    vk::DescriptorBufferInfo buffer_info(buf.get(), 0, buf.size());
+    auto Albedo = [&](){
+      if (std::holds_alternative<vec3<f32>>(m_albedo)) return module::material_albedo::maColor;
+      ef (std::holds_alternative<sptr<asset::texture2>>(m_albedo)) return module::material_albedo::maTexture;
+      else
+        throw except("unknown type");
+    };
 
-    vk::WriteDescriptorSet descriptor_write(
-      *m_desc_set,
-      binding,
-      0,
-      1,
-      vk::DescriptorType::eUniformBuffer,
-      nil,
-      &buffer_info,
-      nil
-    );
 
-    m_core.sub<module::device>().vdevice().updateDescriptorSets(descriptor_write, nullptr);
-  }
+    module::material_props props = {
+      .method = module::material_method::mmPBR,
+      .albedo = Albedo(),
+      .texture = is_texture() ? texture().get() : nil,
+    };
 
-  fun material::bind_texture(u32 binding, vk::ImageView image_view, vk::Sampler sampler) -> void
-  {
-    vk::DescriptorImageInfo image_info(
-      sampler,
-      image_view,
-      vk::ImageLayout::eShaderReadOnlyOptimal
-    );
-
-    vk::WriteDescriptorSet descriptor_write(
-      *m_desc_set,
-      binding,
-      0,
-      1,
-      vk::DescriptorType::eCombinedImageSampler,
-      &image_info,
-      nil,
-      nil
-    );
-
-    m_core.sub<module::device>().vdevice().updateDescriptorSets(descriptor_write, nullptr);
+    return std::move(m_core.sub<module::resource>().get_or_new_material_desc(target, props));
   }
 
 }

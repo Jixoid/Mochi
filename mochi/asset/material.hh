@@ -13,9 +13,10 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/pipeline.hh"
-#include "mochi/rhi/buffer.hh"
+#include "mochi/geometry.hh"
+#include "mochi/module/resource.hh"
 #include "mochi/core.hh"
+#include <variant>
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -30,37 +31,25 @@ namespace mochi::asset
       /**
        * @brief Construct a new material3d instance.
        * @param core The mochi core instance.
-       * @param pip The pipeline used by this material.
        */
-      explicit material(core &core, sptr<rhi::pipeline> pip);
+      explicit material(core &core);
+
 
     private:
       core &m_core;
-      sptr<rhi::pipeline> m_pipeline;
-      vk::raii::DescriptorSet m_desc_set{nil};
+      std::variant<vec3<f32>, sptr<asset::texture2>> m_albedo;
 
     public:
-      /** @brief Access the associated pipeline. */
-      inline fun& get_pipeline() { return m_pipeline; }
+      inline fun is_color() { return std::holds_alternative<vec3<f32>>(m_albedo); }
+      inline fun color() { return std::get<vec3<f32>>(m_albedo); }
+      inline fun setColor(vec3<f32> val) { m_albedo = val; }
       
-      /** @brief Access the allocated descriptor set. */
-      inline fun& get_desc_set() { return m_desc_set; }
+      inline fun is_texture() { return std::holds_alternative<sptr<asset::texture2>>(m_albedo); }
+      inline fun texture() { return std::get<sptr<asset::texture2>>(m_albedo); }
+      inline fun setTexture(sptr<asset::texture2> val) { m_albedo = val; }
 
-    public:
-      /**
-       * @brief Update the descriptor set to bind a uniform buffer.
-       * @param binding The binding index defined in the shader.
-       * @param buf The buffer to bind.
-       */
-      fun bind_uniform(u32 binding, const mochi::rhi::buffer &buf) -> void;
 
-      /**
-       * @brief Update the descriptor set to bind a texture (Combined Image Sampler).
-       * @param binding The binding index defined in the shader.
-       * @param image_view The image view of the texture.
-       * @param sampler The sampler to use.
-       */
-      fun bind_texture(u32 binding, vk::ImageView image_view, vk::Sampler sampler) -> void;
+      fun desc(rhi::render_target &target) -> sptr<module::material_desc>;
   };
 
 }

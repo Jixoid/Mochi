@@ -10,14 +10,15 @@
 */
 
 
+#include "mochi/asset/texture.hh"
 #include "mochi/basis.hh"
 #include "mochi/core.hh"
-#include "mochi/asset/mesh.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/mesh.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/transform.hh"
+#include "mochi/rhi/image.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/module/device.hh"
@@ -41,8 +42,8 @@ namespace mochi
   {
     auto bridge     = make_uptr(new module::bridge("Mochi Test", {1,0,0,0}));
     auto device     = make_uptr(new module::device(GpuPicker(bridge->physicalDevices())));
-    auto resource = make_uptr(new module::resource(*device));
     auto memory     = make_uptr(new module::memory(*bridge, *device));
+    auto resource = make_uptr(new module::resource(*device, *memory));
     auto display   = make_uptr(new module::display(*bridge, *device, *memory, "Mochi Test", 800, 600));
     auto renderer = make_uptr(new module::renderer(*device));
 
@@ -90,7 +91,7 @@ namespace mochi
   }
 
 
-  fun core::paint(vk::raii::CommandBuffer &cmd) -> void
+  fun core::paint(vk::raii::CommandBuffer &cmd, rhi::render_target &target) -> void
   {
     auto &mem = sub<module::memory>();
 
@@ -135,54 +136,79 @@ namespace mochi
     cmd.setViewport(0, {vk::Viewport(0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f)});
     cmd.setScissor(0, {vk::Rect2D({0, 0}, extent)});
 
+    
+
     // Render loop
     rhi::pipeline *last_pipeline{};
     rhi::buffer   *last_buffer{};
+    rhi::image2   *last_image{};
+
 
     auto view = m_registry.view<ecs::Transform, ecs::Mesh>();
-    for (auto entity : view)
+    for (auto entity: view)
     {
       auto &transform = view.get<ecs::Transform>(entity);
       auto &renderable = view.get<ecs::Mesh>(entity);
 
-      if (!renderable.material || !renderable.mesh)
+      if (!renderable.mesh)
         continue;
 
-      auto pipe = renderable.material->get_pipeline();
+      
       auto mesh = renderable.mesh;
-
-
-      if (pipe.get() != last_pipeline) {
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipe->get());
-        last_pipeline = pipe.get();
-      }
-
 
       if (mesh->data().get() != last_buffer) {
         cmd.bindVertexBuffers(0, {mesh->data()->get()}, {0}); 
         last_buffer = mesh->data().get();
       }
 
-      cmd.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        *pipe->layout(),
-        0,
-        {*renderable.material->get_desc_set(), },
-        {}
-      );
 
-      auto model_mat = transform.model;
-      cmd.pushConstants<mochi::mat4<f32>>(
-        *last_pipeline->layout(),
-        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-        0,
-        model_mat
-      );
+      
+      u32 i{};
+      for (auto &subsur: mesh->offs())
+      {
+        auto material = renderable.mesh->material()[renderable.mesh->map()[i]];
+        auto desc = material->desc(target);
+
+        if (desc->pipeline.get() != last_pipeline) {
+          cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *desc->pipeline->get());
+          last_pipeline = desc->pipeline.get();
+        }
+
+        cmd.bindDescriptorSets(
+          vk::PipelineBindPoint::eGraphics,
+          *desc->pipeline->layout(),
+          0,
+          {*desc->desc_sets[0]},
+          {}
+        );
 
 
-      cmd.draw(mesh->data()->size() / asset::vertex_i.stride(), 1, 0, 0);
+        if (material->is_texture()) {
+          cmd.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            *desc->pipeline->layout(),
+            1,
+            {*desc->desc_sets[1]},
+            {}
+          );
+        }
+
+
+        auto model_mat = transform.model;
+        cmd.pushConstants<mochi::mat4<f32>>(
+          *last_pipeline->layout(),
+          vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+          0,
+          model_mat
+        );
+
+        cmd.draw(subsur.size(), 1, subsur.off(), 0);
+        i++;
+      }
+
     }
   }
+
 
   fun core::draw() -> void
   {
@@ -200,7 +226,7 @@ namespace mochi
 
     ren.begin_pass(cmd, target, {0.1f, 0.1f, 0.1f, 1.0f});
 
-    /* paint */ paint(cmd);
+    /* paint */ paint(cmd, target);
 
     ren.end_pass(cmd, target);
 

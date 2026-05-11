@@ -361,10 +361,105 @@ struct data
     u0    m_size{};
 
   public:
-    /** @brief Access the data pointer. */
     inline fun& ptr() { return m_ptr; }
-    /** @brief Access the data size. */
     inline fun& size() { return m_size; }
+};
+
+
+
+
+/// Offs
+
+/** @brief A generic raw offs representation. */
+struct offs
+{
+  public:
+    /** @brief Default constructor. */
+    inline offs() {}
+
+    /** 
+     * @brief Construct from pointer and size.
+     * @param off Offset to the data.
+     * @param size Size of the data in bytes.
+     */
+    inline offs(u0 off, u0 size)
+      : m_off(off)
+      , m_size(size)
+    {}
+
+
+  private:
+    u0 m_off{};
+    u0 m_size{};
+
+  public:
+    inline fun& off() { return m_off; }
+    inline fun& size() { return m_size; }
+};
+
+
+
+
+/// Flags
+template <typename BitType>
+struct flags
+{
+  public:
+    using BitsType = BitType;
+    using MaskType = typename std::underlying_type<BitType>::type;
+
+  public:
+    constexpr flags() noexcept : m_mask(0) {}
+    
+    constexpr flags(const flags &rhs) noexcept : m_mask(rhs.m_mask) {};
+    
+    constexpr flags(BitType bit) noexcept : m_mask(static_cast<MaskType>(bit)) {}
+
+  private:
+    constexpr explicit flags(MaskType flags) noexcept : m_mask(flags) {}
+
+
+  private:
+    MaskType m_mask;
+
+  public:
+    inline fun mask() { return m_mask; }
+
+
+  public:
+    //fun operator<=>(const flags<BitType>&) const = default;
+    
+    constexpr fun operator ==(const flags<BitType> &rhs) const noexcept -> bool { return m_mask == rhs.m_mask; }
+    constexpr fun operator !=(const flags<BitType> &rhs) const noexcept -> bool { return m_mask != rhs.m_mask; }
+  
+    constexpr fun operator <(const flags<BitType> &rhs) const noexcept -> bool { return m_mask < rhs.m_mask; }
+    constexpr fun operator >(const flags<BitType> &rhs) const noexcept -> bool { return m_mask > rhs.m_mask; }
+
+    constexpr fun operator <=(const flags<BitType> &rhs) const noexcept -> bool { return m_mask <= rhs.m_mask; }
+    constexpr fun operator >=(const flags<BitType> &rhs) const noexcept -> bool { return m_mask >= rhs.m_mask; }
+
+
+  public:
+    constexpr fun operator !() const noexcept -> bool { return !m_mask; }
+
+    constexpr fun operator ~() const noexcept -> flags<BitType> { return ~m_mask; }
+
+    constexpr fun operator &(const flags<BitType> &rhs) const noexcept -> flags<BitType> { return flags<BitType>( m_mask & rhs.m_mask ); }
+    constexpr fun operator |(const flags<BitType> &rhs) const noexcept -> flags<BitType> { return flags<BitType>( m_mask | rhs.m_mask ); }
+    constexpr fun operator ^(const flags<BitType> &rhs) const noexcept -> flags<BitType> { return flags<BitType>( m_mask ^ rhs.m_mask ); }
+
+
+  public:
+    constexpr fun operator =(const flags<BitType> &rhs) noexcept -> flags<BitType>& = default;
+
+    constexpr fun operator &=(const flags<BitType> &rhs) noexcept -> flags<BitType>& { m_mask &= rhs.m_mask; return *this; }
+    constexpr fun operator |=(const flags<BitType> &rhs) noexcept -> flags<BitType>& { m_mask |= rhs.m_mask; return *this; }
+    constexpr fun operator ^=(const flags<BitType> &rhs) noexcept -> flags<BitType>& { m_mask ^= rhs.m_mask; return *this; }
+
+
+  public:
+    explicit constexpr operator bool() const noexcept { return !!m_mask; }
+    explicit constexpr operator MaskType() const noexcept { return m_mask; }
 };
 
 

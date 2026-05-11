@@ -15,16 +15,13 @@
 #include "mochi/core.hh"
 #include "mochi/except.hh"
 #include "mochi/module/display.hh"
-#include "mochi/module/memory.hh"
-#include "mochi/rhi/pipeline.hh"
-#include "mochi/rhi/shader.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/asset/texture.hh"
-#include "mochi/asset/material.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/mesh.hh"
 #include "mochi/ecs/transform.hh"
+#include "mochi/vfs/vfs_res.hh"
 #include "vulkan/vulkan.hpp"
 
 using namespace mochi;
@@ -33,11 +30,14 @@ using namespace mochi;
 
 int Main()
 {
+  auto __vfs_res = vfs::__res::get();
+
+
   mochi::vec3<f32> cam_pos{0,0,4};
   mochi::vec3<f32> cam_front{-1};
   cam_front = cam_front.normalize();
   mochi::vec3<f32> cam_up{0,1,0};
-  f32 cam_speed = 10;
+  f32 cam_speed = 2;
   f32 yaw = -135;
   f32 pitch = -35; 
   f64 last_x = 400, last_y = 300;
@@ -171,42 +171,11 @@ int Main()
 
 
   auto m3d = asset::mesh::make(eng, "/home/alforce/Masaüstü/Untitled.glb");
-  auto txt = asset::texture2::make(eng, "/home/alforce/Masaüstü/Untitled.png");
 
-
-  rhi::info<rhi::pipeline> pbr_i(
-    {
-      {mochi::vt::make<mochi::mat4<f32>>(), vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-    },
-    {
-      {&asset::vertex_i, vk::VertexInputRate::eVertex},
-    },
-    {
-      {&ecs::camera_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-      {&ecs::point_light_i, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-      {nil, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
-    }
-  );
-
-
-  std::vector<rhi::shaderSlot> shaders;
-  shaders.push_back({vk::ShaderStageFlagBits::eVertex, rhi::shader(eng, ".qcache/pbr.vert.spv", "main")});
-  shaders.push_back({vk::ShaderStageFlagBits::eFragment, rhi::shader(eng, ".qcache/pbr.frag.spv", "main")});
-  
-  auto pipe = rhi::pipeline::make(eng, &pbr_i, std::move(shaders));
-
-
-  auto &mem = eng.sub<module::memory>();
-  
-  auto mat = make_sptr<asset::material>(eng, pipe);
-  mat->bind_uniform(0, *mem.camera_ubo());
-  mat->bind_uniform(1, *mem.light_ubo());
-  mat->bind_texture(2, *txt->data()->view(), *txt->data()->sampler());
 
   auto mesh_instance = reg.create();
   auto &mesh_comp = reg.emplace<ecs::Mesh>(mesh_instance);
   mesh_comp.mesh = m3d;
-  mesh_comp.material = mat;
   auto &transform = reg.emplace<ecs::Transform>(mesh_instance);
   transform.model = mochi::mat4<f32>::model({0}, quaternion<f32>(), {1});
   scene_nodes.push_back(mesh_instance);
@@ -215,10 +184,7 @@ int Main()
   eng.run();
 
   scene_nodes.clear();
-  mat.reset();
-  pipe.reset();
   m3d.reset();
-  txt.reset();
 
   return 0;
 }

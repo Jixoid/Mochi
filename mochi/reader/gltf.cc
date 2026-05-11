@@ -36,13 +36,34 @@ namespace mochi
       throw mochi::asset_error("glTF file cannot parsed.");
 
     
-
-    if (cgltf_load_buffers(&options, data, nullptr) != cgltf_result_success) {
+    if (cgltf_load_buffers(&options, data, nil) != cgltf_result_success) {
       cgltf_free(data);
       throw mochi::asset_error("glTF buffers cannot loaded.");
     }
 
+
+    // Texture
+    for (cgltf_size i = 0; i < data->images_count; i++)
+    {
+      cgltf_image *img = &data->images[i];
+      gltf_image extracted_img;
+
+      if (img->buffer_view && img->buffer_view->buffer->data)
+      {
+        u8* img_data_ptr = static_cast<u8*>(img->buffer_view->buffer->data) + img->buffer_view->offset;
+        u0 img_size = img->buffer_view->size;
+
+        if (img->name) extracted_img.name = img->name;
+        if (img->mime_type) extracted_img.mime_type = img->mime_type;
+        
+        extracted_img.data.assign(img_data_ptr, img_data_ptr + img_size);
+      }
+
+      result.images.push_back(std::move(extracted_img));
+    }
     
+
+    // Vertex
     for (cgltf_size i = 0; i < data->meshes_count; i++)
     {
       cgltf_mesh *mesh = &data->meshes[i];
@@ -50,33 +71,34 @@ namespace mochi
       for (cgltf_size j = 0; j < mesh->primitives_count; j++)
       {
         cgltf_primitive *prim = &mesh->primitives[j];
-
-        // Extract unique vertices
+        
         cgltf_size vertex_count = prim->attributes[0].data->count;
         std::vector<asset::vertex_t> temp_vertices(vertex_count);
 
 
-        for (auto& v : temp_vertices) v.color = {1.0f, 1.0f, 1.0f};
+        for (auto &v: temp_vertices) v.color = {1,1,1};
 
         // Extract attributes
-        for (cgltf_size a = 0; a < prim->attributes_count; ++a) {
-          cgltf_attribute* attr = &prim->attributes[a];
+        for (cgltf_size a = 0; a < prim->attributes_count; a++) {
+          cgltf_attribute *attr = &prim->attributes[a];
           
           if (attr->type == cgltf_attribute_type_position) {
-            for (cgltf_size v = 0; v < vertex_count; ++v)
+            for (cgltf_size v = 0; v < vertex_count; v++)
               cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].position.X, 3);
           } 
           ef (attr->type == cgltf_attribute_type_normal) {
-            for (cgltf_size v = 0; v < vertex_count; ++v)
+            for (cgltf_size v = 0; v < vertex_count; v++)
               cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].normal.X, 3);
           } 
           ef (attr->type == cgltf_attribute_type_texcoord) {
-            for (cgltf_size v = 0; v < vertex_count; ++v)
+            for (cgltf_size v = 0; v < vertex_count; v++)
               cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].uv.X, 2);
           }
         }
 
         // Unroll
+        auto legsize = result.vertices.size();
+
         if (prim->indices) {
           for (cgltf_size id = 0; id < prim->indices->count; id++) {
             cgltf_size index = cgltf_accessor_read_index(prim->indices, id);
@@ -85,8 +107,19 @@ namespace mochi
         } else {
           result.vertices.insert(result.vertices.end(), temp_vertices.begin(), temp_vertices.end());
         }
+
+        result.offsets.push_back({legsize, result.vertices.size() - legsize});
+        int img_idx = -1;
+        if (prim->material && prim->material->has_pbr_metallic_roughness) {
+          cgltf_texture_view* tex_view = &prim->material->pbr_metallic_roughness.base_color_texture;
+          if (tex_view->texture && tex_view->texture->image) {
+            img_idx = tex_view->texture->image - data->images;
+          }
+        }
+        result.image_map.push_back(img_idx);
       }
     }
+
     
     cgltf_free(data);
     return result;

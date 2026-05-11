@@ -10,53 +10,55 @@
 */
 
 
+#include "mochi/basis.hh"
 #include "mochi/rhi/buffer.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/convert.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/except.hh"
-#include "vulkan/vulkan.hpp"
-#include "vk_mem_alloc.h"
-#include "vk_mem_alloc.h"
+#include "mochi/types.hh"
 
 
 
 namespace mochi::rhi
 {
 
-  buffer::buffer(module::device &device, module::memory &memory, rhi::info<buffer> *info, u64 count, vk::BufferUsageFlags usage, const VmaAllocationCreateInfo &alloc_info)
+  buffer::buffer(module::device &device, module::memory &memory, sptr<rhi::info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create)
     : m_info(info)
-    , m_buffer(nil)
     , m_size(info->stride() * count)
+    , m_buffer(nil)
     , m_allocator(memory.allocator())
   {
-    VkBufferCreateInfo buffer_create_info = {};
-    buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO;
+    alloc_info.flags = VKConvert<BufferCreateFlags>(create);
+
+    VkBufferCreateInfo buffer_create_info{};
+    buffer_create_info.sType = VkStructureType::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_create_info.size = m_size;
-    buffer_create_info.usage = static_cast<VkBufferUsageFlags>(usage);
-    buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    buffer_create_info.usage = static_cast<VkBufferUsageFlags>(VKConvert<BufferUsageFlags>(usage));
+    buffer_create_info.sharingMode = VkSharingMode::VK_SHARING_MODE_EXCLUSIVE;
 
     auto res = vmaCreateBuffer(
-      m_allocator, 
-      &buffer_create_info, 
-      &alloc_info, 
-      &m_buffer, 
-      &m_allocation, 
+      m_allocator,
+      &buffer_create_info,
+      &alloc_info,
+      &m_buffer,
+      &m_allocation,
       &m_alloc_info
     );
+
 
     if (res != VK_SUCCESS)
       throw mochi::rhi_error("Failed to create VMA Buffer! Error code: " + std::to_string(res));
 
     
-    if (alloc_info.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT)
+    if (create & BufferCreate::Mapped)
       m_mapped = m_alloc_info.pMappedData;
   }
 
-
   buffer::~buffer()
   {
-    if (m_buffer)
-      vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);
+    if (m_buffer) vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);
   }
 
 }

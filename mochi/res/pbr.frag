@@ -11,7 +11,6 @@
 
 
 #version 450
-#define WITH_TEXTURE
 
 layout(location = 0) out vec4 out_color;
 
@@ -46,7 +45,7 @@ layout(set = 0, binding = 1) uniform LightBuffer
 } light;
 
 #if defined(WITH_TEXTURE)
-	layout(binding = 2) uniform sampler2D texSampler;
+	layout(set = 1, binding = 0) uniform sampler2D texSampler;
 #endif
 
 

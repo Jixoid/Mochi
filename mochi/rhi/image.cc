@@ -11,12 +11,14 @@
 
 
 #include "mochi/basis.hh"
+#include "mochi/rhi/rhi.hh"
+#include "mochi/types.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/buffer.hh"
-#include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
-#include "mochi/types.hh"
+#include "mochi/module/device.hh"
 #include <vulkan/vulkan_raii.hpp>
+#include "vk_mem_alloc.h"
 
 
 
@@ -24,25 +26,24 @@ namespace mochi::rhi
 {
 
   image2::image2(module::device &device, module::memory &memory, vk::raii::CommandPool &cmd_pool, u32 width, u32 height, void *ptr)
-    : m_allocator(memory.allocator())
-    , m_width(width)
+    : m_width(width)
     , m_height(height)
   {
     vk::DeviceSize image_size = width * height * 4;
 
-    rhi::info<rhi::buffer> staging_info(1, {}); 
+    auto staging_info = rhi::info<rhi::buffer>::make(1, {}); 
     
     VmaAllocationCreateInfo staging_alloc_info = {};
     staging_alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     staging_alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-    rhi::buffer staging_buffer(
-      device, memory, &staging_info, image_size,
-      vk::BufferUsageFlagBits::eTransferSrc,
-      staging_alloc_info
+    auto staging_buffer = rhi::buffer::make(
+      device, memory, staging_info, image_size,
+      BufferUsage::TransferSrc,
+      flags(BufferCreate::Mapped) | BufferCreate::HostSequentialWrite
     );
 
-    std::memcpy(staging_buffer.mapped(), ptr, static_cast<size_t>(image_size));
+    std::memcpy(staging_buffer->mapped(), ptr, static_cast<size_t>(image_size));
 
     vk::ImageCreateInfo image_info(
       {}, vk::ImageType::e2D, vk::Format::eR8G8B8A8Srgb,
@@ -94,7 +95,7 @@ namespace mochi::rhi
     );
     
 
-    cmd.copyBufferToImage(staging_buffer.get(), m_image, vk::ImageLayout::eTransferDstOptimal, {copy_region});
+    cmd.copyBufferToImage(staging_buffer->get(), m_image, vk::ImageLayout::eTransferDstOptimal, {copy_region});
 
 
     vk::ImageMemoryBarrier barrier_to_shader(

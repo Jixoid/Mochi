@@ -100,7 +100,7 @@ namespace mochi::module
 
     vk::SurfaceFormatKHR selected_format = formats[0];
     for (const auto &f: formats)
-      if (f.format == vk::Format::eB8G8R8A8Unorm && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+      if (f.format == vk::Format::eR8G8B8A8Unorm && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
         selected_format = f;
         break;
       }
@@ -250,8 +250,10 @@ namespace mochi::module
     return rhi::render_target{
       m_images[image_index],
       *m_image_views[image_index],
+      m_format,
       m_depth_image,
       *m_depth_view,
+      m_depth_format,
       m_extent,
       vk::ImageLayout::ePresentSrcKHR
     };

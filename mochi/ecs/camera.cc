@@ -15,6 +15,7 @@
 #include "mochi/geometry.hh"
 #include "mochi/rhi/buffer.hh"
 #include <vulkan/vulkan_raii.hpp>
+#include "mochi/rhi/vtype.hh"
 #include "src/entt/entt.hpp"
 
 
@@ -22,9 +23,9 @@
 namespace mochi::ecs
 {
 
-  rhi::info<rhi::buffer> camera_i(
+  auto camera_i = rhi::info<rhi::buffer>::make(
     sizeof(camera_t),
-    vt::make_list<
+    rhi::vt::make_list<
       mat4<f32>, // View
       mat4<f32>  // Projection
     >()

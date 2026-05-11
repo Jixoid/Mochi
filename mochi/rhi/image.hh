@@ -22,46 +22,33 @@
 namespace mochi::rhi
 {
 
-  /** @brief Represents a Vulkan 2D image. */
   struct image2
   {
-    public:
-      /**
-       * @brief Initialize a new image from raw pixel data.
-       * @param device Logical device.
-       * @param memory Memory allocator.
-       * @param cmd_pool Command pool used for staging buffer copy operations.
-       * @param width Width of the image.
-       * @param height Height of the image.
-       * @param ptr Pointer to the raw RGBA8 pixel data.
-       */
+    private:
       explicit image2(module::device &device, module::memory &memory, vk::raii::CommandPool &cmd_pool, u32 width, u32 height, void *ptr);
       
+    public:
       ~image2();
 
+      static inline fun make(module::device &device, module::memory &memory, vk::raii::CommandPool &cmd_pool, u32 width, u32 height, void *ptr) -> sptr<image2> {
+        return make_sptr(new image2(device, memory, cmd_pool, width, height, ptr));
+      }
 
-    private:
+
+    protected:
+      u32 m_width, m_height;
       VmaAllocator m_allocator{nil};
       VkImage m_image{VK_NULL_HANDLE};
       VmaAllocation m_allocation{nil};
       vk::raii::ImageView m_view{nil};
       vk::raii::Sampler m_sampler{nil};
 
-      u32 m_width;
-      u32 m_height;
-
     public:
-      /** @brief Access the underlying Vulkan RAII image. */
+      inline fun  width() const { return m_width; }
+      inline fun  height() const { return m_height; }
       inline fun& image() { return m_image; }
-      /** @brief Access the underlying Vulkan RAII image view. */
       inline fun& view() { return m_view; }
-      /** @brief Access the underlying Vulkan RAII sampler. */
       inline fun& sampler() { return m_sampler; }
-      /** @brief Get image width. */
-      inline fun width() const { return m_width; }
-      /** @brief Get image height. */
-      inline fun height() const { return m_height; }
-
   };
 
 }

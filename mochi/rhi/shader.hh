@@ -13,8 +13,10 @@
 #pragma once
 
 #include "mochi/basis.hh"
+#include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
 #include <string_view>
+#include <span>
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -22,28 +24,26 @@
 namespace mochi::rhi
 {
 
-  /** @brief Represents a Vulkan shader module and its entry point. */
   struct shader
   {
-    public:
-      /** 
-       * @brief Construct a new shader from a file path.
-       * @param core The mochi core instance.
-       * @param fpath The file path to the shader bytecode (e.g., SPIR-V).
-       * @param entry The entry point name of the shader.
-       */
-      explicit shader(mochi::core &core, std::string_view fpath, std::string_view entry);
-      
-
     private:
-      vk::raii::ShaderModule vk_module;
+      explicit shader(module::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry);
+    
+    public:
+      static inline fun make(module::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry) {
+        return make_sptr(new shader(device, stage, span, entry));
+      }
+
+
+    protected:
       std::string m_entry;
+      vk::raii::ShaderModule vk_module;
+      ShaderStage m_stage;
 
     public:
-      /** @brief Access the underlying Vulkan shader module. */
-      inline fun& module() { return vk_module; }
-      /** @brief Access the shader entry point string. */
       inline fun& entry() { return m_entry; }
+      inline fun  stage() { return m_stage; }
+      inline fun& module() { return vk_module; }
   };
 
 }

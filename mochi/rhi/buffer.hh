@@ -13,84 +13,66 @@
 #pragma once
 
 #include "mochi/basis.hh"
+#include "mochi/rhi/image.hh"
+#include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
-#include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_raii.hpp>
-#include "vk_mem_alloc.h"
 
 
 
 namespace mochi::rhi
 {
 
-  /** @brief Specialization of the info template for Vulkan buffers. */
   template<>
   struct info<buffer>
   {
+    private:
+      explicit inline info<buffer>(u64 stride, std::vector<vt> items): m_stride(stride), m_items(items) {}
+
     public:
-      /**
-       * @brief Initialize buffer info with a stride and item types.
-       * @param stride The size of a single element/vertex in bytes.
-       * @param items A list of Vulkan types describing the buffer's layout.
-       */
-      constexpr explicit inline info<buffer>(u64 stride, std::vector<mochi::vt> items)
-        : m_stride(stride)
-        , m_items(items)
-      {}
+      static inline fun make(u64 stride, std::vector<vt> items) {
+        return make_sptr(new info<buffer>(stride, items));
+      }
 
 
     private:
-      std::vector<mochi::vt> m_items;
+      std::vector<vt> m_items;
       u64 m_stride;
 
     public:
-      /** @brief Get the list of Vulkan types describing the layout. */
       inline fun items() { return m_items; }
-      /** @brief Get the stride (size in bytes) of a single element. */
       inline fun stride() { return m_stride; }
   };
 
 
 
 
-  /** @brief Represents a Vulkan buffer with associated memory. */
   struct buffer
   {
-    public:
-      /**
-       * @brief Construct a new buffer. Typically called by the memory allocator.
-       * @param device The logical device.
-       * @param memory The memory allocator.
-       * @param info Pointer to the buffer info structure.
-       * @param count Number of elements in the buffer.
-       * @param usage Buffer usage flags.
-       * @param properties Memory property flags.
-       */
-      explicit buffer(module::device &device, module::memory &memory, info<buffer> *info, u64 count, vk::BufferUsageFlags usage, const VmaAllocationCreateInfo &alloc_info);
-
-    public:
-      /** @brief Destructor. Automatically cleans up resources. */
-      ~buffer();
-
-
     private:
-      info<buffer> *m_info{};
+      explicit buffer(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create);
+      
+    public:
+      ~buffer();
+      
+      static inline fun make(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create) {
+        return make_sptr(new buffer(device, memory, info, count, usage, create));
+      }
+    
+
+    protected:
+      sptr<info<buffer>> m_info{};
+      u64   m_size{};
+      void* m_mapped{};
       VmaAllocator m_allocator{nil};
       VkBuffer m_buffer{nil};
       VmaAllocation m_allocation{nil};
       VmaAllocationInfo m_alloc_info{};
-      vk::DeviceSize m_size{};
-      void* m_mapped{};
 
     public:
-      /** @brief Get the buffer info structure. */
-      inline fun info() { return m_info; }
-      /** @brief Access the underlying Vulkan RAII buffer. */
-      inline fun get() const { return m_buffer; }
-      /** @brief Get the total size of the buffer in bytes. */
+      inline fun info() { return m_info.get(); }
       inline fun size() const { return m_size; }
-      /** @brief Get the mapped host memory pointer, if any. */
       inline fun mapped() const { return m_mapped; }
+      inline fun get() const { return m_buffer; }
   };
 
 }

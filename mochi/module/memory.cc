@@ -17,9 +17,8 @@
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/rhi/buffer.hh"
+#include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
-#include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_raii.hpp>
 
 
 
@@ -96,32 +95,28 @@ namespace mochi::module
 
   fun memory::camera_ubo(u64 required_count) -> sptr<rhi::buffer>
   {
-    if (!m_camera_ubo || (m_camera_ubo->size() / ecs::camera_i.stride()) < required_count) {
-      m_camera_ubo = load_UniformBuffer(&ecs::camera_i, std::max<u64>(10, required_count), [](void*){});
+    if (!m_camera_ubo || (m_camera_ubo->size() / ecs::camera_i->stride()) < required_count) {
+      m_camera_ubo = load_UniformBuffer(ecs::camera_i, std::max<u64>(10, required_count), [](void*){});
     }
     return m_camera_ubo;
   }
 
   fun memory::light_ubo(u64 required_count) -> sptr<rhi::buffer>
   {
-    if (!m_light_ubo || (m_light_ubo->size() / ecs::point_light_i.stride()) < required_count) {
-      m_light_ubo = load_UniformBuffer(&ecs::point_light_i, std::max<u64>(100, required_count), [](void*){});
+    if (!m_light_ubo || (m_light_ubo->size() / ecs::point_light_i->stride()) < required_count) {
+      m_light_ubo = load_UniformBuffer(ecs::point_light_i, std::max<u64>(100, required_count), [](void*){});
     }
     return m_light_ubo;
   }
 
 
 
-  fun memory::load_UMA_UniformBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  fun memory::load_UMA_UniformBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
-    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
-    auto ret = make_sptr<rhi::buffer>(
-      m_device, *this, info, count, 
-      vk::BufferUsageFlagBits::eUniformBuffer,
-      alloc_info
+    auto ret = rhi::buffer::make(
+      m_device, *this, info, count,
+      rhi::BufferUsage::UniformBuffer,
+      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
     );
 
     if (data && ret->mapped()) data(ret->mapped());
@@ -129,16 +124,12 @@ namespace mochi::module
     return ret;
   }
 
-  fun memory::load_DISC_UniformBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  fun memory::load_DISC_UniformBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
-    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
-    auto ret = make_sptr<rhi::buffer>(
+    auto ret = rhi::buffer::make(
       m_device, *this, info, count, 
-      vk::BufferUsageFlagBits::eUniformBuffer,
-      alloc_info
+      rhi::BufferUsage::UniformBuffer,
+      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
     );
 
     if (data && ret->mapped()) data(ret->mapped());
@@ -148,16 +139,12 @@ namespace mochi::module
 
 
   
-  fun memory::load_UMA_StorageBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  fun memory::load_UMA_StorageBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
-    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
-    auto ret = make_sptr<rhi::buffer>(
+    auto ret = rhi::buffer::make(
       m_device, *this, info, count,
-      vk::BufferUsageFlagBits::eStorageBuffer,
-      alloc_info
+      rhi::BufferUsage::StorageBuffer,
+      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
     );
 
     if (data && ret->mapped()) data(ret->mapped());
@@ -165,29 +152,21 @@ namespace mochi::module
     return ret;
   }
 
-  fun memory::load_DISC_StorageBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  fun memory::load_DISC_StorageBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-    auto ret = make_sptr<rhi::buffer>(
+    auto ret = rhi::buffer::make(
       m_device, *this, info, count,
-      vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, 
-      alloc_info
+      flags(rhi::BufferUsage::StorageBuffer) | rhi::BufferUsage::TransferDst,
+      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
     );
 
     if (data) {
-      // Create a temporary staging buffer to transfer data to Vram
-      VmaAllocationCreateInfo staging_alloc_info = {};
-      staging_alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
-      staging_alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
-      auto host_buffer = rhi::buffer(
+      auto host_buffer = rhi::buffer::make(
         m_device, *this, info, count,
-        vk::BufferUsageFlagBits::eTransferSrc, 
-        staging_alloc_info
+        rhi::BufferUsage::TransferSrc,
+        flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
       );
-      data(host_buffer.mapped());
+      data(host_buffer->mapped());
 
 
       vk::CommandBufferAllocateInfo cmd_alloc_info(*m_transfer_pool, vk::CommandBufferLevel::ePrimary, 1);
@@ -197,7 +176,7 @@ namespace mochi::module
       vk::BufferCopy copy_region(0, 0, ret->size());
 
       temp_cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      temp_cmd.copyBuffer(host_buffer.get(), ret->get(), copy_region);
+      temp_cmd.copyBuffer(host_buffer->get(), ret->get(), copy_region);
       temp_cmd.end();
 
       vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
@@ -210,16 +189,12 @@ namespace mochi::module
 
   
 
-  fun memory::load_UMA_VertexBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  fun memory::load_UMA_VertexBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
-    alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
-    auto ret = make_sptr<rhi::buffer>(
+    auto ret = rhi::buffer::make(
       m_device, *this, info, count,
-      vk::BufferUsageFlagBits::eVertexBuffer,
-      alloc_info
+      rhi::BufferUsage::VertexBuffer,
+      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
     );
 
     if (data && ret->mapped()) data(ret->mapped());
@@ -227,29 +202,21 @@ namespace mochi::module
     return ret;
   }
 
-  fun memory::load_DISC_VertexBuffer(rhi::info<rhi::buffer> *info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
+  fun memory::load_DISC_VertexBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
   {
-    VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-    auto ret = make_sptr<rhi::buffer>(
+    auto ret = rhi::buffer::make(
       m_device, *this, info, count,
-      vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, 
-      alloc_info
+      flags(rhi::BufferUsage::VertexBuffer) | rhi::BufferUsage::TransferDst,
+      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
     );
 
     if (data) {
-      // Create a temporary staging buffer to transfer data to Vram
-      VmaAllocationCreateInfo staging_alloc_info = {};
-      staging_alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
-      staging_alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
-      auto host_buffer = rhi::buffer(
-        m_device, *this, info, count,
-        vk::BufferUsageFlagBits::eTransferSrc, 
-        staging_alloc_info
+      auto host_buffer = rhi::buffer::make(
+        m_device, *this, info, count, 
+        rhi::BufferUsage::TransferSrc,
+        flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
       );
-      data(host_buffer.mapped());
+      data(host_buffer->mapped());
 
 
       vk::CommandBufferAllocateInfo cmd_alloc_info(*m_transfer_pool, vk::CommandBufferLevel::ePrimary, 1);
@@ -261,7 +228,7 @@ namespace mochi::module
       );
 
       temp_cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      temp_cmd.copyBuffer(host_buffer.get(), ret->get(), copy_region);
+      temp_cmd.copyBuffer(host_buffer->get(), ret->get(), copy_region);
 
       temp_cmd.pipelineBarrier(
         vk::PipelineStageFlagBits::eTransfer,

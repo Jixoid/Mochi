@@ -86,10 +86,24 @@ namespace mochi
 
   /// glTF
 
+  struct gltf_image {
+    std::string name;
+    std::vector<u8> data;
+    std::string mime_type; // "image/jpeg", "image/png" vb.
+  };
+
+  struct gltf_material {
+    std::string name;
+    int albedo_image_index = -1;  // -1 ise bu materyalde resim yok, düz renk var demektir
+    int normal_image_index = -1;
+  };
+
   /** @brief Complete glTF model data. */
   struct gltf_obj {
-    std::vector<asset::vertex_t> vertices; 
-    std::vector<u32> indices; // glTF typically uses Indexed Draw
+    std::vector<asset::vertex_t> vertices;
+    std::vector<gltf_image> images;
+    std::vector<int> image_map;
+    std::vector<offs> offsets;
   };
 
 

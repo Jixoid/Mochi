@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "mochi/asset/material.hh"
 #include "mochi/basis.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
@@ -27,19 +28,15 @@ namespace mochi::asset
 
   /** @brief Represents a single vertex in a mesh, including position, normal, color, and UV data. */
   struct vertex_t {
-    /** @brief 3D position of the vertex. */
     vec3<f32> position;
-    /** @brief 3D normal vector of the vertex. */
     vec3<f32> normal;
-    /** @brief RGB color of the vertex. */
     vec3<f32> color;
-    /** @brief 2D texture coordinates (UV) of the vertex. */
     vec2<f32> uv;
   };
   
   /** @brief Buffer info describing the vertex_t memory layout. */
-  extern rhi::info<rhi::buffer> vertex_i;
-  
+  extern sptr<rhi::info<rhi::buffer>> vertex_i;
+
 
   
 
@@ -51,7 +48,7 @@ namespace mochi::asset
        * @brief Construct a mesh directly from an existing buffer.
        * @param data The buffer containing vertex data.
        */
-      explicit mesh(sptr<rhi::buffer> data);
+      explicit mesh(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material);
       
       /**
        * @brief Construct a mesh by loading a 3D model file from disk.
@@ -67,7 +64,9 @@ namespace mochi::asset
        * @param data The buffer containing vertex data.
        * @return Pointer to the newly created mesh.
        */
-      static fun make(core &core, sptr<rhi::buffer> data) -> sptr<mesh>;
+      static inline fun make(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material) -> sptr<mesh> {
+        return make_sptr<mesh>(data, offs, material);
+      }
       
       /**
        * @brief Factory method to load and create a mesh from a file.
@@ -75,15 +74,23 @@ namespace mochi::asset
        * @param fpath The file path to the 3D model.
        * @return Pointer to the newly created mesh.
        */
-      static fun make(core &core, std::string_view fpath) -> sptr<mesh>;
+      static inline fun make(core &core, std::string_view fpath) -> sptr<mesh> {
+        return make_sptr<mesh>(core, fpath);
+      }
       
 
     private:
-      sptr<rhi::buffer> m_data{nil};
+      sptr<rhi::buffer> m_data;
+      std::vector<offs> m_offs;
+      std::vector<sptr<asset::material>> m_material;
+      std::vector<int>  m_map;
 
     public:
       /** @brief Access the underlying buffer holding the mesh vertex data. */
-      inline fun data() { return m_data; }
+      inline fun& data() { return m_data; }
+      inline fun& offs() { return m_offs; }
+      inline fun& material() { return m_material; }
+      inline fun& map() { return m_map; }
 
   };
 

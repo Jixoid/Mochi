@@ -10,36 +10,41 @@
 */
 
 
-#include "mochi/rhi/pipeline.hh"
-#include "mochi/module/device.hh"
-#include "mochi/core.hh"
-#include "mochi/rhi/shader.hh"
+#include "mochi/basis.hh"
+#include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
+#include "mochi/rhi/convert.hh"
+#include "mochi/rhi/buffer.hh"
+#include "mochi/rhi/pipeline.hh"
+#include "mochi/rhi/descset.hh"
+#include "mochi/rhi/slotPush.hh"
+#include "mochi/rhi/slotDesc.hh"
+#include "mochi/rhi/slotVertex.hh"
+#include "mochi/module/device.hh"
+#include <vector>
+#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
 
 
 namespace mochi::rhi
 {
+
   constexpr inline fun align_size(u64 size, u64 alignment) { if (alignment == 0) return size; else return ((size + alignment - 1) / alignment) * alignment; }
 
-
-  info<pipeline>::info(std::vector<pushSlot> push, std::vector<vertexSlot> vertex, std::vector<descriptorSlot> descriptor)
-    : m_push(push)
-    , m_vertex(vertex)
-    , m_descriptor(descriptor)
+  info<pipeline>::info(std::vector<sptr<info<slotPush>>> push, std::vector<sptr<info<slotVertex>>> vertex, std::vector<sptr<info<rhi::descset>>> descset)
   {
     u64 off{};
-    for (auto typ: push) {
-      off = align_size(off, typ.type().align());
+    for (auto &typ: push) {
+      off = align_size(off, typ->type().align());
 
       vk_PushConstant.push_back(vk::PushConstantRange(
-        typ.shaderStage(),
+        VKConvert<ShaderStageFlags>(typ->shaderStage()),
         off,
-        typ.type().size() * typ.type().count()
+        typ->type().size() * typ->type().count()
       ));
 
-      off += typ.type().size() * typ.type().count();
+      off += typ->type().size() * typ->type().count();
     }
 
 
@@ -48,69 +53,90 @@ namespace mochi::rhi
     for (auto ibuf: vertex) {
       u32 v_offset{};
 
-      for (auto &typ: ibuf.ibuf()->items()) {
+      for (auto &typ: ibuf->ibuf()->items()) {
         v_offset = align_size(v_offset, typ.align());
         
         for (u32 c{}; c < typ.count(); c++) {
-          vk_via.push_back(vk::VertexInputAttributeDescription(
+          vk_vertexAttribute.push_back(vk::VertexInputAttributeDescription(
             location_idx++,
             binding_idx,
-            typ.format(),
+            VKConvert<Format>(typ.format()),
             v_offset
           ));
           v_offset += typ.size();
         }
       }
 
-      vk_vib.push_back(vk::VertexInputBindingDescription(
+      vk_vertexBinding.push_back(vk::VertexInputBindingDescription(
         binding_idx++,
-        ibuf.ibuf()->stride(),
-        ibuf.inputRate()
+        ibuf->ibuf()->stride(),
+        VKConvert<VertexInputRate>(ibuf->inputRate())
       )); 
     }
   
     
 
-    u32 desc_binding_idx{};
-    for (auto d: descriptor)
-      vk_DescriptorBindings.push_back(vk::DescriptorSetLayoutBinding(
-        desc_binding_idx++,
-        d.kind(),
-        1,
-        d.shaderStage(),
-        nil
-      ));
+    vk_DescBindings.reserve(descset.size());
+
+    for (auto &desc: descset) 
+    {
+      std::vector<vk::DescriptorSetLayoutBinding> current_set_bindings;
+      
+      u32 binding_idx{};
+      for (auto &slot: desc->idescs()) 
+      {
+        current_set_bindings.push_back(vk::DescriptorSetLayoutBinding(
+          binding_idx++,
+          VKConvert<DescriptorType>(slot->kind()),
+          1,
+          VKConvert<ShaderStageFlags>(slot->stage()),
+          nil
+        ));
+      }
+      
+      vk_DescBindings.push_back(std::move(current_set_bindings));
+    }
+
     
+    m_push    = std::move(push);
+    m_vertex  = std::move(vertex);
+    m_descset = std::move(descset);
   }
-  
 
 
-
-  pipeline::pipeline(core &core, rhi::info<pipeline> *info, std::vector<shaderSlot> shaders)
-    : m_info(info), vk_layout(nil), vk_pipeline(nil)
+  pipeline::pipeline(module::device &device, sptr<rhi::info<pipeline>> info, std::vector<sptr<shader>> shaders, Format __color_format, Format __depth_format)
+    : vk_layout(nil), vk_pipeline(nil)
   {
-    bool is_compute = (shaders.size() == 1 && shaders[0].shaderStage() == vk::ShaderStageFlagBits::eCompute);
+    bool is_compute = (shaders.size() == 1 && shaders[0]->stage() == ShaderStage::Compute);
 
 
-    vk::DescriptorSetLayoutCreateInfo set_info({}, info->vkDescriptorBindings());
-    vk_desc_layout = vk::raii::DescriptorSetLayout(core.sub<module::device>().vdevice(), set_info);
+    std::vector<vk::DescriptorSetLayout> raw_layouts;
 
 
-    vk::PipelineLayoutCreateInfo layout_info({}, *vk_desc_layout, info->vkPushConstant());
-    vk_layout = vk::raii::PipelineLayout(core.sub<module::device>().vdevice(), layout_info);
+    for (auto &bindings_for_set: info->descBindings()) {
+      vk::DescriptorSetLayoutCreateInfo set_info({}, bindings_for_set);
+      
+      vk_desc_layouts.push_back(vk::raii::DescriptorSetLayout(device.vdevice(), set_info));
+      
+      raw_layouts.push_back(*vk_desc_layouts.back());
+    }
+    
+
+    vk::PipelineLayoutCreateInfo layout_info({}, raw_layouts, info->pushConstant());
+    vk_layout = vk::raii::PipelineLayout(device.vdevice(), layout_info);
 
 
 
     if (is_compute) 
     {
       vk::PipelineShaderStageCreateInfo compute_stage(
-        {}, shaders[0].shaderStage(), shaders[0].shader().module(), shaders[0].shader().entry().c_str()
+        {}, VKConvert<ShaderStage>(shaders[0]->stage()), shaders[0]->module(), shaders[0]->entry().c_str()
       );
 
       vk::ComputePipelineCreateInfo compute_info({}, compute_stage, *vk_layout);
       
 
-      vk_pipeline = vk::raii::Pipeline(core.sub<module::device>().vdevice(), nil, compute_info);
+      vk_pipeline = vk::raii::Pipeline(device.vdevice(), nil, compute_info);
     } 
     else 
     {
@@ -118,7 +144,7 @@ namespace mochi::rhi
       shader_stages.reserve(shaders.size());
       for (auto &sh: shaders) {
         shader_stages.push_back(vk::PipelineShaderStageCreateInfo(
-          {}, sh.shaderStage(), sh.shader().module(), sh.shader().entry().c_str()
+          {}, VKConvert<ShaderStage>(sh->stage()), sh->module(), sh->entry().c_str()
         ));
       }
 
@@ -147,13 +173,14 @@ namespace mochi::rhi
         VK_FALSE, VK_FALSE, {}, {}, 0.0f, 1.0f
       );
 
-      vk::Format depth_format = core.sub<module::display>().depth_format();
+      auto color_format = VKConvert<Format>(__color_format);
+      auto depth_format = VKConvert<Format>(__depth_format);
       vk::PipelineRenderingCreateInfo rendering_info(
-        0, 1, &core.sub<module::display>().format(),
+        0, 1, &color_format,
         depth_format, vk::Format::eUndefined
       );
 
-      auto VertexInput = info->vkVertexInput();
+      auto VertexInput = info->vertexBinding();
       vk::GraphicsPipelineCreateInfo pipeline_info(
         {}, shader_stages, &VertexInput, &input_assembly, nil,
         &viewport_state, &rasterizer, &multisampling, &depth_stencil,
@@ -162,15 +189,8 @@ namespace mochi::rhi
       pipeline_info.pNext = &rendering_info;
 
 
-      vk_pipeline = vk::raii::Pipeline(core.sub<module::device>().vdevice(), nil, pipeline_info);
+      vk_pipeline = vk::raii::Pipeline(device.vdevice(), nil, pipeline_info);
     }
   }
   
-
-
-  fun pipeline::make(core &core, rhi::info<pipeline> *info, std::vector<shaderSlot> shaders) -> sptr<pipeline>
-  {
-    return make_sptr<pipeline>(core, info, std::move(shaders));
-  }
-
 }

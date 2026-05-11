@@ -25,9 +25,11 @@ namespace mochi::rhi
   {
     vk::Image     color_image{nil};
     vk::ImageView color_view{nil};
-
+    vk::Format    color_format{};
+    
     vk::Image     depth_image{nil};
     vk::ImageView depth_view{nil};
+    vk::Format    depth_format{};
 
     vk::Extent2D  extent{};
     

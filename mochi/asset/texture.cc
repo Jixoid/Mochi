@@ -37,7 +37,7 @@ namespace mochi::asset
     if (!pixels) throw mochi::asset_error("Failed to load texture!");
 
     // Initialize texture and transfer to vram
-    m_data = make_sptr<rhi::image2>(
+    m_data = rhi::image2::make(
       core.sub<module::device>(), 
       core.sub<module::memory>(), 
       core.sub<module::renderer>().cmd_pool(),
@@ -49,7 +49,7 @@ namespace mochi::asset
 
   texture2::texture2(core &core, u32 width, u32 height, const void *pixels)
   {
-    m_data = make_sptr<rhi::image2>(
+    m_data = rhi::image2::make(
       core.sub<module::device>(), 
       core.sub<module::memory>(), 
       core.sub<module::renderer>().cmd_pool(),

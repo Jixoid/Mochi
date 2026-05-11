@@ -14,6 +14,7 @@
 
 #include "mochi/basis.hh"
 #include <cmath>
+#include <functional>
 #include <type_traits>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_shared.hpp>
@@ -33,7 +34,7 @@ namespace mochi
    */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
-  struct vec2
+  struct alignas(sizeof(T)*2) vec2
   {
     public:
       T X{}, Y{};
@@ -117,7 +118,37 @@ namespace mochi
       inline constexpr fun operator/=(const T It) noexcept -> vec2& { X /= It; Y /= It; return *this; }
   };
 
+}
 
+template <typename t>
+struct std::hash<mochi::vec2<t>> {
+  std::size_t operator()(const mochi::vec2<t>& d) const noexcept {
+    std::size_t seed = 0;
+
+    auto hash_combine = [&seed](auto &&v) {
+      using T = std::decay_t<decltype(v)>;
+      std::size_t h;
+      
+      if constexpr (std::is_enum_v<T>)
+        h = std::hash<std::underlying_type_t<T>>{}(std::to_underlying(v));
+      else
+        h = std::hash<T>{}(v);
+      
+      seed ^= h + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
+    };
+
+    hash_combine(d.X);
+    hash_combine(d.Y);
+
+    return seed;
+  }
+};
+
+
+
+
+namespace mochi
+{
 
   /** 
    * @brief A generic 3-dimensional vector.
@@ -125,7 +156,7 @@ namespace mochi
    */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
-  struct vec3
+  struct alignas(sizeof(T)*4) vec3
   {
     public:
       T X{}, Y{}, Z{};
@@ -214,7 +245,38 @@ namespace mochi
       inline constexpr fun operator/=(const T It) noexcept -> vec3& { X /= It; Y /= It; Z /= It; return *this; }
   };
 
+}
 
+template <typename t>
+struct std::hash<mochi::vec3<t>> {
+  std::size_t operator()(const mochi::vec3<t>& d) const noexcept {
+    std::size_t seed = 0;
+
+    auto hash_combine = [&seed](auto &&v) {
+      using T = std::decay_t<decltype(v)>;
+      std::size_t h;
+      
+      if constexpr (std::is_enum_v<T>)
+        h = std::hash<std::underlying_type_t<T>>{}(std::to_underlying(v));
+      else
+        h = std::hash<T>{}(v);
+      
+      seed ^= h + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
+    };
+
+    hash_combine(d.X);
+    hash_combine(d.Y);
+    hash_combine(d.Z);
+
+    return seed;
+  }
+};
+
+
+
+
+namespace mochi
+{
 
   /** 
    * @brief A generic 4-dimensional vector.
@@ -222,7 +284,7 @@ namespace mochi
    */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
-  struct vec4
+  struct alignas(sizeof(T)*4) vec4
   {
     public:
       T X{}, Y{}, Z{}, W{};
@@ -306,7 +368,39 @@ namespace mochi
       inline constexpr fun operator/=(const T It) noexcept -> vec4& { X /= It; Y /= It; Z /= It; W /= It; return *this; }
   };
 
+}
 
+template <typename t>
+struct std::hash<mochi::vec4<t>> {
+  std::size_t operator()(const mochi::vec4<t>& d) const noexcept {
+    std::size_t seed = 0;
+
+    auto hash_combine = [&seed](auto &&v) {
+      using T = std::decay_t<decltype(v)>;
+      std::size_t h;
+      
+      if constexpr (std::is_enum_v<T>)
+        h = std::hash<std::underlying_type_t<T>>{}(std::to_underlying(v));
+      else
+        h = std::hash<T>{}(v);
+      
+      seed ^= h + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
+    };
+
+    hash_combine(d.X);
+    hash_combine(d.Y);
+    hash_combine(d.Z);
+    hash_combine(d.W);
+
+    return seed;
+  }
+};
+
+
+
+
+namespace mochi
+{
 
   /** 
    * @brief A generic quaternion for representing rotations.

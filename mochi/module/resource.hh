@@ -13,10 +13,73 @@
 #pragma once
 
 #include "mochi/basis.hh"
+#include "mochi/rhi/render_target.hh"
+#include "mochi/rhi/rhi.hh"
+#include "mochi/types.hh"
 #include "mochi/module/device.hh"
+#include "vulkan/vulkan.hpp"
+#include <expected>
+#include <functional>
+#include <string>
+#include <unordered_map>
 #include <vulkan/vulkan_raii.hpp>
 #include <vector>
 
+
+
+namespace mochi::module
+{
+
+  enum material_method: u8 { mmBare, mmPBR };
+  enum material_albedo: u8 { maColor, maTexture };
+  
+  struct material_props {
+    material_method method;
+    material_albedo albedo;
+    asset::texture2 *texture{};
+
+    vk::Format __color_format, __depth_format;
+
+    inline fun operator ==(const material_props &it) const -> bool {
+      return (method == it.method) && (albedo == it.albedo) && (texture == it.texture) && (__color_format == it.__color_format) && (__depth_format == it.__depth_format);
+    }
+  };
+  
+  struct material_desc {
+    sptr<rhi::pipeline> pipeline;
+    std::vector<vk::raii::DescriptorSet> desc_sets;
+  };
+
+}
+
+
+template<>
+struct std::hash<mochi::module::material_props> {
+  std::size_t operator()(const mochi::module::material_props& d) const noexcept {
+    std::size_t seed = 0;
+
+    auto hash_combine = [&seed](auto &&v) {
+      using T = std::decay_t<decltype(v)>;
+      std::size_t h;
+      
+      if constexpr (std::is_enum_v<T>)
+        h = std::hash<std::underlying_type_t<T>>{}(std::to_underlying(v));
+      else
+        h = std::hash<T>{}(v);
+      
+      seed ^= h + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
+    };
+
+    hash_combine(d.method);
+    hash_combine(d.albedo);
+    hash_combine(d.texture);
+
+    hash_combine(d.__color_format);
+    hash_combine(d.__depth_format);
+
+    return seed;
+  }
+};
 
 
 namespace mochi::module
@@ -30,25 +93,27 @@ namespace mochi::module
        * @brief Initialize a new resource module.
        * @param device The logical device.
        */
-      explicit resource(module::device &device);
+      explicit resource(module::device &device, module::memory &memory);
       
 
     private:
       module::device &m_device;
-      
+      module::memory &m_memory;
       std::vector<vk::raii::DescriptorPool> m_pools;
 
-      /** @brief Create a new descriptor pool and add it to the list. */
+      std::unordered_map<material_props, sptr<material_desc>> m_materials;
+
       fun create_pool() -> vk::raii::DescriptorPool&;
+      fun allocate_descriptor_set(vk::DescriptorSetLayout layout) -> vk::raii::DescriptorSet;
+
+
+    private:
+      sptr<rhi::info<rhi::pipeline>> shader_color_i, shader_texture_i;
 
     public:
-      /**
-       * @brief Allocate a single descriptor set from the available pools.
-       * If the active pool is full, it automatically creates a new one.
-       * @param layout The layout for the descriptor set.
-       * @return The allocated descriptor set.
-       */
-      fun allocate_descriptor_set(vk::DescriptorSetLayout layout) -> vk::raii::DescriptorSet;
+      fun compile_shader(rhi::ShaderStage stage, std::istream *file, std::vector<std::string> macros) -> std::expected<sptr<rhi::shader>, std::string>;
+
+      fun get_or_new_material_desc(rhi::render_target &target, material_props props) -> sptr<material_desc>;
   };
   
 }

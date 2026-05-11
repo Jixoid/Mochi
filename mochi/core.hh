@@ -88,7 +88,7 @@ namespace mochi
       fun run() -> void;
 
     private:
-      fun paint(vk::raii::CommandBuffer &cmd) -> void;
+      fun paint(vk::raii::CommandBuffer &cmd, rhi::render_target &target) -> void;
       fun draw() -> void;
   };
 

@@ -14,7 +14,6 @@
 
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
-#include "mochi/asset/material.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "src/entt/entt.hpp"
 
@@ -26,7 +25,6 @@ namespace mochi::ecs
   /** @brief Represents a renderable entity with geometry and material data. */
   struct Mesh {
     sptr<asset::mesh> mesh;
-    sptr<asset::material> material;
     entt::entity skeleton = entt::null;
   };
 

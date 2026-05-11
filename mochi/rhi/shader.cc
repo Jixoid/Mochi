@@ -10,12 +10,13 @@
 */
 
 
-#include "mochi/module/device.hh"
-#include "mochi/core.hh"
+#include "mochi/basis.hh"
 #include "mochi/types.hh"
+#include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/shader.hh"
-#include <string>
+#include "mochi/module/device.hh"
 #include <string_view>
+#include <span>
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -23,15 +24,15 @@
 namespace mochi::rhi
 {
 
-  shader::shader(core &core, std::string_view fpath, std::string_view entry)
+  shader::shader(module::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry)
     : vk_module(nil)
-    , m_entry(entry)
   {
-    mappedFile mfile((std::string)fpath);
+    m_stage = stage;
+    m_entry = entry;
 
-    vk::ShaderModuleCreateInfo info({}, mfile.view().size(), (u32*)mfile.view().data());
-      
-    vk_module = vk::raii::ShaderModule(core.sub<module::device>().vdevice(), info);
+    vk::ShaderModuleCreateInfo info({}, span.size_bytes(), span.data());
+  
+    vk_module = vk::raii::ShaderModule(device.vdevice(), info);
   }
 
 }

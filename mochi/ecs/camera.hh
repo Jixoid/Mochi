@@ -30,7 +30,7 @@ namespace mochi::ecs
   };
   
   /** @brief Buffer info describing the camera3d_t memory layout. */
-  extern rhi::info<rhi::buffer> camera_i;
+  extern sptr<rhi::info<rhi::buffer>> camera_i;
 
 
 

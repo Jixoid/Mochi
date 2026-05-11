@@ -10,10 +10,15 @@
 */
 
 
+#include "mochi/asset/material.hh"
+#include "mochi/asset/texture.hh"
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
+#include "mochi/except.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/reader/reader.hh"
+#include "mochi/rhi/image.hh"
+#include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
 #include "mochi/core.hh"
 #include <cstring>
@@ -21,19 +26,20 @@
 #include <string_view>
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
+#include "stb_image.h"
 
 
 
 namespace mochi::asset
 {
   
-  rhi::info<rhi::buffer> vertex_i = rhi::info<rhi::buffer>(
+  auto vertex_i = rhi::info<rhi::buffer>::make(
     sizeof(vertex_t),
-    vt::make_list<
+    rhi::vt::make_list<
       vec3<f32>, // Position
       vec3<f32>, // Normal
       vec3<f32>, // Color
-      vec2<f32>  // Uv
+      vec2<f32>  // UV
     >()
   );
 
@@ -93,43 +99,89 @@ namespace mochi::asset
     return vertexs;
   }
 
+  inline fun include_images(core &core, gltf_image &raw_image) -> sptr<rhi::image2>
+  {
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load_from_memory(raw_image.data.data(), raw_image.data.size(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    if (!pixels) throw mochi::asset_error("Failed to load texture!");
+
+    
+    auto ret = rhi::image2::make(
+      core.sub<module::device>(), 
+      core.sub<module::memory>(), 
+      core.sub<module::renderer>().cmd_pool(),
+      texWidth, texHeight, pixels
+    );
+
+    stbi_image_free(pixels);
+
+    return ret;
+  }
 
 
-  mesh::mesh(sptr<rhi::buffer> data)
+
+  mesh::mesh(sptr<rhi::buffer> data, std::vector<::offs> offs, std::vector<sptr<asset::material>> material)
     : m_data(data)
+    , m_offs(offs)
+    , m_material(material)
   {}
 
   mesh::mesh(core &core, std::string_view fpath)
   {
     mappedFile mfile((std::string)fpath);
     
-    std::vector<vertex_t> final_vertices;
+    std::vector<vertex_t> final_data;
+    std::vector<::offs>   final_offs;
+    std::vector<sptr<asset::material>> final_material;
+    std::vector<int>      final_map;
+
 
     if (fpath.ends_with(".obj")) {
       auto raw = read<ft_wavefront>(mfile);
-      final_vertices = std::move(build_vertices(raw));
+
+      auto asset = make_sptr<asset::material>(core);
+      asset->setColor({0,0,0});
+
+      final_data = std::move(build_vertices(raw));
+      final_offs = {{0, final_data.size()}};
+      final_material = {asset};
+      final_map = {0};
     } 
-    else if (fpath.ends_with(".glb") || fpath.ends_with(".gltf")) {
+    ef (fpath.ends_with(".glb") || fpath.ends_with(".gltf")) {
       auto raw = read<ft_gltf>(mfile);
-      final_vertices = std::move(raw.vertices);
+
+      final_data = std::move(raw.vertices);
+      final_offs = std::move(raw.offsets);
+
+      for (auto &X: raw.images) {
+        if (X.data.empty()) {
+          auto mat = make_sptr<asset::material>(core);
+          mat->setColor({0.5f, 0.5f, 0.5f}); // Gri renk
+          final_material.push_back(mat);
+        }
+        else {
+          auto img = include_images(core, X);
+          auto tex = make_sptr<asset::texture2>(core, img);
+
+          auto mat = make_sptr<asset::material>(core);
+          mat->setTexture(tex);
+          
+          final_material.push_back(mat);
+        }
+      }
+
+      final_map = std::move(raw.image_map);
     }
 
-    m_data = core.sub<module::memory>().load_VertexBuffer(&vertex_i, final_vertices.size(),
-      [&final_vertices](void* _data) {
-        memcpy(_data, final_vertices.data(), vertex_i.stride() * final_vertices.size());
+
+    m_data = core.sub<module::memory>().load_VertexBuffer(vertex_i, final_data.size(),
+      [&final_data](void* _data) {
+        memcpy(_data, final_data.data(), vertex_i->stride() * final_data.size());
       }
     );
-  }
-
-
-  fun mesh::make(core &core, sptr<rhi::buffer> data) -> sptr<mesh>
-  {
-    return make_sptr<mesh>(data);
-  }
-
-  fun mesh::make(core &core, std::string_view fpath) -> sptr<mesh>
-  {
-    return make_sptr<mesh>(core, fpath);
+    m_offs = std::move(final_offs);
+    m_map = std::move(final_map);
+    m_material = std::move(final_material);
   }
 
 }

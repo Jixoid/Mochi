@@ -55,29 +55,37 @@ foreach(child ${childs})
 endforeach()
 
 
-# Shader
-find_program(GLSLC glslc REQUIRED)
+# Resources
+file(GLOB_RECURSE ABS_RES_FILES "${CMAKE_CURRENT_SOURCE_DIR}/mochi/res/*")
+set(RES_OBJECTS "")
 
-file(GLOB_RECURSE SHADERS "mochi/shader/*.vert" "mochi/shader/*.frag")
-set(SPV_FILES "")
 
-foreach(SHADER IN LISTS SHADERS)
-  get_filename_component(FILE_NAME ${SHADER} NAME)
-  
-  set(SPV_FILE "${CMAKE_CURRENT_SOURCE_DIR}/.qcache/${FILE_NAME}.spv")
-  
-  add_custom_command(
-    OUTPUT ${SPV_FILE}
-    COMMAND ${GLSLC} ${SHADER} -o ${SPV_FILE}
-    DEPENDS ${SHADER}
-    COMMENT "Vulkan Shader Compiling: ${FILE_NAME}"
-  )
-  
-  list(APPEND SPV_FILES ${SPV_FILE})
-endforeach()
+if (NOT EMSCRIPTEN)
+  foreach(ABS_RES_FILE ${ABS_RES_FILES})
+    
+    file(RELATIVE_PATH RES_FILE "${CMAKE_CURRENT_SOURCE_DIR}/mochi" "${ABS_RES_FILE}")
+    
+    set(OBJ_FILE "${CMAKE_CURRENT_BINARY_DIR}/${RES_FILE}.o")
+
+    string(REPLACE "/" "::" SYM_NAME "${RES_FILE}")
+    string(REPLACE "." "_"  SYM_NAME "${SYM_NAME}")
+    
+    add_custom_command(
+      OUTPUT ${OBJ_FILE}
+      COMMAND ld -r -b binary -o ${OBJ_FILE} ${RES_FILE}
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mochi"
+      DEPENDS "${ABS_RES_FILE}"
+      COMMENT "Embedding: ${RES_FILE}"
+    )
+    
+    list(APPEND RES_OBJECTS ${OBJ_FILE})
+  endforeach()
+endif()
 
 
 # Depency
+find_package(PkgConfig REQUIRED)
+
 find_package(Vulkan REQUIRED)
 
 find_package(glfw3 CONFIG QUIET)
@@ -94,6 +102,7 @@ endif()
 add_library(glfw_ INTERFACE)
 target_link_libraries(glfw_ INTERFACE ${GLFW_TARGET})
 
+pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
 
 
 
@@ -101,11 +110,12 @@ target_link_libraries(glfw_ INTERFACE ${GLFW_TARGET})
 # Engine
 file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cc" "${CMAKE_CURRENT_SOURCE_DIR}/mochi/*.cc")
 
-add_executable(qaos_mochi ${SOURCES} ${RES_OBJECTS} ${SPV_FILES})
+add_executable(qaos_mochi ${SOURCES} ${RES_OBJECTS})
 
 target_link_libraries(qaos_mochi PRIVATE
   glfw_
   Vulkan::Vulkan
+  PkgConfig::SHADERC
   ext_cgltf
   ext_stb
   ext_vma
