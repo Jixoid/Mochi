@@ -156,7 +156,7 @@ namespace mochi::asset
       for (auto &X: raw.images) {
         if (X.data.empty()) {
           auto mat = make_sptr<asset::material>(core);
-          mat->setColor({0.5f, 0.5f, 0.5f}); // Gri renk
+          mat->setColor({0.5f, 0.5f, 0.5f});
           final_material.push_back(mat);
         }
         else {
@@ -170,7 +170,19 @@ namespace mochi::asset
         }
       }
 
-      final_map = std::move(raw.image_map);
+      auto default_mat = make_sptr<asset::material>(core);
+      default_mat->setColor({0.8f, 0.8f, 0.8f});
+      final_material.push_back(default_mat);
+      int default_idx = final_material.size() - 1;
+
+      final_map.reserve(raw.image_map.size());
+      for (int idx : raw.image_map) {
+        if (idx == -1) {
+          final_map.push_back(default_idx);
+        } else {
+          final_map.push_back(idx);
+        }
+      }
     }
 
 
