@@ -128,7 +128,22 @@ namespace mochi::module
       vk::ImageUsageFlagBits::eColorAttachment
     );
     
-    swp_info.setPresentMode(vk::PresentModeKHR::eFifo);
+
+    auto present_modes = m_device.phys_dev().getSurfacePresentModesKHR(vk_surface);
+    vk::PresentModeKHR present_mode = vk::PresentModeKHR::eFifo; // backup
+
+    for (const auto& mode : present_modes) {
+      if (mode == vk::PresentModeKHR::eMailbox) {
+        present_mode = mode;
+        break;
+      }
+      ef (mode == vk::PresentModeKHR::eImmediate) {
+        present_mode = mode;
+      }
+    }
+    swp_info.setPresentMode(present_mode);
+
+
     swp_info.setPreTransform(caps.currentTransform);
     swp_info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
     swp_info.setOldSwapchain(old_swapchain);
