@@ -37,11 +37,16 @@ namespace mochi::module
     material_method method;
     material_albedo albedo;
     asset::texture2 *texture{};
+    rhi::PolygonMode polymode;
+    rhi::PrimitiveTopology primitiveTopology;
 
     vk::Format __color_format, __depth_format;
 
     inline fun operator ==(const material_props &it) const -> bool {
-      return (method == it.method) && (albedo == it.albedo) && (texture == it.texture) && (__color_format == it.__color_format) && (__depth_format == it.__depth_format);
+      return (method == it.method)
+        && (albedo == it.albedo) && (texture == it.texture)
+        && (polymode == it.polymode) && (primitiveTopology == it.primitiveTopology)
+        && (__color_format == it.__color_format) && (__depth_format == it.__depth_format);
     }
   };
   
@@ -55,7 +60,7 @@ namespace mochi::module
 
 template<>
 struct std::hash<mochi::module::material_props> {
-  std::size_t operator()(const mochi::module::material_props& d) const noexcept {
+  std::size_t operator()(const mochi::module::material_props &d) const noexcept {
     std::size_t seed = 0;
 
     auto hash_combine = [&seed](auto &&v) {
@@ -73,6 +78,9 @@ struct std::hash<mochi::module::material_props> {
     hash_combine(d.method);
     hash_combine(d.albedo);
     hash_combine(d.texture);
+    
+    hash_combine(d.polymode);
+    hash_combine(d.primitiveTopology);
 
     hash_combine(d.__color_format);
     hash_combine(d.__depth_format);

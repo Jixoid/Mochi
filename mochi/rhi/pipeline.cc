@@ -104,7 +104,11 @@ namespace mochi::rhi
   }
 
 
-  pipeline::pipeline(module::device &device, sptr<rhi::info<pipeline>> info, std::vector<sptr<shader>> shaders, Format __color_format, Format __depth_format)
+  pipeline::pipeline(
+    module::device &device, sptr<rhi::info<pipeline>> info, std::vector<sptr<shader>> shaders,
+    PolygonMode polymode, PrimitiveTopology primitiveTopology,
+    Format __color_format, Format __depth_format
+  )
     : vk_layout(nil), vk_pipeline(nil)
   {
     bool is_compute = (shaders.size() == 1 && shaders[0]->stage() == ShaderStage::Compute);
@@ -151,12 +155,12 @@ namespace mochi::rhi
       std::array<vk::DynamicState, 2> dynamic_states = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
       vk::PipelineDynamicStateCreateInfo dynamic_info({}, dynamic_states);
 
-      vk::PipelineInputAssemblyStateCreateInfo input_assembly({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
+      vk::PipelineInputAssemblyStateCreateInfo input_assembly({}, VKConvert<PrimitiveTopology>(primitiveTopology), VK_FALSE);
       vk::PipelineViewportStateCreateInfo      viewport_state({}, 1, nil, 1, nil);
       vk::PipelineMultisampleStateCreateInfo   multisampling({}, vk::SampleCountFlagBits::e1, VK_FALSE);
 
       vk::PipelineRasterizationStateCreateInfo rasterizer(
-        {}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, 
+        {}, VK_FALSE, VK_FALSE, VKConvert<PolygonMode>(polymode), 
         vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise,
         VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f
       );

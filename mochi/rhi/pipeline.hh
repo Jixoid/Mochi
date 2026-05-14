@@ -17,7 +17,6 @@
 #include "mochi/types.hh"
 #include "mochi/rhi/shader.hh"
 #include "mochi/rhi/slotPush.hh"
-#include "mochi/rhi/slotDesc.hh"
 #include "mochi/rhi/slotVertex.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -72,11 +71,19 @@ namespace mochi::rhi
   struct pipeline
   {
     private:
-      explicit pipeline(module::device &device, sptr<info<pipeline>> info, std::vector<sptr<shader>> shaders, Format color_format, Format depth_format);
+      explicit pipeline(
+        module::device &device, sptr<info<pipeline>> info, std::vector<sptr<shader>> shaders,
+        PolygonMode polymode, PrimitiveTopology primitiveTopology,
+        Format color_format, Format depth_format
+      );
       
     public:
-      static inline fun make(module::device &device, sptr<info<pipeline>> info, std::vector<sptr<shader>> shaders, Format color_format, Format depth_format) {
-        return make_sptr(new pipeline(device, info, std::move(shaders), color_format, depth_format));
+      static inline fun make(
+        module::device &device, sptr<info<pipeline>> info, std::vector<sptr<shader>> shaders,
+        PolygonMode polymode, PrimitiveTopology primitiveTopology,
+        Format color_format, Format depth_format
+      ) {
+        return make_sptr(new pipeline(device, info, std::move(shaders), polymode, primitiveTopology, color_format, depth_format));
       }
     
 

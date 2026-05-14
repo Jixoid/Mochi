@@ -224,7 +224,11 @@ namespace mochi::module
       throw mochi::rhi_error("Shaders failed to compile.");
 
     
-    auto pipe = rhi::pipeline::make(m_device, InAlbedo[props.albedo], {*vert, *frag}, static_cast<rhi::Format>(target.color_format), static_cast<rhi::Format>(target.depth_format));
+    auto pipe = rhi::pipeline::make(
+      m_device, InAlbedo[props.albedo], {*vert, *frag},
+      props.polymode, props.primitiveTopology,
+      static_cast<rhi::Format>(target.color_format), static_cast<rhi::Format>(target.depth_format)
+    );
 
     std::vector<vk::raii::DescriptorSet> desc_sets;
     desc_sets.reserve(pipe->desc_layouts().size());

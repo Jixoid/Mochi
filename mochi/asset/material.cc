@@ -40,6 +40,8 @@ namespace mochi::asset
       .method = module::material_method::mmPBR,
       .albedo = Albedo(),
       .texture = is_texture() ? texture().get() : nil,
+      .polymode = m_polymode,
+      .primitiveTopology = m_primitiveTopology,
     };
 
     return std::move(m_core.sub<module::resource>().get_or_new_material_desc(target, props));

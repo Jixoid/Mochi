@@ -80,6 +80,24 @@ namespace mochi::rhi
     AccelerationStructure = 1000150000,
   };
 
+  enum struct PolygonMode: u8
+  {
+    Fill  = 0,
+    Line  = 1,
+    Point = 2,
+  };
+
+  enum struct PrimitiveTopology: u8
+  {
+    ePointList     = 0,
+    eLineList      = 1,
+    eLineStrip     = 2,
+    eTriangleList  = 3,
+    eTriangleStrip = 4,
+    eTriangleFan   = 5,
+    ePatchList     = 10
+  };
+
 
   enum struct Format: u32
   {

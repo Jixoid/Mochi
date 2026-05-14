@@ -91,6 +91,22 @@ namespace mochi::rhi
 
 
   template <typename T>
+    requires (std::is_same_v<T, PolygonMode>)
+  inline fun VKConvert(PolygonMode in) -> vk::PolygonMode
+  {
+    return static_cast<vk::PolygonMode>(in);
+  }
+
+
+  template <typename T>
+    requires (std::is_same_v<T, PrimitiveTopology>)
+  inline fun VKConvert(PrimitiveTopology in) -> vk::PrimitiveTopology
+  {
+    return static_cast<vk::PrimitiveTopology>(in);
+  }
+
+
+  template <typename T>
     requires (std::is_same_v<T, Format>)
   inline fun VKConvert(Format in) -> vk::Format
   {
