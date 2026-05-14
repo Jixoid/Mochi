@@ -23,6 +23,32 @@
 namespace vfs
 {
 
+	struct mapped
+	{
+		protected:
+			mapped() = default;
+
+		public:
+			virtual ~mapped() = default;
+
+		
+		protected:
+			void* m_data{};
+			u0 m_size;
+
+		public:
+			inline fun data() { return m_data; }
+			inline fun size() { return m_size; }
+
+			inline fun view() { return std::string_view{(char*)data(), size()}; }
+			inline fun span() { return std::span<char>{(char*)data(), size()}; }
+
+		public:
+			inline operator ::data() { return {data(), size()}; }
+	};
+
+
+
 	/**
 	 * @brief Virtual file system provider interface.
 	 */
@@ -47,6 +73,9 @@ namespace vfs
 		 * @return A shared pointer to an input stream, or null if it fails.
 		 */
 		fun (*open_ro)(void* state, std::string_view fpath) -> sptr<std::istream> {};
+
+
+		fun (*open_map)(void* state, std::string_view fpath) -> sptr<mapped> {};
 
 		/**
 		 * @brief Opens a file in read-write mode.
@@ -79,6 +108,15 @@ namespace vfs
 	 * @return A shared pointer to an input stream.
 	 */
 	fun resolve_ro(std::string_view fpath) -> sptr<std::istream>;
+
+
+	/**
+	 * @brief Resolves a file path and opens it in read-only mode.
+	 * @param fpath The path of the file to resolve.
+	 * @return A shared pointer to a mapped.
+	 */
+	fun resolve_map(std::string_view fpath) -> sptr<mapped>;
+
 
 	/**
 	 * @brief Resolves a file path and opens it in read-write mode.
@@ -140,6 +178,12 @@ namespace vfs
 inline fun operator""_vfs_ro (const char *fpath, std::size_t len) -> sptr<std::istream>
 {
 	return vfs::resolve_ro(std::string_view(fpath, len));
+}
+
+
+inline fun operator""_vfs_map (const char *fpath, std::size_t len) -> sptr<vfs::mapped>
+{
+	return vfs::resolve_map(std::string_view(fpath, len));
 }
 
 /**

@@ -16,8 +16,7 @@
 #include "mochi/basis.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
-#include "mochi/geometry.hh"
-#include <string_view>
+#include <span>
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
 
@@ -50,12 +49,7 @@ namespace mochi::asset
        */
       explicit mesh(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material);
       
-      /**
-       * @brief Construct a mesh by loading a 3D model file from disk.
-       * @param core The mochi core instance.
-       * @param fpath The file path to the 3D model.
-       */
-      explicit mesh(core &core, std::string_view fpath);
+      explicit mesh(core &core, std::span<char> file, std::string_view ext);
       
     public:
       /**
@@ -74,8 +68,8 @@ namespace mochi::asset
        * @param fpath The file path to the 3D model.
        * @return Pointer to the newly created mesh.
        */
-      static inline fun make(core &core, std::string_view fpath) -> sptr<mesh> {
-        return make_sptr<mesh>(core, fpath);
+      static inline fun make(core &core, std::span<char> file, std::string_view ext) -> sptr<mesh> {
+        return make_sptr<mesh>(core, file, ext);
       }
       
 

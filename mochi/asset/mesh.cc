@@ -126,9 +126,9 @@ namespace mochi::asset
     , m_material(material)
   {}
 
-  mesh::mesh(core &core, std::string_view fpath)
+  mesh::mesh(core &core, std::span<char> file, std::string_view ext)
   {
-    mappedFile mfile((std::string)fpath);
+    ::data mfile{file.data(), file.size_bytes()};
     
     std::vector<vertex_t> final_data;
     std::vector<::offs>   final_offs;
@@ -136,7 +136,7 @@ namespace mochi::asset
     std::vector<int>      final_map;
 
 
-    if (fpath.ends_with(".obj")) {
+    if (ext == ".obj") {
       auto raw = read<ft_wavefront>(mfile);
 
       auto asset = make_sptr<asset::material>(core);
@@ -147,7 +147,7 @@ namespace mochi::asset
       final_material = {asset};
       final_map = {0};
     } 
-    ef (fpath.ends_with(".glb") || fpath.ends_with(".gltf")) {
+    ef (ext == ".glb" || ext == ".gltf") {
       auto raw = read<ft_gltf>(mfile);
 
       final_data = std::move(raw.vertices);

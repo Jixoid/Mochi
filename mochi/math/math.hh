@@ -12,20 +12,8 @@
 
 #pragma once
 
-#include "mochi/basis.hh"
-#include "mochi/math/math.hh"
-#include <vulkan/vulkan_raii.hpp>
-#include "mochi/types.hh"
-#include "src/entt/entt.hpp"
-
-
-
-namespace mochi::ecs
-{
-  
-  /** @brief Represents a bone matrices. */
-  struct Skeleton {
-    std::vector<mat4<f32>> bones;
-  };
-
-}
+#include "mochi/math/vec2.hh"
+#include "mochi/math/vec3.hh"
+#include "mochi/math/vec4.hh"
+#include "mochi/math/quaternion.hh"
+#include "mochi/math/mat4.hh"

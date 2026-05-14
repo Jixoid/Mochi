@@ -13,7 +13,7 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/geometry.hh"
+#include "mochi/math/math.hh"
 #include "mochi/rhi/rhi.hh"
 
 #define ef else if

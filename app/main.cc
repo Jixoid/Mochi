@@ -16,13 +16,12 @@
 #include "mochi/except.hh"
 #include "mochi/module/display.hh"
 #include "mochi/asset/mesh.hh"
-#include "mochi/asset/texture.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/mesh.hh"
 #include "mochi/ecs/transform.hh"
-#include "mochi/vfs/vfs_res.hh"
-#include "vulkan/vulkan.hpp"
+#include "mochi/vfs/vfs_file.hh"
+#include "mochi/vfs/vfs_embed.hh"
 
 using namespace mochi;
 
@@ -30,7 +29,8 @@ using namespace mochi;
 
 int Main()
 {
-  auto __vfs_res = vfs::__res::get();
+  auto __vfs_file  = vfs::__file::get();
+  auto __vfs_embed = vfs::__embed::get();
 
 
   mochi::vec3<f32> cam_pos{0,0,4};
@@ -169,8 +169,7 @@ int Main()
   scene_nodes.push_back(make_light({0,-4,0}));
 
 
-
-  auto m3d = asset::mesh::make(eng, "/home/alforce/Masaüstü/Untitled.glb");
+  auto m3d = asset::mesh::make(eng, "file:///home/alforce/Masaüstü/Untitled.glb"_vfs_map->span(), ".glb");
 
 
   auto mesh_instance = reg.create();

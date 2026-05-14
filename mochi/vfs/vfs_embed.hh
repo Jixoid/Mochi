@@ -17,7 +17,7 @@
 
 
 
-namespace vfs::__res
+namespace vfs::__embed
 {
 	/**
 	 * @brief Gets a RAII wrapper for the "res" VFS provider.

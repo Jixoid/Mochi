@@ -13,7 +13,6 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/geometry.hh"
 #include "mochi/asset/mesh.hh"
 
 

@@ -15,7 +15,6 @@
 #include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
-#include "mochi/geometry.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/asset/texture.hh"
 #include "mochi/ecs/camera.hh"
@@ -153,8 +152,8 @@ namespace mochi::module
   fun resource::get_or_new_material_desc(rhi::render_target &target, material_props props) -> sptr<material_desc>
   {
     static std::unordered_map<material_method, std::string> ShSource = {
-      {material_method::mmBare, "res://bare"},
-      {material_method::mmPBR,  "res://pbr"},
+      {material_method::mmBare, "embed://bare"},
+      {material_method::mmPBR,  "embed://pbr"},
     };
 
     std::unordered_map<material_albedo, sptr<rhi::info<rhi::pipeline>>> InAlbedo = {

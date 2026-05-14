@@ -20,7 +20,9 @@
 #include <initializer_list>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <pthread.h>
+#include <shared_mutex>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
@@ -461,6 +463,16 @@ struct flags
     explicit constexpr operator bool() const noexcept { return !!m_mask; }
     explicit constexpr operator MaskType() const noexcept { return m_mask; }
 };
+
+
+
+
+/// Mutex
+template <typename T>
+using slock = std::shared_lock<T>;
+
+template <typename T>
+using ulock = std::unique_lock<T>;
 
 
 

@@ -12,7 +12,7 @@
 
 #include "mochi/ecs/camera.hh"
 #include "mochi/basis.hh"
-#include "mochi/geometry.hh"
+#include "mochi/math/math.hh"
 #include "mochi/rhi/buffer.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "mochi/rhi/vtype.hh"
