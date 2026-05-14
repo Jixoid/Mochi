@@ -108,11 +108,12 @@ pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
 
 
 # Engine
-file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cc" "${CMAKE_CURRENT_SOURCE_DIR}/mochi/*.cc")
+file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mochi/*.cc")
 
-add_executable(qaos_mochi ${SOURCES} ${RES_OBJECTS})
 
-target_link_libraries(qaos_mochi PRIVATE
+add_library(qaos_mochi_shared SHARED ${SOURCES} ${RES_OBJECTS})
+
+target_link_libraries(qaos_mochi_shared PUBLIC
   glfw_
   Vulkan::Vulkan
   PkgConfig::SHADERC
@@ -122,6 +123,24 @@ target_link_libraries(qaos_mochi PRIVATE
   ext_entt
 )
 
-target_include_directories(qaos_mochi PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(qaos_mochi_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
-target_link_options(qaos_mochi PUBLIC -rdynamic)
+
+add_library(qaos_mochi_static STATIC ${SOURCES} ${RES_OBJECTS})
+
+target_link_libraries(qaos_mochi_static PUBLIC
+  glfw_
+  Vulkan::Vulkan
+  PkgConfig::SHADERC
+  ext_cgltf
+  ext_stb
+  ext_vma
+  ext_entt
+)
+
+target_include_directories(qaos_mochi_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+
+
+
+# Test App
+add_subdirectory(app)
