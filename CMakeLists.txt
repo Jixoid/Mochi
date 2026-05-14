@@ -59,7 +59,6 @@ endforeach()
 file(GLOB_RECURSE ABS_RES_FILES "${CMAKE_CURRENT_SOURCE_DIR}/mochi/res/*")
 set(RES_OBJECTS "")
 
-
 if (NOT EMSCRIPTEN)
   foreach(ABS_RES_FILE ${ABS_RES_FILES})
     
@@ -67,12 +66,15 @@ if (NOT EMSCRIPTEN)
     
     set(OBJ_FILE "${CMAKE_CURRENT_BINARY_DIR}/${RES_FILE}.o")
 
-    string(REPLACE "/" "::" SYM_NAME "${RES_FILE}")
-    string(REPLACE "." "_"  SYM_NAME "${SYM_NAME}")
+    if(WIN32 OR MINGW)
+      set(LD_FLAGS "-r") 
+    else()
+      set(LD_FLAGS "-r" "-m" "elf_x86_64")
+    endif()
     
     add_custom_command(
       OUTPUT ${OBJ_FILE}
-      COMMAND ld -r -b binary -o ${OBJ_FILE} ${RES_FILE}
+      COMMAND ${CMAKE_LINKER} ${LD_FLAGS} -b binary -o ${OBJ_FILE} ${RES_FILE}
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mochi"
       DEPENDS "${ABS_RES_FILE}"
       COMMENT "Embedding: ${RES_FILE}"
