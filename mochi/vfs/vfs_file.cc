@@ -83,7 +83,7 @@ namespace vfs::__file
 
 	#elif defined(_WIN32)
 
-	mappedFile::mappedFile(std::string fpath)
+	mapped__file::mapped__file(std::string fpath)
 	{
 		if (!std::filesystem::is_regular_file(fpath))
 			throw mochi::io_error("file not found: "+fpath+".");
@@ -122,7 +122,7 @@ namespace vfs::__file
 		}
 	}
 
-	mappedFile::~mappedFile() {
+	mapped__file::~mapped__file() {
 		UnmapViewOfFile(m_data);
 		CloseHandle(hMapping);
 		CloseHandle(hFile);
