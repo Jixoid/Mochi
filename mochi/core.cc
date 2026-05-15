@@ -212,8 +212,13 @@ namespace mochi
 
   fun core::draw() -> void
   {
+    auto &dev = sub<module::device>();
     auto &ren = sub<module::renderer>();
     auto &disp = sub<module::display>();
+
+
+    dev.flushTransferBuf();
+
 
     auto &cmd = ren.begin_frame();
 

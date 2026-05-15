@@ -26,26 +26,16 @@ namespace mochi::module
 
   renderer::renderer(device &device)
     : m_device(device)
-    , m_cmd_pool(nil)
   {
-    vk::CommandPoolCreateInfo pool_info(
-      vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 
-      0
-    );
-    m_cmd_pool = vk::raii::CommandPool(m_device.vdevice(), pool_info);
-
-
-    vk::CommandBufferAllocateInfo alloc_info(*m_cmd_pool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT);
-    m_cmd_buffers = vk::raii::CommandBuffers(m_device.vdevice(), alloc_info);
-
+    m_cmd_buffers = device.getMainBuffer(MAX_FRAMES_IN_FLIGHT);
 
 
     vk::SemaphoreCreateInfo sem_info{};
     vk::FenceCreateInfo fence_info(vk::FenceCreateFlagBits::eSignaled);
 
     for (u32 i{}; i < MAX_FRAMES_IN_FLIGHT; i++) {
-      m_image_available_sems.push_back(vk::raii::Semaphore(m_device.vdevice(), sem_info));
-      m_in_flight_fences.push_back(vk::raii::Fence(m_device.vdevice(), fence_info));
+      m_image_available_sems.push_back(vk::raii::Semaphore(m_device.get(), sem_info));
+      m_in_flight_fences.push_back(vk::raii::Fence(m_device.get(), fence_info));
     }
   }
 
@@ -145,7 +135,7 @@ namespace mochi::module
     m_device.vdevice().resetFences({*m_in_flight_fences[m_current_frame]});
 
 
-    vk::raii::CommandBuffer& cmd = m_cmd_buffers[m_current_frame];
+    vk::raii::CommandBuffer &cmd = m_cmd_buffers[m_current_frame];
     cmd.reset();
     cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
@@ -165,7 +155,7 @@ namespace mochi::module
       signal_sems.size(), signal_sems.data()
     );
 
-    m_device.graphics_q().best().queue.submit(submit_info, *m_in_flight_fences[m_current_frame]);
+    m_device.graphics_q().best().get().submit(submit_info, *m_in_flight_fences[m_current_frame]);
 
 
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;

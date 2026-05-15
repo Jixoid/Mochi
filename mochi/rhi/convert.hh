@@ -73,6 +73,14 @@ namespace mochi::rhi
     return static_cast<VmaAllocationCreateFlags>(in.mask());
   }
 
+
+  template <typename T>
+    requires (std::is_same_v<T, BufferLocation>)
+  inline fun VKConvert(BufferLocation in) -> VmaMemoryUsage
+  {
+    return static_cast<VmaMemoryUsage>(in);
+  }
+
   
   template <typename T>
     requires (std::is_same_v<T, VertexInputRate>)

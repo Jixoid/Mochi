@@ -479,8 +479,8 @@ using ulock = std::unique_lock<T>;
 
 /// Pointer
 
-/** @brief A shorthand null pointer constant. */
-inline constexpr decltype(nullptr) nil = nullptr;
+using nil_t = decltype(nullptr);
+inline constexpr nil_t nil = nullptr;
 
 
 /** @brief Unique pointer alias. */

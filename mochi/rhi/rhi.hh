@@ -61,6 +61,14 @@ namespace mochi::rhi
   using BufferCreateFlags = flags<BufferCreate>;
 
 
+  enum struct BufferLocation: u8
+  {
+    Auto         = 7,
+    PreferDevice = 8,
+    PreferHost   = 9,
+  };
+  
+
   enum struct VertexInputRate: u8 {
     PerVertex   = 0,
     PerInstance = 1,

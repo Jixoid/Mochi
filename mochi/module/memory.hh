@@ -16,7 +16,6 @@
 #include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
 #include <cassert>
-#include <functional>
 
 
 
@@ -33,8 +32,6 @@ namespace mochi::module
     private:
       module::bridge &m_bridge;
       module::device &m_device;
-
-      vk::raii::CommandPool m_transfer_pool{nil};
 
       
     #pragma region Limits
@@ -75,25 +72,6 @@ namespace mochi::module
     public:
       fun camera_ubo(u64 required_count = 0) -> sptr<rhi::buffer>;
       fun light_ubo(u64 required_count = 0) -> sptr<rhi::buffer>;
-
-
-
-    #pragma region Allocation
-    private:
-      fun load_UMA_UniformBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>;
-      fun load_UMA_StorageBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>;
-      fun load_UMA_VertexBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>;
-
-      fun load_DISC_UniformBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>;
-      fun load_DISC_StorageBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>;
-      fun load_DISC_VertexBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>;
-
-    public:
-      inline fun load_UniformBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer> { return m_sharedMemory ? load_UMA_UniformBuffer(info, count, data) : load_DISC_UniformBuffer(info, count, data); }
-      inline fun load_StorageBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer> { return m_sharedMemory ? load_UMA_StorageBuffer(info, count, data) : load_DISC_StorageBuffer(info, count, data); }
-      inline fun load_VertexBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer> { return m_sharedMemory ? load_UMA_VertexBuffer(info, count, data) : load_DISC_VertexBuffer(info, count, data); }
-    #pragma endregion
-
   };
 
 }

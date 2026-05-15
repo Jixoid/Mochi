@@ -235,13 +235,13 @@ namespace mochi::module
   fun display::present(vk::Semaphore render_finished_sem, u32 image_index) -> void
   {
     vk::PresentInfoKHR present_info(
-      1, &render_finished_sem,
-      1, &*m_swapchain,
-      &image_index
+      {render_finished_sem},
+      {*m_swapchain},
+      {image_index}
     );
 
     try {
-      auto err = m_device.graphics_q().best().queue.presentKHR(present_info);
+      auto err = m_device.graphics_q().best().get().presentKHR(present_info);
 
       if (err == vk::Result::eErrorOutOfDateKHR || err == vk::Result::eSuboptimalKHR || m_resized)
         recreate_swapchain();

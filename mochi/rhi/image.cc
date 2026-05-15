@@ -25,7 +25,7 @@
 namespace mochi::rhi
 {
 
-  image2::image2(module::device &device, module::memory &memory, vk::raii::CommandPool &cmd_pool, u32 width, u32 height, void *ptr)
+  image2::image2(module::device &device, module::memory &memory, u32 width, u32 height, void *ptr)
     : m_width(width)
     , m_height(height)
   {
@@ -40,7 +40,8 @@ namespace mochi::rhi
     auto staging_buffer = rhi::buffer::make(
       device, memory, staging_info, image_size,
       BufferUsage::TransferSrc,
-      flags(BufferCreate::Mapped) | BufferCreate::HostSequentialWrite
+      flags(BufferCreate::Mapped) | BufferCreate::HostSequentialWrite,
+      BufferLocation::PreferHost
     );
 
     std::memcpy(staging_buffer->mapped(), ptr, static_cast<size_t>(image_size));
@@ -69,12 +70,8 @@ namespace mochi::rhi
     );
 
 
-    vk::CommandBufferAllocateInfo cmd_alloc_info(*cmd_pool, vk::CommandBufferLevel::ePrimary, 1);
-    vk::raii::CommandBuffer cmd = std::move(vk::raii::CommandBuffers(device.vdevice(), cmd_alloc_info).front());
+    auto &cmd = device.transferBuf();
     
-    cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-
-
     vk::ImageMemoryBarrier barrier_to_transfer(
       vk::AccessFlagBits::eNone, vk::AccessFlagBits::eTransferWrite,
       vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
@@ -96,6 +93,7 @@ namespace mochi::rhi
     
 
     cmd.copyBufferToImage(staging_buffer->get(), m_image, vk::ImageLayout::eTransferDstOptimal, {copy_region});
+    device.addTransferBufRef(staging_buffer);
 
 
     vk::ImageMemoryBarrier barrier_to_shader(
@@ -109,16 +107,6 @@ namespace mochi::rhi
       vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
       {}, {}, {}, {barrier_to_shader}
     );
-
-    cmd.end();
-
-
-
-    vk::SubmitInfo submit_info(nullptr, nullptr, *cmd);
-    device.graphics_q().best().queue.submit(submit_info, nullptr);
-    
-    device.graphics_q().best().queue.waitIdle(); 
-
 
 
     vk::ImageViewCreateInfo view_info(

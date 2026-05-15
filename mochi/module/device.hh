@@ -13,6 +13,7 @@
 #pragma once
 
 #include "mochi/basis.hh"
+#include "mochi/rhi/buffer.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan.h>
 
@@ -21,9 +22,20 @@
 namespace mochi::module
 {
 
-  struct queue {
-    vk::raii::Queue queue;
-    u32 family;
+  struct queue
+  {
+    public:
+      queue(nil_t): m_queue(nil), m_family(-1) {}
+
+      queue(vk::raii::Queue queue, u32 family): m_queue(queue), m_family(family) {}
+
+    private:
+      vk::raii::Queue m_queue;
+      u32 m_family;
+
+    public:
+      inline fun get() const { return m_queue; }
+      inline fun family() const { return m_family; }
   };
 
 
@@ -67,22 +79,43 @@ namespace mochi::module
     private:
       vk::raii::PhysicalDevice vk_phys_dev;
       vk::raii::Device vk_device;
-      queue_group  m_graphics_q, m_compute_q, m_transfer_q;
 
-      struct { u32 graphics, compute, transfer; } vk_indices;
+      queue m_main_q;
+      queue_group m_graphics_q, m_compute_q, m_transfer_q;
+
+      vk::raii::CommandPool m_mainPool; // Has Graphic & Compute
+      vk::raii::CommandPool m_transferPool;
+
+      vk::raii::CommandBuffer m_transferBuf;
+      std::vector<sptr<rhi::buffer>> m_transferBuf_refs;
+      bool m_transferBuf_used{};
 
 
     public:
-      /** @brief Access the Vulkan RAII physical device. */
       inline fun& phys_dev() { return vk_phys_dev; }
-      /** @brief Access the Vulkan RAII logical device. */
+      inline fun& get() { return vk_device; }
       inline fun& vdevice() { return vk_device; }
-      /** @brief Access the graphics queue group. */
+      
+      inline fun& main_q() { return m_main_q; }
       inline fun& graphics_q() { return m_graphics_q; }
-      /** @brief Access the compute queue group. */
       inline fun& compute_q() { return m_compute_q; }
-      /** @brief Access the transfer queue group. */
       inline fun& transfer_q() { return m_transfer_q; }
+
+      inline fun& transferBuf() {
+        if (!m_transferBuf_used) {
+          m_transferBuf.reset();
+          m_transferBuf.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+          m_transferBuf_used = true;
+        }
+        return m_transferBuf;
+      }
+
+      inline fun addTransferBufRef(sptr<rhi::buffer> ref) { m_transferBuf_refs.push_back(ref); }
+
+    public:
+      fun flushTransferBuf() -> void;
+      fun getMainBuffer(u32 count) -> vk::raii::CommandBuffers;
+      fun getTransferBuffer(u32 count) -> vk::raii::CommandBuffers;
   };
 
 }

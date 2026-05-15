@@ -39,8 +39,7 @@ namespace mochi::asset
     // Initialize texture and transfer to vram
     m_data = rhi::image2::make(
       core.sub<module::device>(), 
-      core.sub<module::memory>(), 
-      core.sub<module::renderer>().cmd_pool(),
+      core.sub<module::memory>(),
       texWidth, texHeight, pixels
     );
 
@@ -52,7 +51,6 @@ namespace mochi::asset
     m_data = rhi::image2::make(
       core.sub<module::device>(), 
       core.sub<module::memory>(), 
-      core.sub<module::renderer>().cmd_pool(),
       width, height, const_cast<void*>(pixels)
     );
   }

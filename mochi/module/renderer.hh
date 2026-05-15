@@ -40,20 +40,17 @@ namespace mochi::module
 
 
     private:
-      module::device  &m_device;
+      module::device &m_device;
 
-      vk::raii::CommandPool                m_cmd_pool;
       std::vector<vk::raii::CommandBuffer> m_cmd_buffers;
 
       // Synchronization Objects (per frame)
       std::vector<vk::raii::Semaphore> m_image_available_sems;
       std::vector<vk::raii::Fence>     m_in_flight_fences;
 
-      u32 m_current_frame{}; // Current frame in flight (e.g., 0 or 1)
+      u32 m_current_frame{}; // Current frame in flight
 
     public:
-      /** @brief Access the Vulkan RAII command pool. */
-      inline fun& cmd_pool() { return m_cmd_pool; }
       /** @brief Get the current frame in flight index. */
       inline fun current_frame() const { return m_current_frame; }
 

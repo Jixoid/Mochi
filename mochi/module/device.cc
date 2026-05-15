@@ -11,6 +11,7 @@
 
 
 #include "mochi/module/device.hh"
+#include "vulkan/vulkan.hpp"
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -20,6 +21,8 @@ namespace mochi::module
 
   device::device(vk::raii::PhysicalDevice phys_dev)
     : vk_phys_dev(phys_dev), vk_device(nil)
+    , m_main_q(nil)
+    , m_mainPool(nil), m_transferPool(nil), m_transferBuf(nil)
   {
     // Allocate one queue per available queue family with default priority
     auto props = phys_dev.getQueueFamilyProperties();
@@ -60,10 +63,17 @@ namespace mochi::module
 
       for (u32 q_idx{}; q_idx < count; q_idx++)
       {
+        // MAIN
+        if (m_main_q.family() == -1 && flags & (vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute))
+          m_main_q = {vk::raii::Queue(vk_device, i, q_idx), i};
+
+
+        // GRAPHIC
         if (flags & vk::QueueFlagBits::eGraphics)
           graphics_q().m_primary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
         
 
+        // COMPUTE
         if (flags & vk::QueueFlagBits::eCompute) {
           if (!(flags & vk::QueueFlagBits::eGraphics))
             compute_q().m_primary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
@@ -72,6 +82,7 @@ namespace mochi::module
         }
 
 
+        // TRANSFER
         if (flags & vk::QueueFlagBits::eTransfer) {
           if (!(flags & vk::QueueFlagBits::eGraphics) && !(flags & vk::QueueFlagBits::eCompute))
             transfer_q().m_primary.push_back({vk::raii::Queue(vk_device, i, q_idx), i});
@@ -82,6 +93,49 @@ namespace mochi::module
     }
 
 
+
+    vk::CommandPoolCreateInfo main_pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, main_q().family());
+    m_mainPool = vk::raii::CommandPool(vk_device, main_pool_info);
+
+    vk::CommandPoolCreateInfo transfer_pool_info(vk::CommandPoolCreateFlagBits::eTransient, transfer_q().best().family());
+    m_transferPool = vk::raii::CommandPool(vk_device, transfer_pool_info);
+
+
+    vk::CommandBufferAllocateInfo alloc_info(*m_mainPool, vk::CommandBufferLevel::ePrimary, 1);
+    m_transferBuf = std::move(vk::raii::CommandBuffers(vk_device, alloc_info).front());
+  }
+
+
+
+
+  fun device::getMainBuffer(u32 count) -> vk::raii::CommandBuffers
+  {
+    vk::CommandBufferAllocateInfo alloc_info(*m_mainPool, vk::CommandBufferLevel::ePrimary, count);
+    return vk::raii::CommandBuffers(vk_device, alloc_info);
+  }
+
+  fun device::getTransferBuffer(u32 count) -> vk::raii::CommandBuffers
+  {
+    vk::CommandBufferAllocateInfo alloc_info(*m_transferPool, vk::CommandBufferLevel::ePrimary, count);
+    return vk::raii::CommandBuffers(vk_device, alloc_info);
+  }
+
+
+
+  fun device::flushTransferBuf() -> void
+  {
+    if (m_transferBuf_used) {
+      auto &cmd = m_transferBuf;
+
+      cmd.end();
+
+      vk::SubmitInfo submit_info({}, {}, *cmd, {});
+      transfer_q().best().get().submit(submit_info, nil);
+      transfer_q().best().get().waitIdle();
+
+      m_transferBuf_refs.clear();
+      m_transferBuf_used = false;
+    }
   }
 
 }

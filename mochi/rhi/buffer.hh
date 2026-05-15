@@ -16,6 +16,7 @@
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
+#include <vulkan/vulkan_core.h>
 
 
 
@@ -49,17 +50,16 @@ namespace mochi::rhi
   struct buffer
   {
     private:
-      explicit buffer(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create);
+      explicit buffer(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location);
       
     public:
       ~buffer();
       
-      static inline fun make(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create) {
-        return make_sptr(new buffer(device, memory, info, count, usage, create));
-      }
+      static fun make(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data = nil) -> sptr<buffer>;
     
 
     protected:
+      module::device &m_device;
       sptr<info<buffer>> m_info{};
       u64   m_size{};
       void* m_mapped{};
@@ -73,6 +73,7 @@ namespace mochi::rhi
       inline fun size() const { return m_size; }
       inline fun mapped() const { return m_mapped; }
       inline fun get() const { return m_buffer; }
+      fun address() const -> VkDeviceAddress;
   };
 
 }

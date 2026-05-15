@@ -74,13 +74,6 @@ namespace mochi::module
     allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
 
     vmaCreateAllocator(&allocatorInfo, &m_allocator);
-
-
-    vk::CommandPoolCreateInfo pool_info(
-      vk::CommandPoolCreateFlagBits::eTransient,
-      device.transfer_q().best().family
-    );
-    m_transfer_pool = vk::raii::CommandPool(device.vdevice(), pool_info);
   }
 
   memory::~memory()
@@ -95,158 +88,28 @@ namespace mochi::module
 
   fun memory::camera_ubo(u64 required_count) -> sptr<rhi::buffer>
   {
-    if (!m_camera_ubo || (m_camera_ubo->size() / ecs::camera_i->stride()) < required_count) {
-      m_camera_ubo = load_UniformBuffer(ecs::camera_i, std::max<u64>(10, required_count), [](void*){});
-    }
+    if (!m_camera_ubo || (m_camera_ubo->size() / ecs::camera_i->stride()) < required_count)
+      m_camera_ubo = rhi::buffer::make(
+        m_device, *this,
+        ecs::camera_i, std::max<u64>(10, required_count),
+        rhi::BufferUsage::UniformBuffer, flags(rhi::BufferCreate::HostSequentialWrite) | rhi::BufferCreate::Mapped,
+        rhi::BufferLocation::PreferHost
+      );
+
     return m_camera_ubo;
   }
 
   fun memory::light_ubo(u64 required_count) -> sptr<rhi::buffer>
   {
-    if (!m_light_ubo || (m_light_ubo->size() / ecs::point_light_i->stride()) < required_count) {
-      m_light_ubo = load_UniformBuffer(ecs::point_light_i, std::max<u64>(100, required_count), [](void*){});
-    }
+    if (!m_light_ubo || (m_light_ubo->size() / ecs::point_light_i->stride()) < required_count)
+      m_light_ubo = rhi::buffer::make(
+        m_device, *this,
+        ecs::point_light_i, std::max<u64>(100, required_count),
+        rhi::BufferUsage::UniformBuffer, flags(rhi::BufferCreate::HostSequentialWrite) | rhi::BufferCreate::Mapped,
+        rhi::BufferLocation::PreferHost
+      );
+
     return m_light_ubo;
-  }
-
-
-
-  fun memory::load_UMA_UniformBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
-  {
-    auto ret = rhi::buffer::make(
-      m_device, *this, info, count,
-      rhi::BufferUsage::UniformBuffer,
-      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-    );
-
-    if (data && ret->mapped()) data(ret->mapped());
-
-    return ret;
-  }
-
-  fun memory::load_DISC_UniformBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
-  {
-    auto ret = rhi::buffer::make(
-      m_device, *this, info, count, 
-      rhi::BufferUsage::UniformBuffer,
-      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-    );
-
-    if (data && ret->mapped()) data(ret->mapped());
-
-    return ret;
-  }
-
-
-  
-  fun memory::load_UMA_StorageBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
-  {
-    auto ret = rhi::buffer::make(
-      m_device, *this, info, count,
-      rhi::BufferUsage::StorageBuffer,
-      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-    );
-
-    if (data && ret->mapped()) data(ret->mapped());
-
-    return ret;
-  }
-
-  fun memory::load_DISC_StorageBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
-  {
-    auto ret = rhi::buffer::make(
-      m_device, *this, info, count,
-      flags(rhi::BufferUsage::StorageBuffer) | rhi::BufferUsage::TransferDst,
-      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-    );
-
-    if (data) {
-      auto host_buffer = rhi::buffer::make(
-        m_device, *this, info, count,
-        rhi::BufferUsage::TransferSrc,
-        flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-      );
-      data(host_buffer->mapped());
-
-
-      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_transfer_pool, vk::CommandBufferLevel::ePrimary, 1);
-      vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), cmd_alloc_info).front());
-      
-
-      vk::BufferCopy copy_region(0, 0, ret->size());
-
-      temp_cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      temp_cmd.copyBuffer(host_buffer->get(), ret->get(), copy_region);
-      temp_cmd.end();
-
-      vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
-      m_device.transfer_q().best().queue.submit(submit_info, nil);
-      m_device.transfer_q().best().queue.waitIdle();
-    }
-    
-    return ret;
-  }
-
-  
-
-  fun memory::load_UMA_VertexBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
-  {
-    auto ret = rhi::buffer::make(
-      m_device, *this, info, count,
-      rhi::BufferUsage::VertexBuffer,
-      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-    );
-
-    if (data && ret->mapped()) data(ret->mapped());
-
-    return ret;
-  }
-
-  fun memory::load_DISC_VertexBuffer(sptr<rhi::info<rhi::buffer>> info, u64 count, std::function<void (void*)> data) -> sptr<rhi::buffer>
-  {
-    auto ret = rhi::buffer::make(
-      m_device, *this, info, count,
-      flags(rhi::BufferUsage::VertexBuffer) | rhi::BufferUsage::TransferDst,
-      flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-    );
-
-    if (data) {
-      auto host_buffer = rhi::buffer::make(
-        m_device, *this, info, count, 
-        rhi::BufferUsage::TransferSrc,
-        flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite
-      );
-      data(host_buffer->mapped());
-
-
-      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_transfer_pool, vk::CommandBufferLevel::ePrimary, 1);
-      vk::raii::CommandBuffer temp_cmd = std::move(vk::raii::CommandBuffers(m_device.vdevice(), cmd_alloc_info).front());
-      vk::BufferCopy copy_region(0, 0, ret->size());
-      vk::MemoryBarrier memory_barrier(
-        vk::AccessFlagBits::eTransferWrite,
-        vk::AccessFlagBits::eVertexAttributeRead
-      );
-
-      temp_cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      temp_cmd.copyBuffer(host_buffer->get(), ret->get(), copy_region);
-
-      temp_cmd.pipelineBarrier(
-        vk::PipelineStageFlagBits::eTransfer,
-        vk::PipelineStageFlagBits::eVertexInput,
-        {},
-        {memory_barrier},
-        {},
-        {}
-      );
-      
-      temp_cmd.end();
-
-      vk::SubmitInfo submit_info({}, {}, *temp_cmd, {});
-      m_device.transfer_q().best().queue.submit(submit_info, nil);
-      m_device.transfer_q().best().queue.waitIdle();
-    }
-    
-    return ret;
   }
 
 }

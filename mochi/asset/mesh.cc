@@ -15,9 +15,11 @@
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/except.hh"
+#include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/reader/reader.hh"
 #include "mochi/rhi/image.hh"
+#include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
 #include "mochi/core.hh"
@@ -108,8 +110,7 @@ namespace mochi::asset
     
     auto ret = rhi::image2::make(
       core.sub<module::device>(), 
-      core.sub<module::memory>(), 
-      core.sub<module::renderer>().cmd_pool(),
+      core.sub<module::memory>(),
       texWidth, texHeight, pixels
     );
 
@@ -186,7 +187,12 @@ namespace mochi::asset
     }
 
 
-    m_data = core.sub<module::memory>().load_VertexBuffer(vertex_i, final_data.size(),
+    m_data = rhi::buffer::make(
+      core.sub<module::device>(), core.sub<module::memory>(),
+      vertex_i, final_data.size(),
+      flags(rhi::BufferUsage::VertexBuffer) | rhi::BufferUsage::TransferDst,
+      flags(rhi::BufferCreate::HostSequentialWrite) | rhi::BufferCreate::Mapped,
+      rhi::BufferLocation::PreferDevice,
       [&final_data](void* _data) {
         memcpy(_data, final_data.data(), vertex_i->stride() * final_data.size());
       }
