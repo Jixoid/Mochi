@@ -47,7 +47,7 @@ namespace mochi::asset
        * @brief Construct a mesh directly from an existing buffer.
        * @param data The buffer containing vertex data.
        */
-      explicit mesh(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material);
+      explicit mesh(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material, std::vector<int> map);
       
       explicit mesh(core &core, std::span<char> file, std::string_view ext);
       
@@ -58,8 +58,8 @@ namespace mochi::asset
        * @param data The buffer containing vertex data.
        * @return Pointer to the newly created mesh.
        */
-      static inline fun make(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material) -> sptr<mesh> {
-        return make_sptr<mesh>(data, offs, material);
+      static inline fun make(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material, std::vector<int> map) -> sptr<mesh> {
+        return make_sptr<mesh>(data, offs, material, map);
       }
       
       /**

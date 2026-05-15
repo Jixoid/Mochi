@@ -121,10 +121,11 @@ namespace mochi::asset
 
 
 
-  mesh::mesh(sptr<rhi::buffer> data, std::vector<::offs> offs, std::vector<sptr<asset::material>> material)
+  mesh::mesh(sptr<rhi::buffer> data, std::vector<::offs> offs, std::vector<sptr<asset::material>> material, std::vector<int> map)
     : m_data(data)
     , m_offs(offs)
     , m_material(material)
+    , m_map(map)
   {}
 
   mesh::mesh(core &core, std::span<char> file, std::string_view ext)
