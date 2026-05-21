@@ -13,12 +13,20 @@
 #version 450
 
 #extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 
-layout(location = 0) in vec3 pos;
-layout(location = 1) in vec3 normal;
-layout(location = 2) in vec3 color;
-layout(location = 3) in vec2 uv;
+struct vertex_t {
+  vec3 pos;
+  vec3 normal;
+  vec3 color;
+  vec2 uv;
+};
+
+layout(buffer_reference, std430) readonly buffer VertexBuffer {
+  vertex_t v[];
+};
+
 
 layout(location = 0) out vec3 frag_pos_world;
 layout(location = 1) out vec3 frag_normal_world;
@@ -33,6 +41,7 @@ layout(location = 1) out vec3 frag_normal_world;
 layout(push_constant) uniform PushConstant
 {
   mat4 model;
+  VertexBuffer vertexs;
 } push;
 
 layout(set = 0, binding = 0, row_major) uniform CameraBuffer
@@ -45,19 +54,21 @@ layout(set = 0, binding = 0, row_major) uniform CameraBuffer
 
 void main()
 {
+  vertex_t vex = push.vertexs.v[gl_VertexIndex];
+
   #if defined(WITH_COLOR)
-    frag_color = color;
+    frag_color = vex.color;
   #elif defined(WITH_TEXTURE)
-    frag_uv = uv;
+    frag_uv = vex.uv;
   #endif
 
   mat4 trueModel = transpose(push.model);
 
-  vec4 worldPos = trueModel * vec4(pos, 1.0);
+  vec4 worldPos = trueModel * vec4(vex.pos, 1.0);
   frag_pos_world = worldPos.xyz;
 
   mat3 normalMatrix = transpose(inverse(mat3(trueModel)));
-  frag_normal_world = normalize(normalMatrix * normal);
+  frag_normal_world = normalize(normalMatrix * vex.normal);
 
   gl_Position = camera.proj * camera.view * worldPos;
 }

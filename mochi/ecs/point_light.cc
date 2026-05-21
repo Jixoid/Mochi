@@ -23,7 +23,7 @@
 namespace mochi::ecs
 {
 
-  auto point_light_i = rhi::info<rhi::buffer>::make(
+  rhi::info<rhi::buffer> point_light_i(
     sizeof(point_light_t),
     rhi::vt::make_list<
       vec4<f32>, // Position

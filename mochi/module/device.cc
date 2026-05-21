@@ -46,10 +46,14 @@ namespace mochi::module
 
     vk::PhysicalDeviceFeatures features;
     features.samplerAnisotropy = VK_TRUE;
+    features.fillModeNonSolid = VK_TRUE;
 
+    vk::PhysicalDeviceVulkan12Features features12{};
+    features12.bufferDeviceAddress = VK_TRUE;
     
     vk::PhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeature;
     dynamicRenderingFeature.dynamicRendering = VK_TRUE;
+    dynamicRenderingFeature.pNext = features12;
 
 
     vk::DeviceCreateInfo dev_info({}, queue_infos, {}, extensions, &features, &dynamicRenderingFeature);
@@ -97,11 +101,11 @@ namespace mochi::module
     vk::CommandPoolCreateInfo main_pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, main_q().family());
     m_mainPool = vk::raii::CommandPool(vk_device, main_pool_info);
 
-    vk::CommandPoolCreateInfo transfer_pool_info(vk::CommandPoolCreateFlagBits::eTransient, transfer_q().best().family());
+    vk::CommandPoolCreateInfo transfer_pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, transfer_q().best().family());
     m_transferPool = vk::raii::CommandPool(vk_device, transfer_pool_info);
 
 
-    vk::CommandBufferAllocateInfo alloc_info(*m_mainPool, vk::CommandBufferLevel::ePrimary, 1);
+    vk::CommandBufferAllocateInfo alloc_info(*m_transferPool, vk::CommandBufferLevel::ePrimary, 1);
     m_transferBuf = std::move(vk::raii::CommandBuffers(vk_device, alloc_info).front());
   }
 

@@ -14,6 +14,7 @@
 
 #include "mochi/basis.hh"
 #include "mochi/types.hh"
+#include "mochi/rhi/slotDesc.hh"
 #include <cassert>
 
 
@@ -22,19 +23,14 @@ namespace mochi::rhi
 {
 
   template<>
-  struct info<descset>
+  struct info<listDesc>
   {
-    private:
-      info(std::vector<sptr<info<slotDesc>>> idescs): m_idescs(idescs) {}
-
     public:
-      static inline fun make(std::vector<sptr<info<slotDesc>>> idescs) {
-        return make_sptr(new info<descset>(idescs));
-      }
+      info(std::vector<info<slotDesc>> idescs): m_idescs(idescs) {}
 
 
     private:
-      std::vector<sptr<info<slotDesc>>> m_idescs;
+      std::vector<info<slotDesc>> m_idescs;
 
     public:
       inline fun& idescs() { return m_idescs; }
@@ -42,18 +38,18 @@ namespace mochi::rhi
 
   
 
-  struct descset
+  struct listDesc
   {
     public:
-      descset(u32 id, std::vector<sptr<slotDesc>> descs): m_id(id), m_descs(descs) {}
+      listDesc(u32 index, std::vector<sptr<slotDesc>> descs): m_index(index), m_descs(descs) {}
 
 
     private:
-      u32 m_id;
+      u32 m_index;
       std::vector<sptr<slotDesc>> m_descs;
     
     public:
-      inline fun id() { return m_id; }
+      inline fun index() { return m_index; }
       inline fun descs() { return m_descs; }
   };
 

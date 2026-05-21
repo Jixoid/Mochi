@@ -39,7 +39,9 @@ namespace mochi
     struct slotPush;
     struct slotDesc;
     struct slotVertex;
-    struct descset;
+    
+    struct listDesc;
+    struct listPush;
 
     struct pipeline;
     struct buffer;

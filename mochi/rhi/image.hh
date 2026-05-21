@@ -35,7 +35,7 @@ namespace mochi::rhi
       }
 
 
-    protected:
+    private:
       u32 m_width, m_height;
       VmaAllocator m_allocator{nil};
       VkImage m_image{VK_NULL_HANDLE};

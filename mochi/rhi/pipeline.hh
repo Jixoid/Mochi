@@ -16,7 +16,8 @@
 #include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
 #include "mochi/rhi/shader.hh"
-#include "mochi/rhi/slotPush.hh"
+#include "mochi/rhi/listPush.hh"
+#include "mochi/rhi/listDesc.hh"
 #include "mochi/rhi/slotVertex.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -29,25 +30,15 @@ namespace mochi::rhi
   template<>
   struct info<pipeline>
   {
-    private:
-      explicit info(std::vector<sptr<info<slotPush>>> push, std::vector<sptr<info<slotVertex>>> vertex, std::vector<sptr<info<descset>>> descset);
-
     public:
-      static inline fun make(std::vector<sptr<info<slotPush>>> push, std::vector<sptr<info<slotVertex>>> vertex, std::vector<sptr<info<descset>>> descset) {
-        return make_sptr(new info<pipeline>(std::move(push), std::move(vertex), std::move(descset)));
-      }
+      explicit inline info(nil_t): m_push() {}
+      explicit info(std::vector<info<listPush>> pushlist, std::vector<info<slotVertex>> vertex, std::vector<info<listDesc>> descset);
 
 
     protected:
-      info() = default;
-    public:
-      virtual ~info() = default;
-
-
-    protected:
-      std::vector<sptr<info<slotPush>>>   m_push;
-      std::vector<sptr<info<slotVertex>>> m_vertex;
-      std::vector<sptr<info<descset>>>    m_descset;
+      std::vector<info<listPush>>   m_push;
+      std::vector<info<slotVertex>> m_vertex;
+      std::vector<info<listDesc>>    m_descset;
 
       std::vector<vk::PushConstantRange> vk_PushConstant;
       std::vector<vk::VertexInputBindingDescription> vk_vertexBinding;
@@ -56,9 +47,9 @@ namespace mochi::rhi
 
 
     public:
-      inline const fun& push() { return m_push; }
-      inline const fun& vertex() { return m_vertex; }
-      inline const fun& descset() { return m_descset; }
+      inline fun& push() { return m_push; }
+      inline fun& vertex() { return m_vertex; }
+      inline fun& desc() { return m_descset; }
 
       inline fun& pushConstant() { return vk_PushConstant; }
       inline fun  vertexBinding() { return vk::PipelineVertexInputStateCreateInfo({}, vk_vertexBinding, vk_vertexAttribute); }
@@ -72,14 +63,14 @@ namespace mochi::rhi
   {
     private:
       explicit pipeline(
-        module::device &device, sptr<info<pipeline>> info, std::vector<sptr<shader>> shaders,
+        module::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       );
       
     public:
       static inline fun make(
-        module::device &device, sptr<info<pipeline>> info, std::vector<sptr<shader>> shaders,
+        module::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       ) {
@@ -88,14 +79,17 @@ namespace mochi::rhi
     
 
     private:
-      sptr<info<pipeline>>     m_info{};
+      info<pipeline> m_dbg_info;
+
+      PipelineKind m_kind;
       vk::raii::PipelineLayout vk_layout;
       vk::raii::Pipeline       vk_pipeline;
       std::vector<vk::raii::DescriptorSetLayout> vk_desc_layouts;
       
     public:
-      inline fun  info() { return m_info.get(); }
+      inline fun& info() { return m_dbg_info; }
       inline fun& get() { return vk_pipeline; }
+      inline fun  kind() { return m_kind; }
       inline fun& layout() { return vk_layout; }
       inline fun& desc_layouts() { return vk_desc_layouts; }
   };

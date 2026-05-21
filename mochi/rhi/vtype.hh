@@ -162,10 +162,10 @@ namespace mochi::rhi
       u8 m_count;
 
     public:
-      inline fun size() { return m_size; }
-      inline fun align() { return m_align; }
-      inline fun format() { return m_format; }
-      inline fun count() { return m_count; }
+      inline fun size() const { return m_size; }
+      inline fun align() const { return m_align; }
+      inline fun format() const { return m_format; }
+      inline fun count() const { return m_count; }
   };
 
 }

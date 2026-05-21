@@ -31,7 +31,7 @@ namespace mochi::rhi
   {
     vk::DeviceSize image_size = width * height * 4;
 
-    auto staging_info = rhi::info<rhi::buffer>::make(1, {}); 
+    auto staging_info = rhi::info<rhi::buffer>(1, {}); 
     
     VmaAllocationCreateInfo staging_alloc_info = {};
     staging_alloc_info.usage = VMA_MEMORY_USAGE_AUTO;

@@ -26,13 +26,8 @@ namespace mochi::rhi
   template<>
   struct info<buffer>
   {
-    private:
-      explicit inline info<buffer>(u64 stride, std::vector<vt> items): m_stride(stride), m_items(items) {}
-
     public:
-      static inline fun make(u64 stride, std::vector<vt> items) {
-        return make_sptr(new info<buffer>(stride, items));
-      }
+      explicit inline info<buffer>(u64 stride, std::vector<vt> items): m_stride(stride), m_items(items) {}
 
 
     private:
@@ -40,8 +35,8 @@ namespace mochi::rhi
       u64 m_stride;
 
     public:
-      inline fun items() { return m_items; }
-      inline fun stride() { return m_stride; }
+      inline fun& items() const { return m_items; }
+      inline fun  stride() const { return m_stride; }
   };
 
 
@@ -50,17 +45,17 @@ namespace mochi::rhi
   struct buffer
   {
     private:
-      explicit buffer(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location);
+      explicit buffer(module::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location);
       
     public:
       ~buffer();
       
-      static fun make(module::device &device, module::memory &memory, sptr<info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data = nil) -> sptr<buffer>;
+      static fun make(module::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data = nil) -> sptr<buffer>;
     
 
-    protected:
+    private:
+      info<buffer> m_info;
       module::device &m_device;
-      sptr<info<buffer>> m_info{};
       u64   m_size{};
       void* m_mapped{};
       VmaAllocator m_allocator{nil};
@@ -69,7 +64,7 @@ namespace mochi::rhi
       VmaAllocationInfo m_alloc_info{};
 
     public:
-      inline fun info() { return m_info.get(); }
+      inline fun info() { return &m_info; }
       inline fun size() const { return m_size; }
       inline fun mapped() const { return m_mapped; }
       inline fun get() const { return m_buffer; }

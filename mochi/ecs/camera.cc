@@ -23,7 +23,7 @@
 namespace mochi::ecs
 {
 
-  auto camera_i = rhi::info<rhi::buffer>::make(
+  rhi::info<rhi::buffer> camera_i(
     sizeof(camera_t),
     rhi::vt::make_list<
       mat4<f32>, // View

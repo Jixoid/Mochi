@@ -107,6 +107,14 @@ namespace mochi::rhi
   };
 
 
+  enum struct PipelineKind: u32
+  {
+    Graphic    = 0,
+    Compute    = 1,
+    RayTracing = 1000165000,
+  };
+
+
   enum struct Format: u32
   {
     /// 8-bit

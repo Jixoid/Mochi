@@ -10,7 +10,6 @@
 */
 
 
-#include "mochi/asset/texture.hh"
 #include "mochi/basis.hh"
 #include "mochi/core.hh"
 #include "mochi/ecs/camera.hh"
@@ -18,7 +17,9 @@
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/transform.hh"
+#include "mochi/rhi/cmd.hh"
 #include "mochi/rhi/image.hh"
+#include "mochi/rhi/listPush.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/module/device.hh"
@@ -26,6 +27,8 @@
 #include "mochi/module/display.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/module/renderer.hh"
+#include "mochi/rhi/slotPush.hh"
+#include "vulkan/vulkan.hpp"
 #include <chrono>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -91,7 +94,7 @@ namespace mochi
   }
 
 
-  fun core::paint(vk::raii::CommandBuffer &cmd, rhi::render_target &target) -> void
+  fun core::paint(rhi::cmd &cmd, rhi::render_target &target) -> void
   {
     auto &mem = sub<module::memory>();
 
@@ -133,8 +136,8 @@ namespace mochi
 
 
     auto extent = sub<module::display>().extent(); 
-    cmd.setViewport(0, {vk::Viewport(0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f)});
-    cmd.setScissor(0, {vk::Rect2D({0, 0}, extent)});
+    cmd.get().setViewport(0, {vk::Viewport(0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f)});
+    cmd.get().setScissor(0, {vk::Rect2D({0, 0}, extent)});
 
     
 
@@ -153,14 +156,7 @@ namespace mochi
       if (!renderable.mesh)
         continue;
 
-      
       auto mesh = renderable.mesh;
-
-      if (mesh->data().get() != last_buffer) {
-        cmd.bindVertexBuffers(0, {mesh->data()->get()}, {0}); 
-        last_buffer = mesh->data().get();
-      }
-
 
       
       u32 i{};
@@ -170,11 +166,11 @@ namespace mochi
         auto desc = material->desc(target);
 
         if (desc->pipeline.get() != last_pipeline) {
-          cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *desc->pipeline->get());
+          cmd.setPipeline(desc->pipeline.get());
           last_pipeline = desc->pipeline.get();
         }
 
-        cmd.bindDescriptorSets(
+        cmd.get().bindDescriptorSets(
           vk::PipelineBindPoint::eGraphics,
           *desc->pipeline->layout(),
           0,
@@ -184,7 +180,7 @@ namespace mochi
 
 
         if (material->is_texture()) {
-          cmd.bindDescriptorSets(
+          cmd.get().bindDescriptorSets(
             vk::PipelineBindPoint::eGraphics,
             *desc->pipeline->layout(),
             1,
@@ -193,16 +189,10 @@ namespace mochi
           );
         }
 
+        cmd.writePushConstant(rhi::listPush(std::tuple{transform.model, mesh->data()->address()}));
+        
 
-        auto model_mat = transform.model;
-        cmd.pushConstants<mochi::mat4<f32>>(
-          *last_pipeline->layout(),
-          vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-          0,
-          model_mat
-        );
-
-        cmd.draw(subsur.size(), 1, subsur.off(), 0);
+        cmd.draw({subsur.off(), subsur.size()}, {0, 1});
         i++;
       }
 
@@ -231,7 +221,9 @@ namespace mochi
 
     ren.begin_pass(cmd, target, {0.1f, 0.1f, 0.1f, 1.0f});
 
-    /* paint */ paint(cmd, target);
+    rhi::cmd mochi_cmd(&cmd);
+
+    /* paint */ paint(mochi_cmd, target);
 
     ren.end_pass(cmd, target);
 

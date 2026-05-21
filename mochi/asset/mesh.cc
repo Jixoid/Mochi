@@ -35,7 +35,7 @@
 namespace mochi::asset
 {
   
-  auto vertex_i = rhi::info<rhi::buffer>::make(
+  rhi::info<rhi::buffer> vertex_i(
     sizeof(vertex_t),
     rhi::vt::make_list<
       vec3<f32>, // Position
@@ -191,11 +191,11 @@ namespace mochi::asset
     m_data = rhi::buffer::make(
       core.sub<module::device>(), core.sub<module::memory>(),
       vertex_i, final_data.size(),
-      flags(rhi::BufferUsage::VertexBuffer) | rhi::BufferUsage::TransferDst,
-      flags(rhi::BufferCreate::HostSequentialWrite) | rhi::BufferCreate::Mapped,
+      flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
+      rhi::BufferCreate::HostSequentialWrite,
       rhi::BufferLocation::PreferDevice,
       [&final_data](void* _data) {
-        memcpy(_data, final_data.data(), vertex_i->stride() * final_data.size());
+        memcpy(_data, final_data.data(), vertex_i.stride() * final_data.size());
       }
     );
     m_offs = std::move(final_offs);

@@ -115,6 +115,14 @@ namespace mochi::rhi
 
 
   template <typename T>
+    requires (std::is_same_v<T, PipelineKind>)
+  inline fun VKConvert(PipelineKind in) -> vk::PipelineBindPoint
+  {
+    return static_cast<vk::PipelineBindPoint>(in);
+  }
+
+
+  template <typename T>
     requires (std::is_same_v<T, Format>)
   inline fun VKConvert(Format in) -> vk::Format
   {

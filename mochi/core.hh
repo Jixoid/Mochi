@@ -23,6 +23,7 @@
 #include <functional>
 #include <tuple>
 #include <vulkan/vulkan_raii.hpp>
+#include "mochi/rhi/cmd.hh"
 #include "src/entt/entt.hpp"
 
 
@@ -88,7 +89,7 @@ namespace mochi
       fun run() -> void;
 
     private:
-      fun paint(vk::raii::CommandBuffer &cmd, rhi::render_target &target) -> void;
+      fun paint(rhi::cmd &cmd, rhi::render_target &target) -> void;
       fun draw() -> void;
   };
 

@@ -34,7 +34,7 @@ namespace mochi::asset
   };
   
   /** @brief Buffer info describing the vertex_t memory layout. */
-  extern sptr<rhi::info<rhi::buffer>> vertex_i;
+  extern rhi::info<rhi::buffer> vertex_i;
 
 
   

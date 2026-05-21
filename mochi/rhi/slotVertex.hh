@@ -14,6 +14,7 @@
 
 #include "mochi/basis.hh"
 #include "mochi/rhi/rhi.hh"
+#include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
 #include <cassert>
 
@@ -25,25 +26,23 @@ namespace mochi::rhi
   template<>
   struct info<slotVertex>
   {
-    private:
-      info(sptr<info<rhi::buffer>> ibuf, VertexInputRate inputRate)
+    public:
+      info(info<rhi::buffer> ibuf, VertexInputRate inputRate, i16 index = -1)
         : m_ibuf(ibuf)
         , m_inputRate(inputRate)
+        , m_index(index)
       {}
-
-    public:
-      static inline fun make(sptr<info<rhi::buffer>> ibuf, VertexInputRate inputRate) {
-        return make_sptr(new info<slotVertex>(ibuf, inputRate));
-      }
 
 
     private:
-      sptr<info<rhi::buffer>> m_ibuf;
+      info<rhi::buffer> m_ibuf;
+      i16 m_index;
       VertexInputRate m_inputRate;
 
     public:
-      inline fun ibuf() { return m_ibuf.get(); }
-      inline fun inputRate() { return m_inputRate; }
+      inline fun  ibuf() const { return &m_ibuf; }
+      inline fun  inputRate() const { return m_inputRate; }
+      inline fun& index() { return m_index; }
   };
 
 
@@ -51,21 +50,24 @@ namespace mochi::rhi
   struct slotVertex
   {
     public:
-      slotVertex(info<slotVertex> *info, rhi::buffer *buf)
+      slotVertex(info<slotVertex> info, rhi::buffer *buf, i16 index = -1)
         : m_info(info)
         , m_buf(buf)
+        , m_index(index)
       {
-        assert(info && buf);
+        assert(buf);
       }
 
 
     private:
-      info<slotVertex> *m_info;
+      info<slotVertex> m_info;
+      i16 m_index;
       rhi::buffer *m_buf;
     
     public:
-      inline fun info() { return m_info; }
-      inline fun buf() { return m_buf; }
+      inline fun index() const { return m_index; }
+      inline fun info() const { return &m_info; }
+      inline fun buf() const { return m_buf; }
   };
 
 }

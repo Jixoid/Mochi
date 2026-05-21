@@ -14,6 +14,7 @@
 
 #include "mochi/basis.hh"
 #include "mochi/rhi/rhi.hh"
+#include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
 #include <cassert>
 
@@ -25,26 +26,21 @@ namespace mochi::rhi
   template<>
   struct info<slotDesc>
   {
-    private:
-      info(sptr<info<buffer>> ibuf, DescriptorType kind, ShaderStageFlags stage)
+    public:
+      info(info<buffer> ibuf, DescriptorType kind, ShaderStageFlags stage)
         : m_ibuf(ibuf)
         , m_kind(kind)
         , m_stage(stage)
       {}
 
-    public:
-      static inline fun make(sptr<info<buffer>> ibuf, DescriptorType kind, ShaderStageFlags stage) {
-        return make_sptr(new info<slotDesc>(ibuf, kind, stage));
-      }
-
 
     private:
-      sptr<info<buffer>> m_ibuf;
+      info<buffer> m_ibuf;
       DescriptorType m_kind;
       ShaderStageFlags m_stage;
 
     public:
-      inline fun ibuf() { return m_ibuf.get(); }
+      inline fun ibuf() { return &m_ibuf; }
       inline fun kind() { return m_kind; }
       inline fun stage() { return m_stage; }
   };
@@ -54,21 +50,21 @@ namespace mochi::rhi
   struct slotDesc
   {
     public:
-      slotDesc(info<slotDesc> *info, rhi::buffer *buf)
+      slotDesc(info<slotDesc> info, rhi::buffer *buf)
         : m_info(info)
         , m_buf(buf)
       {
-        assert(info && buf);
+        assert(buf);
       }
 
 
     private:
-      info<slotDesc> *m_info;
+      info<slotDesc> m_info;
       rhi::buffer *m_buf;
     
     public:
-      inline fun info() { return m_info; }
-      inline fun buf() { return m_buf; }
+      inline fun info() const { return &m_info; }
+      inline fun buf() const { return m_buf; }
   };
 
 }

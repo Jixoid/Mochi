@@ -12,9 +12,9 @@
 
 #include "mochi/basis.hh"
 #include "mochi/except.hh"
+#include "mochi/types.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/vtype.hh"
-#include "mochi/types.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/asset/texture.hh"
 #include "mochi/ecs/camera.hh"
@@ -22,10 +22,10 @@
 #include "mochi/rhi/convert.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/render_target.hh"
-#include "mochi/rhi/descset.hh"
+#include "mochi/rhi/listPush.hh"
+#include "mochi/rhi/listDesc.hh"
 #include "mochi/rhi/slotPush.hh"
 #include "mochi/rhi/slotDesc.hh"
-#include "mochi/rhi/slotVertex.hh"
 #include "mochi/module/resource.hh"
 #include "mochi/vfs/vfs.hh"
 #include "vulkan/vulkan.hpp"
@@ -45,25 +45,31 @@ namespace mochi::module
   resource::resource(module::device &device, module::memory &memory)
     : m_device(device)
     , m_memory(memory)
+    , shader_color_i(nil)
+    , shader_texture_i(nil)
   {
     create_pool();
 
 
-    auto Transform = rhi::info<rhi::slotPush>::make(rhi::vt::make<mat4<f32>>(), flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel);
-    
-    auto Vertex = rhi::info<rhi::slotVertex>::make(asset::vertex_i, rhi::VertexInputRate::PerVertex);
-
-    auto Camera = rhi::info<rhi::slotDesc>::make(ecs::camera_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel);
-    auto Light = rhi::info<rhi::slotDesc>::make(ecs::point_light_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel);
-    auto Texture = rhi::info<rhi::slotDesc>::make(nil, rhi::DescriptorType::TextureSampler, rhi::ShaderStage::Pixel);
-
-
-    auto Set0 = rhi::info<rhi::descset>::make({Camera, Light});
-    auto Set1 = rhi::info<rhi::descset>::make({Texture});
+    auto Push_Vertex = rhi::info<rhi::listPush>(rhi::ShaderStage::Vertex,
+      {
+        rhi::vt::make<mat4<f32>>(),
+        rhi::vt::make<u64>(),
+      }
+    );
 
 
-    shader_color_i = rhi::info<rhi::pipeline>::make({Transform}, {Vertex}, {Set0});
-    shader_texture_i = rhi::info<rhi::pipeline>::make({Transform}, {Vertex}, {Set0, Set1});
+    auto Camera = rhi::info<rhi::slotDesc>(ecs::camera_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel);
+    auto Light = rhi::info<rhi::slotDesc>(ecs::point_light_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel);
+    auto Texture = rhi::info<rhi::slotDesc>(rhi::info<rhi::buffer>(1, {}), rhi::DescriptorType::TextureSampler, rhi::ShaderStage::Pixel);
+
+
+    auto Set0 = rhi::info<rhi::listDesc>({Camera, Light});
+    auto Set1 = rhi::info<rhi::listDesc>({Texture});
+
+
+    shader_color_i = rhi::info<rhi::pipeline>({Push_Vertex}, {}, {Set0});
+    shader_texture_i = rhi::info<rhi::pipeline>({Push_Vertex}, {}, {Set0, Set1});
   }
   
 
@@ -156,9 +162,9 @@ namespace mochi::module
       {material_method::mmPBR,  "embed://pbr"},
     };
 
-    std::unordered_map<material_albedo, sptr<rhi::info<rhi::pipeline>>> InAlbedo = {
-      {material_albedo::maColor,   shader_color_i},
-      {material_albedo::maTexture, shader_texture_i},
+    std::unordered_map<material_albedo, rhi::info<rhi::pipeline>*> InAlbedo = {
+      {material_albedo::maColor,   &shader_color_i},
+      {material_albedo::maTexture, &shader_texture_i},
     };
 
     static std::unordered_map<material_albedo, std::string> ShAlbedo = {
@@ -225,7 +231,7 @@ namespace mochi::module
 
     
     auto pipe = rhi::pipeline::make(
-      m_device, InAlbedo[props.albedo], {*vert, *frag},
+      m_device, *InAlbedo[props.albedo], {*vert, *frag},
       props.polymode, props.primitiveTopology,
       static_cast<rhi::Format>(target.color_format), static_cast<rhi::Format>(target.depth_format)
     );

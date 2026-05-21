@@ -26,10 +26,10 @@
 namespace mochi::rhi
 {
 
-  buffer::buffer(module::device &device, module::memory &memory, sptr<rhi::info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location)
+  buffer::buffer(module::device &device, module::memory &memory, rhi::info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location)
     : m_device(device)
     , m_info(info)
-    , m_size(info->stride() * count)
+    , m_size(info.stride() * count)
     , m_buffer(nil)
     , m_allocator(memory.allocator())
   {
@@ -69,7 +69,7 @@ namespace mochi::rhi
 
   
 
-  fun buffer::make(module::device &device, module::memory &memory, sptr<rhi::info<buffer>> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data) -> sptr<buffer>
+  fun buffer::make(module::device &device, module::memory &memory, rhi::info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data) -> sptr<buffer>
   {
     auto ret = make_sptr(new buffer(
       device, memory,

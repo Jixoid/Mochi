@@ -17,6 +17,7 @@
 #include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
 #include "mochi/module/device.hh"
+#include "mochi/rhi/pipeline.hh"
 #include "vulkan/vulkan.hpp"
 #include <expected>
 #include <functional>
@@ -116,7 +117,7 @@ namespace mochi::module
 
 
     private:
-      sptr<rhi::info<rhi::pipeline>> shader_color_i, shader_texture_i;
+      rhi::info<rhi::pipeline> shader_color_i, shader_texture_i;
 
     public:
       fun compile_shader(rhi::ShaderStage stage, std::istream *file, std::vector<std::string> macros) -> std::expected<sptr<rhi::shader>, std::string>;

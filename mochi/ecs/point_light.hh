@@ -30,7 +30,7 @@ namespace mochi::ecs
   };
   
   /** @brief Buffer info describing the light3d_t memory layout. */
-  extern sptr<rhi::info<rhi::buffer>> point_light_i;
+  extern rhi::info<rhi::buffer> point_light_i;
 
 
 

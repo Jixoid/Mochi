@@ -13,10 +13,11 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
 #include <cassert>
+#include <cstdlib>
+#include <iostream>
 
 
 
@@ -26,47 +27,51 @@ namespace mochi::rhi
   template<>
   struct info<slotPush>
   {
-    private:
-      info(vt type, ShaderStageFlags shaderStage)
-        : m_type(type)
-        , m_shaderStage(shaderStage)
-      {}
-
     public:
-      static inline fun make(vt type, ShaderStageFlags shaderStage) {
-        return make_sptr(new info<slotPush>(type, shaderStage));
-      }
+      info(vt type): m_type(type) {}
 
 
     private:
       vt m_type;
-      ShaderStageFlags m_shaderStage;
+      u32 m_offset{};
 
     public:
-      inline fun type() { return m_type; }
-      inline fun shaderStage() { return m_shaderStage; }
+      inline fun  type() const { return m_type; }
+      inline fun& offset() { return m_offset; }
   };
+
 
 
 
   struct slotPush
   {
     public:
-      slotPush(info<slotPush> *info, rhi::buffer *buf)
-        : m_info(info)
-        , m_buf(buf)
+      template <typename T>
+      inline slotPush(T raw)
+        : m_data(
+          std::malloc(sizeof(T)),
+          sizeof(T)
+        )
       {
-        assert(info && buf);
+        T vaw = raw;
+        __builtin_memcpy(m_data.ptr(), &vaw, sizeof(T));
+        std::cerr << "malloc: " << m_data.ptr() << std::endl;
       }
+
+      inline ~slotPush() {
+        std::cerr << "free: " << m_data.ptr() << std::endl;
+        std::free(m_data.ptr());
+      }
+
+      slotPush(const slotPush&) = delete;
+      slotPush& operator=(const slotPush&) = delete;
 
 
     private:
-      info<slotPush> *m_info;
-      rhi::buffer *m_buf;
-    
+      data m_data{};
+      
     public:
-      inline fun info() { return m_info; }
-      inline fun buf() { return m_buf; }
+      inline fun data() const { return m_data; }
   };
-
+ 
 }

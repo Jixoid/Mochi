@@ -16,8 +16,10 @@ set(FETCHCONTENT_QUIET OFF)
 
 
 # Debug
+add_compile_options(-Wno-gnu-alignof-expression)
 add_compile_definitions($<$<CONFIG:Debug>:_DBG> $<$<CONFIG:RelWithDebInfo>:_DBG>)
 add_compile_definitions(_mochi_debug_ownership)
+add_compile_definitions(_mochi_debug_validator)
 
 
 # Sanitizer

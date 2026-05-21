@@ -68,10 +68,11 @@ namespace mochi::module
 
 
     VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
     allocatorInfo.physicalDevice = *device.phys_dev();
     allocatorInfo.device = *device.vdevice();
     allocatorInfo.instance = *bridge.inst();
-    allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
     vmaCreateAllocator(&allocatorInfo, &m_allocator);
   }
@@ -88,7 +89,7 @@ namespace mochi::module
 
   fun memory::camera_ubo(u64 required_count) -> sptr<rhi::buffer>
   {
-    if (!m_camera_ubo || (m_camera_ubo->size() / ecs::camera_i->stride()) < required_count)
+    if (!m_camera_ubo || (m_camera_ubo->size() / ecs::camera_i.stride()) < required_count)
       m_camera_ubo = rhi::buffer::make(
         m_device, *this,
         ecs::camera_i, std::max<u64>(10, required_count),
@@ -101,7 +102,7 @@ namespace mochi::module
 
   fun memory::light_ubo(u64 required_count) -> sptr<rhi::buffer>
   {
-    if (!m_light_ubo || (m_light_ubo->size() / ecs::point_light_i->stride()) < required_count)
+    if (!m_light_ubo || (m_light_ubo->size() / ecs::point_light_i.stride()) < required_count)
       m_light_ubo = rhi::buffer::make(
         m_device, *this,
         ecs::point_light_i, std::max<u64>(100, required_count),
