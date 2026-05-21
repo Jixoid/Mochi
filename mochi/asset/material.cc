@@ -39,6 +39,7 @@ namespace mochi::asset
     module::material_props props = {
       .method = module::material_method::mmPBR,
       .albedo = Albedo(),
+      .count  = m_count,
       .texture = is_texture() ? texture().get() : nil,
       .polymode = m_polymode,
       .primitiveTopology = m_primitiveTopology,

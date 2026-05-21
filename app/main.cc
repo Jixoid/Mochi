@@ -12,7 +12,9 @@
 
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <random>
 #include "mochi/core.hh"
+#include "mochi/ecs/multi_mesh.hh"
 #include "mochi/except.hh"
 #include "mochi/module/display.hh"
 #include "mochi/asset/mesh.hh"
@@ -20,6 +22,7 @@
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/mesh.hh"
 #include "mochi/ecs/transform.hh"
+#include "mochi/rhi/vtype.hh"
 #include "mochi/vfs/vfs_file.hh"
 #include "mochi/vfs/vfs_embed.hh"
 
@@ -170,11 +173,40 @@ int Main()
 
 
   auto m3d = asset::mesh::make(eng, "file:///home/alforce/Masaüstü/Untitled.glb"_vfs_map->span(), ".glb");
+  for (auto& mat : m3d->material()) mat->setCount(module::material_count::mcMulti);
+
+
+  const u32 PARTICLE_COUNT = 5;
+  std::vector<ecs::instance_data_t> instance_data(PARTICLE_COUNT);
+  
+  std::mt19937 rnd(1337);
+  std::uniform_real_distribution<f32> dist(-5.0f, 5.0f);
+  
+  for (u32 i = 0; i < PARTICLE_COUNT; i++)
+    instance_data[i].pos_radius = {dist(rnd), dist(rnd) + 10.0f, dist(rnd), 0.1f};
+  
+
+  auto inst_info = rhi::info<rhi::buffer>(sizeof(ecs::instance_data_t), rhi::vt::make_list<vec3<f32>>());
+  auto instance_buffer = rhi::buffer::make(
+    eng.sub<module::device>(), eng.sub<module::memory>(),
+    inst_info, PARTICLE_COUNT,
+    flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
+    flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite,
+    rhi::BufferLocation::PreferHost,
+    [&](void* _data) {
+      std::memcpy(_data, instance_data.data(), sizeof(ecs::instance_data_t) * PARTICLE_COUNT);
+    }
+  );
+
+
+
 
 
   auto mesh_instance = reg.create();
-  auto &mesh_comp = reg.emplace<ecs::Mesh>(mesh_instance);
+  auto &mesh_comp = reg.emplace<ecs::MultiMesh>(mesh_instance);
   mesh_comp.mesh = m3d;
+  mesh_comp.instances = instance_buffer;
+  mesh_comp.active_count = PARTICLE_COUNT;
   auto &transform = reg.emplace<ecs::Transform>(mesh_instance);
   transform.model = mochi::mat4<f32>::model({0}, quaternion<f32>(), {1});
   scene_nodes.push_back(mesh_instance);

@@ -28,6 +28,17 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer {
 };
 
 
+#if defined(WITH_MULTI_INST)
+  struct inst_t {
+    vec4 pos;
+  };
+
+  layout(buffer_reference, std430) readonly buffer InstBuffer {
+    inst_t v[];
+  };
+#endif
+
+
 layout(location = 0) out vec3 frag_pos_world;
 layout(location = 1) out vec3 frag_normal_world;
 
@@ -42,6 +53,10 @@ layout(push_constant) uniform PushConstant
 {
   mat4 model;
   VertexBuffer vertexs;
+  
+  #if defined(WITH_MULTI_INST)
+    InstBuffer insts;
+  #endif
 } push;
 
 layout(set = 0, binding = 0, row_major) uniform CameraBuffer
@@ -56,6 +71,11 @@ void main()
 {
   vertex_t vex = push.vertexs.v[gl_VertexIndex];
 
+  #if defined(WITH_MULTI_INST)
+    inst_t ins = push.insts.v[gl_InstanceIndex];
+  #endif
+  
+
   #if defined(WITH_COLOR)
     frag_color = vex.color;
   #elif defined(WITH_TEXTURE)
@@ -64,7 +84,12 @@ void main()
 
   mat4 trueModel = transpose(push.model);
 
-  vec4 worldPos = trueModel * vec4(vex.pos, 1.0);
+  #if defined(WITH_MULTI_INST)
+    vec4 worldPos = trueModel * vec4(vex.pos + ins.pos.xyz, 1.0);
+  #elif defined(WITH_SINGLE_INST)
+    vec4 worldPos = trueModel * vec4(vex.pos, 1.0);
+  #endif
+
   frag_pos_world = worldPos.xyz;
 
   mat3 normalMatrix = transpose(inverse(mat3(trueModel)));

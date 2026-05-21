@@ -40,6 +40,7 @@ namespace mochi::asset
       std::variant<vec3<f32>, sptr<asset::texture2>> m_albedo;
       rhi::PolygonMode m_polymode{rhi::PolygonMode::Fill};
       rhi::PrimitiveTopology m_primitiveTopology{rhi::PrimitiveTopology::eTriangleList};
+      module::material_count m_count{module::material_count::mcSingle};
 
     public:
       inline fun is_color() { return std::holds_alternative<vec3<f32>>(m_albedo); }
@@ -55,6 +56,9 @@ namespace mochi::asset
 
       inline fun primitiveTopology() { return m_primitiveTopology; }
       inline fun setPrimitiveTopology(rhi::PrimitiveTopology val) { m_primitiveTopology = val; }
+
+      inline fun count() { return m_count; }
+      inline fun setCount(module::material_count val) { m_count = val; }
 
 
       fun desc(rhi::render_target &target) -> sptr<module::material_desc>;

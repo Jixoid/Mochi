@@ -15,6 +15,7 @@
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/mesh.hh"
 #include "mochi/ecs/camera.hh"
+#include "mochi/ecs/multi_mesh.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/transform.hh"
 #include "mochi/rhi/cmd.hh"
@@ -197,6 +198,59 @@ namespace mochi
       }
 
     }
+
+
+    auto views = m_registry.view<ecs::Transform, ecs::MultiMesh>();
+    for (auto entity: views)
+    {
+      auto &transform = view.get<ecs::Transform>(entity);
+      auto &renderable = views.get<ecs::MultiMesh>(entity);
+
+      if (!renderable.mesh)
+        continue;
+
+      auto mesh = renderable.mesh;
+
+      
+      u32 i{};
+      for (auto &subsur: mesh->offs())
+      {
+        auto material = renderable.mesh->material()[renderable.mesh->map()[i]];
+        auto desc = material->desc(target);
+
+        if (desc->pipeline.get() != last_pipeline) {
+          cmd.setPipeline(desc->pipeline.get());
+          last_pipeline = desc->pipeline.get();
+        }
+
+        cmd.get().bindDescriptorSets(
+          vk::PipelineBindPoint::eGraphics,
+          *desc->pipeline->layout(),
+          0,
+          {*desc->desc_sets[0]},
+          {}
+        );
+
+
+        if (material->is_texture()) {
+          cmd.get().bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            *desc->pipeline->layout(),
+            1,
+            {*desc->desc_sets[1]},
+            {}
+          );
+        }
+
+        cmd.writePushConstant(rhi::listPush(std::tuple{transform.model, mesh->data()->address(), renderable.instances->address()}));
+        
+
+        cmd.draw({subsur.off(), subsur.size()}, {0, renderable.active_count});
+        i++;
+      }
+
+    }
+
   }
 
 

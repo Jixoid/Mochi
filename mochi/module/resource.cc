@@ -45,31 +45,8 @@ namespace mochi::module
   resource::resource(module::device &device, module::memory &memory)
     : m_device(device)
     , m_memory(memory)
-    , shader_color_i(nil)
-    , shader_texture_i(nil)
   {
     create_pool();
-
-
-    auto Push_Vertex = rhi::info<rhi::listPush>(rhi::ShaderStage::Vertex,
-      {
-        rhi::vt::make<mat4<f32>>(),
-        rhi::vt::make<u64>(),
-      }
-    );
-
-
-    auto Camera = rhi::info<rhi::slotDesc>(ecs::camera_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel);
-    auto Light = rhi::info<rhi::slotDesc>(ecs::point_light_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel);
-    auto Texture = rhi::info<rhi::slotDesc>(rhi::info<rhi::buffer>(1, {}), rhi::DescriptorType::TextureSampler, rhi::ShaderStage::Pixel);
-
-
-    auto Set0 = rhi::info<rhi::listDesc>({Camera, Light});
-    auto Set1 = rhi::info<rhi::listDesc>({Texture});
-
-
-    shader_color_i = rhi::info<rhi::pipeline>({Push_Vertex}, {}, {Set0});
-    shader_texture_i = rhi::info<rhi::pipeline>({Push_Vertex}, {}, {Set0, Set1});
   }
   
 
@@ -157,19 +134,64 @@ namespace mochi::module
 
   fun resource::get_or_new_material_desc(rhi::render_target &target, material_props props) -> sptr<material_desc>
   {
+    // Info Pipeline
+    std::vector<rhi::info<rhi::slotPush>> ipush;
+    std::vector<rhi::info<rhi::slotDesc>> idescs_0;
+    std::vector<rhi::info<rhi::slotDesc>> idescs_1;
+
+
+
+    // push: model
+    ipush.push_back(rhi::vt::make<mat4<f32>>());
+
+    // push: vertex
+    ipush.push_back(rhi::vt::make<u64>());
+    
+    // push: instance
+    if (props.count == material_count::mcMulti)
+      ipush.push_back(rhi::vt::make<u64>());
+
+
+
+    // desc: set 0
+    idescs_0.push_back(rhi::info<rhi::slotDesc>(ecs::camera_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel));
+    idescs_0.push_back(rhi::info<rhi::slotDesc>(ecs::point_light_i, rhi::DescriptorType::UniformBuffer, flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel));
+    
+    
+    // desc: set 1
+    idescs_1.push_back(rhi::info<rhi::slotDesc>(rhi::info<rhi::buffer>(1, {}), rhi::DescriptorType::TextureSampler, rhi::ShaderStage::Pixel));
+
+
+
+    // prepare
+    auto Push = rhi::info<rhi::listPush>(rhi::ShaderStage::Vertex, std::move(ipush));
+    auto Set0 = rhi::info<rhi::listDesc>(std::move(idescs_0));
+    auto Set1 = rhi::info<rhi::listDesc>(std::move(idescs_1));
+
+
+    // descset
+    std::vector<rhi::info<rhi::listDesc>> iDescSet;
+    
+    if (!Set0.idescs().empty()) iDescSet.push_back(Set0);
+    if (!Set1.idescs().empty()) iDescSet.push_back(Set1);
+
+
+
+
+    // Pipeline
     static std::unordered_map<material_method, std::string> ShSource = {
       {material_method::mmBare, "embed://bare"},
       {material_method::mmPBR,  "embed://pbr"},
     };
 
-    std::unordered_map<material_albedo, rhi::info<rhi::pipeline>*> InAlbedo = {
-      {material_albedo::maColor,   &shader_color_i},
-      {material_albedo::maTexture, &shader_texture_i},
-    };
-
     static std::unordered_map<material_albedo, std::string> ShAlbedo = {
       {material_albedo::maColor,   "WITH_COLOR"},
       {material_albedo::maTexture, "WITH_TEXTURE"},
+    };
+
+    static std::unordered_map<material_count, std::string> ShCount = {
+      {material_count::mcSingle, "WITH_SINGLE_INST"},
+      {material_count::mcMulti,  "WITH_MULTI_INST"},
     };
 
     auto bind_uniform = [this](u32 binding, vk::raii::DescriptorSet &desc_set, rhi::buffer *buf){
@@ -223,15 +245,26 @@ namespace mochi::module
 
 
 
-    auto vert = compile_shader(rhi::ShaderStage::Vertex, vfs::resolve_ro(ShSource[props.method]+".vert").get(), {ShAlbedo[props.albedo]});
-    auto frag = compile_shader(rhi::ShaderStage::Pixel,  vfs::resolve_ro(ShSource[props.method]+".frag").get(), {ShAlbedo[props.albedo]});
+    std::vector<std::string> Macros = {
+      ShAlbedo[props.albedo],
+      ShCount[props.count],
+    };
+
+    auto vert = compile_shader(rhi::ShaderStage::Vertex, vfs::resolve_ro(ShSource[props.method]+".vert").get(), Macros);
+    auto frag = compile_shader(rhi::ShaderStage::Pixel,  vfs::resolve_ro(ShSource[props.method]+".frag").get(), Macros);
 
     if (!vert.has_value() || !frag.has_value())
       throw mochi::rhi_error("Shaders failed to compile.");
 
+
+    auto ipipe = rhi::info<rhi::pipeline>(
+      {Push},
+      {},
+      iDescSet
+    );
     
     auto pipe = rhi::pipeline::make(
-      m_device, *InAlbedo[props.albedo], {*vert, *frag},
+      m_device, ipipe, {*vert, *frag},
       props.polymode, props.primitiveTopology,
       static_cast<rhi::Format>(target.color_format), static_cast<rhi::Format>(target.depth_format)
     );
@@ -250,7 +283,7 @@ namespace mochi::module
       bind_texture(0, desc_sets[1], props.texture->data()->view(), props.texture->data()->sampler());
 
     
-    auto ret = make_sptr(new material_desc{pipe, std::move(desc_sets)});
+    auto ret = make_sptr(new material_desc{ipipe, pipe, std::move(desc_sets)});
     m_materials[props] = ret;
     return ret;
   }

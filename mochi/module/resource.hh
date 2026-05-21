@@ -33,10 +33,13 @@ namespace mochi::module
 
   enum material_method: u8 { mmBare, mmPBR };
   enum material_albedo: u8 { maColor, maTexture };
+  enum material_count:  u8 { mcSingle, mcMulti };
   
   struct material_props {
     material_method method;
     material_albedo albedo;
+    material_count  count;
+
     asset::texture2 *texture{};
     rhi::PolygonMode polymode;
     rhi::PrimitiveTopology primitiveTopology;
@@ -52,6 +55,7 @@ namespace mochi::module
   };
   
   struct material_desc {
+    rhi::info<rhi::pipeline> ipipe;
     sptr<rhi::pipeline> pipeline;
     std::vector<vk::raii::DescriptorSet> desc_sets;
   };
@@ -78,8 +82,9 @@ struct std::hash<mochi::module::material_props> {
 
     hash_combine(d.method);
     hash_combine(d.albedo);
-    hash_combine(d.texture);
+    hash_combine(d.count);
     
+    hash_combine(d.texture);
     hash_combine(d.polymode);
     hash_combine(d.primitiveTopology);
 
@@ -115,9 +120,6 @@ namespace mochi::module
       fun create_pool() -> vk::raii::DescriptorPool&;
       fun allocate_descriptor_set(vk::DescriptorSetLayout layout) -> vk::raii::DescriptorSet;
 
-
-    private:
-      rhi::info<rhi::pipeline> shader_color_i, shader_texture_i;
 
     public:
       fun compile_shader(rhi::ShaderStage stage, std::istream *file, std::vector<std::string> macros) -> std::expected<sptr<rhi::shader>, std::string>;
