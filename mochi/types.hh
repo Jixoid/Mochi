@@ -26,9 +26,7 @@ namespace mochi
 
   namespace module
   {
-    struct bridge;
     struct display;
-    struct device;
     struct renderer;
     struct memory;
   }
@@ -36,6 +34,8 @@ namespace mochi
 
   namespace rhi
   {
+    struct device;
+
     struct slotPush;
     struct slotDesc;
     struct slotVertex;

@@ -23,7 +23,7 @@
 #include "mochi/rhi/listPush.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/buffer.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/device.hh"
 #include "mochi/module/resource.hh"
 #include "mochi/module/display.hh"
 #include "mochi/module/memory.hh"
@@ -39,21 +39,23 @@ namespace mochi
 {
 
   core::core(
-    std::function<vk::raii::PhysicalDevice (vk::raii::PhysicalDevices)> GpuPicker,
+    std::function<i32 (const vk::raii::PhysicalDevices&, rhi::PhysicalDeviceSuitable)> GpuPicker,
     std::function<void (f32 dt)> Idle
   )
     : m_idle(Idle)
   {
-    auto bridge     = make_uptr(new module::bridge("Mochi Test", {1,0,0,0}));
-    auto device     = make_uptr(new module::device(GpuPicker(bridge->physicalDevices())));
-    auto memory     = make_uptr(new module::memory(*bridge, *device));
+    rhi::vulkan_extension vkext{
+      .instance_extensions = module::display::extensions(),
+    };
+    auto device     = make_uptr(new rhi::device("Mochi Test", {1,0,0,0}, GpuPicker, &vkext));
+
+    auto memory     = make_uptr(new module::memory(*device));
     auto resource = make_uptr(new module::resource(*device, *memory));
-    auto display   = make_uptr(new module::display(*bridge, *device, *memory, "Mochi Test", 800, 600));
+    auto display   = make_uptr(new module::display(*device, *memory, "Mochi Test", 800, 600));
     auto renderer = make_uptr(new module::renderer(*device));
 
 
     m_modules = decltype(m_modules)(
-      std::move(bridge),
       std::move(device),
       std::move(resource),
       std::move(memory),
@@ -64,16 +66,16 @@ namespace mochi
 
   core::~core()
   {
-    sub<module::device>().vdevice().waitIdle();
+    sub<rhi::device>().get().waitIdle();
     
     m_registry.clear();
+
+    std::get<uptr<rhi::device>>(m_modules).reset();
     
     std::get<uptr<module::renderer>>(m_modules).reset();
     std::get<uptr<module::display>>(m_modules).reset();
     std::get<uptr<module::memory>>(m_modules).reset();
     std::get<uptr<module::resource>>(m_modules).reset();
-    std::get<uptr<module::device>>(m_modules).reset();
-    std::get<uptr<module::bridge>>(m_modules).reset();
   }
 
 
@@ -256,7 +258,7 @@ namespace mochi
 
   fun core::draw() -> void
   {
-    auto &dev = sub<module::device>();
+    auto &dev = sub<rhi::device>();
     auto &ren = sub<module::renderer>();
     auto &disp = sub<module::display>();
 

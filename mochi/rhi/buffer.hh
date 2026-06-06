@@ -46,17 +46,17 @@ namespace mochi::rhi
   struct buffer
   {
     private:
-      explicit buffer(module::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location);
+      explicit buffer(rhi::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location);
       
     public:
       ~buffer();
       
-      static fun make(module::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data = nil) -> sptr<buffer>;
+      static fun make(rhi::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data = nil) -> sptr<buffer>;
     
 
     private:
       info<buffer> m_info;
-      module::device &m_device;
+      rhi::device &m_device;
       u64   m_size{};
       void* m_mapped{};
       VmaAllocator m_allocator{nil};

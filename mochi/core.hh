@@ -13,12 +13,11 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/module/bridge.hh"
 #include "mochi/module/display.hh"
-#include "mochi/module/device.hh"
 #include "mochi/module/resource.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/module/renderer.hh"
+#include "mochi/rhi/device.hh"
 #include <cassert>
 #include <functional>
 #include <tuple>
@@ -41,7 +40,7 @@ namespace mochi
        * @param Idle A callback executed every frame, typically used for game logic updates.
        */
       explicit core(
-        std::function<vk::raii::PhysicalDevice (vk::raii::PhysicalDevices)> GpuPicker,
+        std::function<i32 (const vk::raii::PhysicalDevices&, rhi::PhysicalDeviceSuitable)> GpuPicker,
         std::function<void (f32 dt)> Idle
       );
 
@@ -65,8 +64,7 @@ namespace mochi
     // Sub Module
     private:
       std::tuple<
-        uptr<module::bridge>,
-        uptr<module::device>,
+        uptr<rhi::device>,
         uptr<module::resource>,
         uptr<module::memory>,
         uptr<module::display>,

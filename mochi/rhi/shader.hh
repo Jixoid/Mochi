@@ -27,10 +27,10 @@ namespace mochi::rhi
   struct shader
   {
     private:
-      explicit shader(module::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry);
+      explicit shader(rhi::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry);
     
     public:
-      static inline fun make(module::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry) {
+      static inline fun make(rhi::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry) {
         return make_sptr(new shader(device, stage, span, entry));
       }
 

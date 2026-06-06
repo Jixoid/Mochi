@@ -8,18 +8,16 @@
 
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
-
-
 #pragma once
 
 #include "mochi/basis.hh"
 #include "mochi/rhi/buffer.hh"
+#include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_raii.hpp>
-#include <vulkan/vulkan.h>
+#include <functional>
 
 
-
-namespace mochi::module
+namespace mochi::rhi
 {
 
   struct queue
@@ -37,7 +35,6 @@ namespace mochi::module
       inline fun get() const { return m_queue; }
       inline fun family() const { return m_family; }
   };
-
 
   /** @brief Represents a group of Vulkan queues for a specific capability. */
   struct queue_group
@@ -65,18 +62,33 @@ namespace mochi::module
   };
 
 
-  /** @brief Represents a Vulkan logical device and its associated resources. */
+  struct vulkan_extension {
+    std::vector<const char*> instance_layers;
+    std::vector<const char*> instance_extensions;
+    std::vector<const char*> device_extensions;
+  };
+
+
+  using PhysicalDeviceSuitable = std::function<bool (vk::raii::PhysicalDevice)>;
+
   struct device
   {
     public:
-      /**
-       * @brief Initialize a logical device from a physical device.
-       * @param phys_dev The Vulkan physical device to create the logical device from.
-       */
-      explicit device(vk::raii::PhysicalDevice phys_dev);
+      explicit device(
+        std::string_view appName, std::array<u16, 4> appVer,
+        std::function<i32 (const vk::raii::PhysicalDevices&, PhysicalDeviceSuitable)> GpuPicker,
+        vulkan_extension *ext = nil
+      );
 
 
     private:
+      static fun f_is_suitable(vk::raii::PhysicalDevice) -> bool;
+      
+
+    private:
+      vk::raii::Context vk_ctx;
+      vk::raii::Instance vk_inst;
+
       vk::raii::PhysicalDevice vk_phys_dev;
       vk::raii::Device vk_device;
 
@@ -92,10 +104,12 @@ namespace mochi::module
 
 
     public:
+      inline fun& ctx() { return vk_ctx; }
+      inline fun& inst() { return vk_inst; }
+      
       inline fun& phys_dev() { return vk_phys_dev; }
       inline fun& get() { return vk_device; }
-      inline fun& vdevice() { return vk_device; }
-      
+
       inline fun& main_q() { return m_main_q; }
       inline fun& graphics_q() { return m_graphics_q; }
       inline fun& compute_q() { return m_compute_q; }

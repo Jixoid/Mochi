@@ -13,7 +13,7 @@
 #include "mochi/basis.hh"
 #include "mochi/except.hh"
 #include "mochi/module/renderer.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/device.hh"
 #include "vulkan/vulkan.hpp"
 #include <vulkan/vulkan_raii.hpp>
 
@@ -24,7 +24,7 @@
 namespace mochi::module
 {
 
-  renderer::renderer(device &device)
+  renderer::renderer(rhi::device &device)
     : m_device(device)
   {
     m_cmd_buffers = device.getMainBuffer(MAX_FRAMES_IN_FLIGHT);
@@ -126,13 +126,13 @@ namespace mochi::module
 
   fun renderer::begin_frame() -> vk::raii::CommandBuffer&
   {
-    vk::Result err = m_device.vdevice().waitForFences({*m_in_flight_fences[m_current_frame]}, VK_TRUE, UINT64_MAX);
+    vk::Result err = m_device.get().waitForFences({*m_in_flight_fences[m_current_frame]}, VK_TRUE, UINT64_MAX);
 
     if (err != vk::Result::eSuccess)
       throw mochi::rhi_error("Error waiting for GPU or device lost!");
     
 
-    m_device.vdevice().resetFences({*m_in_flight_fences[m_current_frame]});
+    m_device.get().resetFences({*m_in_flight_fences[m_current_frame]});
 
 
     vk::raii::CommandBuffer &cmd = m_cmd_buffers[m_current_frame];

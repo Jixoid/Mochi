@@ -42,7 +42,7 @@
 namespace mochi::module
 {
 
-  resource::resource(module::device &device, module::memory &memory)
+  resource::resource(rhi::device &device, module::memory &memory)
     : m_device(device)
     , m_memory(memory)
   {
@@ -64,7 +64,7 @@ namespace mochi::module
       pool_sizes
     );
 
-    m_pools.push_back(vk::raii::DescriptorPool(m_device.vdevice(), pool_info));
+    m_pools.push_back(vk::raii::DescriptorPool(m_device.get(), pool_info));
     return m_pools.back();
   }
 
@@ -75,19 +75,19 @@ namespace mochi::module
     vk::DescriptorSetAllocateInfo alloc_info(*m_pools.back(), 1, &layout);
     
     try {
-      vk::raii::DescriptorSets sets(m_device.vdevice(), alloc_info);
+      vk::raii::DescriptorSets sets(m_device.get(), alloc_info);
       return std::move(sets.front());
     }
     catch(const vk::OutOfPoolMemoryError &e) {
       auto &new_pool = create_pool();
       vk::DescriptorSetAllocateInfo new_alloc_info(*new_pool, 1, &layout);
-      vk::raii::DescriptorSets sets(m_device.vdevice(), new_alloc_info);
+      vk::raii::DescriptorSets sets(m_device.get(), new_alloc_info);
       return std::move(sets.front());
     }
     catch(const vk::FragmentedPoolError &e) {
       auto &new_pool = create_pool();
       vk::DescriptorSetAllocateInfo new_alloc_info(*new_pool, 1, &layout);
-      vk::raii::DescriptorSets sets(m_device.vdevice(), new_alloc_info);
+      vk::raii::DescriptorSets sets(m_device.get(), new_alloc_info);
       return std::move(sets.front());
     }
   }
@@ -208,7 +208,7 @@ namespace mochi::module
         nil
       );
 
-      m_device.vdevice().updateDescriptorSets(descriptor_write, nil);
+      m_device.get().updateDescriptorSets(descriptor_write, nil);
     };
 
     auto bind_texture = [this](u32 binding, vk::raii::DescriptorSet &desc_set, vk::ImageView image_view, vk::Sampler sampler) -> void
@@ -230,7 +230,7 @@ namespace mochi::module
         nil
       );
 
-      m_device.vdevice().updateDescriptorSets(descriptor_write, nullptr);
+      m_device.get().updateDescriptorSets(descriptor_write, nullptr);
     };
 
 

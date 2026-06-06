@@ -25,12 +25,12 @@ namespace mochi::rhi
   struct image2
   {
     private:
-      explicit image2(module::device &device, module::memory &memory, u32 width, u32 height, void *ptr);
+      explicit image2(rhi::device &device, module::memory &memory, u32 width, u32 height, void *ptr);
       
     public:
       ~image2();
 
-      static inline fun make(module::device &device, module::memory &memory, u32 width, u32 height, void *ptr) -> sptr<image2> {
+      static inline fun make(rhi::device &device, module::memory &memory, u32 width, u32 height, void *ptr) -> sptr<image2> {
         return make_sptr(new image2(device, memory, width, height, ptr));
       }
 

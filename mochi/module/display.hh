@@ -27,10 +27,10 @@ namespace mochi::module
   struct display
   {
     public:
-      explicit display(module::bridge &bridge, module::device &device, module::memory &memory, std::string_view title, int width, int height);
+      explicit display(rhi::device &device, module::memory &memory, std::string_view title, int width, int height);
       ~display();
       
-      module::device &m_device;
+      rhi::device &m_device;
       module::memory &m_memory;
 
 

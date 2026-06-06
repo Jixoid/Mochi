@@ -15,10 +15,10 @@
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/except.hh"
-#include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/reader/reader.hh"
 #include "mochi/rhi/image.hh"
+#include "mochi/rhi/device.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
@@ -109,7 +109,7 @@ namespace mochi::asset
 
     
     auto ret = rhi::image2::make(
-      core.sub<module::device>(), 
+      core.sub<rhi::device>(), 
       core.sub<module::memory>(),
       texWidth, texHeight, pixels
     );
@@ -189,7 +189,7 @@ namespace mochi::asset
 
 
     m_data = rhi::buffer::make(
-      core.sub<module::device>(), core.sub<module::memory>(),
+      core.sub<rhi::device>(), core.sub<module::memory>(),
       vertex_i, final_data.size(),
       flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
       rhi::BufferCreate::HostSequentialWrite,

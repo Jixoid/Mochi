@@ -20,7 +20,7 @@
 #include "mochi/rhi/slotPush.hh"
 #include "mochi/rhi/slotDesc.hh"
 #include "mochi/rhi/slotVertex.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/device.hh"
 #include <vector>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -111,7 +111,7 @@ namespace mochi::rhi
 
 
   pipeline::pipeline(
-    module::device &device, rhi::info<pipeline> info, std::vector<sptr<shader>> shaders,
+    rhi::device &device, rhi::info<pipeline> info, std::vector<sptr<shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format __color_format, Format __depth_format
   )
@@ -127,14 +127,14 @@ namespace mochi::rhi
     for (auto &bindings_for_set: info.descBindings()) {
       vk::DescriptorSetLayoutCreateInfo set_info({}, bindings_for_set);
       
-      vk_desc_layouts.push_back(vk::raii::DescriptorSetLayout(device.vdevice(), set_info));
+      vk_desc_layouts.push_back(vk::raii::DescriptorSetLayout(device.get(), set_info));
       
       raw_layouts.push_back(*vk_desc_layouts.back());
     }
     
 
     vk::PipelineLayoutCreateInfo layout_info({}, raw_layouts, info.pushConstant());
-    vk_layout = vk::raii::PipelineLayout(device.vdevice(), layout_info);
+    vk_layout = vk::raii::PipelineLayout(device.get(), layout_info);
 
 
 
@@ -148,7 +148,7 @@ namespace mochi::rhi
       vk::ComputePipelineCreateInfo compute_info({}, compute_stage, *vk_layout);
       
 
-      vk_pipeline = vk::raii::Pipeline(device.vdevice(), nil, compute_info);
+      vk_pipeline = vk::raii::Pipeline(device.get(), nil, compute_info);
     } 
     else 
     {
@@ -202,7 +202,7 @@ namespace mochi::rhi
       pipeline_info.pNext = &rendering_info;
 
 
-      vk_pipeline = vk::raii::Pipeline(device.vdevice(), nil, pipeline_info);
+      vk_pipeline = vk::raii::Pipeline(device.get(), nil, pipeline_info);
     }
   }
   

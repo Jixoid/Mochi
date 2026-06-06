@@ -25,13 +25,12 @@ namespace mochi::module
   struct memory
   {
     public:
-      explicit memory(module::bridge &bridge, module::device &device);
+      explicit memory(rhi::device &device);
       ~memory();
 
 
     private:
-      module::bridge &m_bridge;
-      module::device &m_device;
+      rhi::device &m_device;
 
       
     #pragma region Limits

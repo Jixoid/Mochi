@@ -14,8 +14,8 @@
 #include "mochi/rhi/buffer.hh"
 #include "mochi/rhi/convert.hh"
 #include "mochi/module/memory.hh"
-#include "mochi/module/device.hh"
 #include "mochi/except.hh"
+#include "mochi/rhi/device.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
@@ -27,7 +27,7 @@
 namespace mochi::rhi
 {
 
-  buffer::buffer(module::device &device, module::memory &memory, rhi::info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location)
+  buffer::buffer(rhi::device &device, module::memory &memory, rhi::info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location)
     : m_device(device)
     , m_info(info)
     , m_size(info.stride() * count)
@@ -70,7 +70,7 @@ namespace mochi::rhi
 
   
 
-  fun buffer::make(module::device &device, module::memory &memory, rhi::info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data) -> sptr<buffer>
+  fun buffer::make(rhi::device &device, module::memory &memory, rhi::info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data) -> sptr<buffer>
   {
     auto ret = make_sptr(new buffer(
       device, memory,

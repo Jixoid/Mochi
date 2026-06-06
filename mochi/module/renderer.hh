@@ -15,7 +15,7 @@
 #include "mochi/basis.hh"
 #include "mochi/types.hh"
 #include "mochi/rhi/render_target.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/device.hh"
 #include <span>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -36,11 +36,11 @@ namespace mochi::module
        * @brief Initialize a new renderer.
        * @param device The logical device.
        */
-      explicit renderer(module::device &device);
+      explicit renderer(rhi::device &device);
 
 
     private:
-      module::device &m_device;
+      rhi::device &m_device;
 
       std::vector<vk::raii::CommandBuffer> m_cmd_buffers;
 

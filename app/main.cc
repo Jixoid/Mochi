@@ -51,12 +51,12 @@ int Main()
   std::vector<entt::entity> scene_nodes;  
 
   core eng(
-    [](vk::raii::PhysicalDevices devices) -> vk::raii::PhysicalDevice
+    [](const vk::raii::PhysicalDevices &devices, rhi::PhysicalDeviceSuitable is_suitable) -> i32
     {
       if (devices.empty())
         throw mochi::rhi_error("Vulkan supported graphics unit not found.");
 
-      return devices[0];
+      return 0;
     },
     [&](f32 dt)
     {
@@ -188,7 +188,7 @@ int Main()
 
   auto inst_info = rhi::info<rhi::buffer>(sizeof(ecs::instance_data_t), rhi::vt::make_list<vec3<f32>>());
   auto instance_buffer = rhi::buffer::make(
-    eng.sub<module::device>(), eng.sub<module::memory>(),
+    eng.sub<rhi::device>(), eng.sub<module::memory>(),
     inst_info, PARTICLE_COUNT,
     flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
     flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite,

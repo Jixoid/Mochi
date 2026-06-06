@@ -11,11 +11,10 @@
 
 
 #include "mochi/basis.hh"
-#include "mochi/module/bridge.hh"
-#include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
+#include "mochi/rhi/device.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
@@ -25,9 +24,8 @@
 namespace mochi::module
 {
 
-  memory::memory(bridge &bridge, device &device)
-    : m_bridge(bridge)
-    , m_device(device)
+  memory::memory(rhi::device &device)
+    : m_device(device)
   {
     auto props = device.phys_dev().getProperties();
     vk::PhysicalDeviceMemoryProperties mem_props = device.phys_dev().getMemoryProperties();
@@ -70,8 +68,8 @@ namespace mochi::module
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
     allocatorInfo.physicalDevice = *device.phys_dev();
-    allocatorInfo.device = *device.vdevice();
-    allocatorInfo.instance = *bridge.inst();
+    allocatorInfo.device = *device.get();
+    allocatorInfo.instance = *device.inst();
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
     vmaCreateAllocator(&allocatorInfo, &m_allocator);

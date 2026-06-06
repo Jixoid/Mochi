@@ -63,14 +63,14 @@ namespace mochi::rhi
   {
     private:
       explicit pipeline(
-        module::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
+        rhi::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       );
       
     public:
       static inline fun make(
-        module::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
+        rhi::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       ) {

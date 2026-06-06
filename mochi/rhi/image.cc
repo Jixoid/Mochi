@@ -11,12 +11,12 @@
 
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
+#include "mochi/module/memory.hh"
+#include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/buffer.hh"
-#include "mochi/module/memory.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/device.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "vk_mem_alloc.h"
 
@@ -25,7 +25,7 @@
 namespace mochi::rhi
 {
 
-  image2::image2(module::device &device, module::memory &memory, u32 width, u32 height, void *ptr)
+  image2::image2(rhi::device &device, module::memory &memory, u32 width, u32 height, void *ptr)
     : m_width(width)
     , m_height(height)
   {
@@ -113,7 +113,7 @@ namespace mochi::rhi
       {}, m_image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Srgb,
       {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
     );
-    m_view = vk::raii::ImageView(device.vdevice(), view_info);
+    m_view = vk::raii::ImageView(device.get(), view_info);
 
     vk::SamplerCreateInfo sampler_info(
       {}, 
@@ -123,7 +123,7 @@ namespace mochi::rhi
       VK_FALSE, vk::CompareOp::eAlways, 0.0f, 0.0f, 
       vk::BorderColor::eIntOpaqueBlack, VK_FALSE
     );
-    m_sampler = vk::raii::Sampler(device.vdevice(), sampler_info);
+    m_sampler = vk::raii::Sampler(device.get(), sampler_info);
   }
 
   image2::~image2()

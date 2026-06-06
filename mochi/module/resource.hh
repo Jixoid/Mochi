@@ -16,7 +16,7 @@
 #include "mochi/rhi/render_target.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/device.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "vulkan/vulkan.hpp"
 #include <expected>
@@ -107,11 +107,11 @@ namespace mochi::module
        * @brief Initialize a new resource module.
        * @param device The logical device.
        */
-      explicit resource(module::device &device, module::memory &memory);
+      explicit resource(rhi::device &device, module::memory &memory);
       
 
     private:
-      module::device &m_device;
+      rhi::device &m_device;
       module::memory &m_memory;
       std::vector<vk::raii::DescriptorPool> m_pools;
 

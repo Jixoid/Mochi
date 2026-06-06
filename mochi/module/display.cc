@@ -11,10 +11,9 @@
 
 
 #include "mochi/except.hh"
-#include "mochi/module/bridge.hh"
-#include "mochi/module/device.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/module/display.hh"
+#include "mochi/rhi/device.hh"
 #include <GLFW/glfw3.h>
 #include <string_view>
 
@@ -28,7 +27,7 @@ namespace mochi::module
 
 
 
-  display::display(module::bridge &bridge, module::device &device, module::memory &memory, std::string_view title, int width, int height)
+  display::display(rhi::device &device, module::memory &memory, std::string_view title, int width, int height)
     : m_device(device)
     , m_memory(memory)
   {
@@ -47,10 +46,10 @@ namespace mochi::module
     glfwSetFramebufferSizeCallback(m_window, framebuffer_resize_callback);
 
     VkSurfaceKHR rawSurface;
-    if (glfwCreateWindowSurface(*bridge.inst(), m_window, nil, &rawSurface) != VK_SUCCESS)
+    if (glfwCreateWindowSurface(*device.inst(), m_window, nil, &rawSurface) != VK_SUCCESS)
       throw mochi::rhi_error("Failed to create surface!");
     
-    vk_surface = vk::raii::SurfaceKHR(bridge.inst(), rawSurface);
+    vk_surface = vk::raii::SurfaceKHR(device.inst(), rawSurface);
 
     recreate_swapchain();
   }
@@ -76,7 +75,7 @@ namespace mochi::module
       glfwWaitEvents();
     }
 
-    m_device.vdevice().waitIdle();
+    m_device.get().waitIdle();
 
 
     m_image_views.clear();
@@ -148,7 +147,7 @@ namespace mochi::module
     swp_info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
     swp_info.setOldSwapchain(old_swapchain);
 
-    m_swapchain = vk::raii::SwapchainKHR(m_device.vdevice(), swp_info);
+    m_swapchain = vk::raii::SwapchainKHR(m_device.get(), swp_info);
 
 
     m_images = m_swapchain.getImages();
@@ -158,8 +157,8 @@ namespace mochi::module
         {}, img, vk::ImageViewType::e2D, m_format,
         {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
       );
-      m_image_views.push_back(vk::raii::ImageView(m_device.vdevice(), view_info));
-      m_render_finished_sems.push_back(vk::raii::Semaphore(m_device.vdevice(), sem_info));
+      m_image_views.push_back(vk::raii::ImageView(m_device.get(), view_info));
+      m_render_finished_sems.push_back(vk::raii::Semaphore(m_device.get(), sem_info));
     }
 
 
@@ -186,7 +185,7 @@ namespace mochi::module
       {}, m_depth_image, vk::ImageViewType::e2D, m_depth_format,
       {}, {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
     );
-    m_depth_view = vk::raii::ImageView(m_device.vdevice(), depth_view_info);
+    m_depth_view = vk::raii::ImageView(m_device.get(), depth_view_info);
 
     m_resized = false;
   }

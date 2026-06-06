@@ -10,22 +10,84 @@
 */
 
 
-#include "mochi/module/device.hh"
+#include "mochi/basis.hh"
+#include "mochi/except.hh"
+#include "mochi/rhi/device.hh"
 #include "vulkan/vulkan.hpp"
-#include <vulkan/vulkan_raii.hpp>
+#include "vulkan/vulkan_raii.hpp"
+#include <functional>
+#include <string_view>
+
+#define ef else if
 
 
 
-namespace mochi::module
+namespace mochi::rhi
 {
 
-  device::device(vk::raii::PhysicalDevice phys_dev)
-    : vk_phys_dev(phys_dev), vk_device(nil)
+  device::device(
+    std::string_view appName, std::array<u16, 4> appVer,
+    std::function<i32 (const vk::raii::PhysicalDevices&, PhysicalDeviceSuitable)> GpuPicker,
+    vulkan_extension *ext
+  )
+    : vk_ctx(), vk_inst(nil)
+    , vk_phys_dev(nil), vk_device(nil)
     , m_main_q(nil)
     , m_mainPool(nil), m_transferPool(nil), m_transferBuf(nil)
   {
-    // Allocate one queue per available queue family with default priority
-    auto props = phys_dev.getQueueFamilyProperties();
+    /// Instance
+    l_instance: {
+      vk::ApplicationInfo appInfo {
+        appName.data(),
+        VK_MAKE_API_VERSION(appVer[0], appVer[1], appVer[2], appVer[3]),
+        "No Engine",
+        VK_MAKE_API_VERSION(0, 1, 0, 0),
+        vk::ApiVersion13
+      };
+
+      std::vector<const char*> layers {
+        #ifdef _mochi_debug_khronos_validator
+        "VK_LAYER_KHRONOS_validation",
+        #endif
+      };
+      if (ext && !ext->instance_layers.empty())
+        layers.append_range(ext->instance_layers);
+      
+      std::vector<const char*> extensions {
+      };
+      if (ext && !ext->instance_extensions.empty())
+        extensions.append_range(ext->instance_extensions);
+
+      vk::InstanceCreateInfo createInfo({}, &appInfo, layers, extensions);
+      vk_inst = vk::raii::Instance(ctx(), createInfo);
+    }
+
+
+
+    /// Select Device
+    l_select_device: {
+      const auto phys_devs = vk::raii::PhysicalDevices(vk_inst);
+
+      if (!GpuPicker | phys_devs.empty())
+        throw rhi_error("no GPU was found to start the engine.");
+      
+      auto phys_idx = GpuPicker(phys_devs, f_is_suitable);
+      
+      if (phys_idx == -1)
+        throw rhi_error("no GPU was found to start the engine.");
+      ef (phys_idx <= -2 | phys_idx >= phys_devs.size())
+        throw rhi_error("the specified index is out of range.");
+
+      vk_phys_dev = phys_devs[phys_idx];
+        
+      if (!f_is_suitable(vk_phys_dev))
+        throw rhi_error("the selected GPU is not supported by mochi.");
+    }
+
+
+
+    /// Device
+    auto props = vk_phys_dev.getQueueFamilyProperties();
     
     std::vector<std::vector<f32>> all_priorities(props.size());
     std::vector<vk::DeviceQueueCreateInfo> queue_infos;
@@ -42,22 +104,29 @@ namespace mochi::module
     }
 
 
-    std::vector<const char*> extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    std::vector<const char*> extensions = {
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
+    };
+    if (ext && !ext->device_extensions.empty())
+      extensions.append_range(ext->device_extensions);
 
-    vk::PhysicalDeviceFeatures features;
+
+    vk::PhysicalDeviceFeatures features{};
     features.samplerAnisotropy = VK_TRUE;
     features.fillModeNonSolid = VK_TRUE;
 
     vk::PhysicalDeviceVulkan12Features features12{};
     features12.bufferDeviceAddress = VK_TRUE;
     
-    vk::PhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeature;
-    dynamicRenderingFeature.dynamicRendering = VK_TRUE;
-    dynamicRenderingFeature.pNext = features12;
+    vk::PhysicalDeviceVulkan13Features features13{};
+    features13.dynamicRendering = VK_TRUE;
+    features13.synchronization2 = VK_TRUE;
+    features13.pNext = &features12;
 
 
-    vk::DeviceCreateInfo dev_info({}, queue_infos, {}, extensions, &features, &dynamicRenderingFeature);
-    vk_device = vk::raii::Device(phys_dev, dev_info);
+    vk::DeviceCreateInfo dev_info({}, queue_infos, {}, extensions, &features, &features13);
+    vk_device = vk::raii::Device(vk_phys_dev, dev_info);
 
 
     for (u32 i{}; i < props.size(); i++)
@@ -111,6 +180,27 @@ namespace mochi::module
 
 
 
+  fun device::f_is_suitable(vk::raii::PhysicalDevice phys_dev) -> bool
+  {
+    auto featureChain = phys_dev.getFeatures2<
+      vk::PhysicalDeviceFeatures2, 
+      vk::PhysicalDeviceVulkan12Features, 
+      vk::PhysicalDeviceVulkan13Features
+    >();
+
+    auto features = featureChain.get<vk::PhysicalDeviceFeatures2>();
+    auto features12 = featureChain.get<vk::PhysicalDeviceVulkan12Features>();
+    auto features13 = featureChain.get<vk::PhysicalDeviceVulkan13Features>();
+
+
+    return
+      features.features.samplerAnisotropy &&
+      features.features.fillModeNonSolid &&
+      features12.bufferDeviceAddress &&
+      features13.dynamicRendering &&
+      features13.synchronization2;
+  }
+
 
   fun device::getMainBuffer(u32 count) -> vk::raii::CommandBuffers
   {
@@ -141,5 +231,5 @@ namespace mochi::module
       m_transferBuf_used = false;
     }
   }
-
+  
 }

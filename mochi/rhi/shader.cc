@@ -14,7 +14,7 @@
 #include "mochi/types.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/shader.hh"
-#include "mochi/module/device.hh"
+#include "mochi/rhi/device.hh"
 #include <string_view>
 #include <span>
 #include <vulkan/vulkan_raii.hpp>
@@ -24,7 +24,7 @@
 namespace mochi::rhi
 {
 
-  shader::shader(module::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry)
+  shader::shader(rhi::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry)
     : vk_module(nil)
   {
     m_stage = stage;
@@ -32,7 +32,7 @@ namespace mochi::rhi
 
     vk::ShaderModuleCreateInfo info({}, span.size_bytes(), span.data());
   
-    vk_module = vk::raii::ShaderModule(device.vdevice(), info);
+    vk_module = vk::raii::ShaderModule(device.get(), info);
   }
 
 }
