@@ -24,7 +24,7 @@ namespace mochi::ecs
 
   /** @brief Represents the local and global transform of an entity. */
   struct Transform {
-    mat4<f32> model = mat4<f32>();
+    mat4x3<f32> model = mat4x3<f32>();
   };
 
 }

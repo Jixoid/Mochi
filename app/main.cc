@@ -116,9 +116,9 @@ int Main()
         if (pitch < -89.0f) pitch = -89.0f;
         
         mochi::vec3<f32> front;
-        front.X = std::cos(yaw * (M_PI / 180.0f)) * std::cos(pitch * (M_PI / 180.0f));
-        front.Y = std::sin(pitch * (M_PI / 180.0f));
-        front.Z = std::sin(yaw * (M_PI / 180.0f)) * std::cos(pitch * (M_PI / 180.0f));
+        front.x = std::cos(yaw * (M_PI / 180.0f)) * std::cos(pitch * (M_PI / 180.0f));
+        front.y = std::sin(pitch * (M_PI / 180.0f));
+        front.z = std::sin(yaw * (M_PI / 180.0f)) * std::cos(pitch * (M_PI / 180.0f));
         cam_front = front.normalize();
       }
 
@@ -137,8 +137,8 @@ int Main()
       if (is_key_pressed(GLFW_KEY_LEFT_SHIFT)) { cam_pos -= cam_up * (cam_speed * dt); moved = true; }
 
       if (moved || cursor_locked) {
-        eng.registry().get<ecs::Camera>(camera).view = mochi::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
-        eng.registry().get<ecs::Camera>(camera).proj = mochi::mat4<f32>::perspective(90, (f32)eng.sub<module::display>().extent().width/eng.sub<module::display>().extent().height, 0.1, 100);
+        eng.registry().get<ecs::Camera>(camera).view = mochi::mat4x4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
+        eng.registry().get<ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, (f32)eng.sub<module::display>().extent().width/eng.sub<module::display>().extent().height, 0.1, 100);
       }
     }
   );
@@ -153,8 +153,8 @@ int Main()
   cam_comp.fov = 90.0f;
   cam_comp.near = 0.1f;
   cam_comp.far = 1000.0f;
-  cam_comp.view = mochi::mat4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
-  cam_comp.proj = mochi::mat4<f32>::perspective(cam_comp.fov, 800.0f / 600.0f, cam_comp.near, cam_comp.far);
+  cam_comp.view = mochi::mat4x4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
+  cam_comp.proj = mochi::mat4x4<f32>::perspective(cam_comp.fov, 800.0f / 600.0f, cam_comp.near, cam_comp.far);
 
 
   auto make_light = [&](vec3<f32> pos) {
@@ -163,7 +163,7 @@ int Main()
     light_comp.color = {1,1,1};
     light_comp.intensity = 10.0f;
     auto &transform = reg.emplace<ecs::Transform>(light);
-    transform.model = mochi::mat4<f32>::model(pos, quaternion<f32>(), {1});
+    transform.model = mochi::mat4x3<f32>::model(pos, quaternion<f32>(), {1});
     return light;
   };
   scene_nodes.push_back(make_light({4,0,0}));
@@ -201,14 +201,13 @@ int Main()
 
 
 
-
   auto mesh_instance = reg.create();
   auto &mesh_comp = reg.emplace<ecs::MultiMesh>(mesh_instance);
   mesh_comp.mesh = m3d;
   mesh_comp.instances = instance_buffer;
   mesh_comp.active_count = PARTICLE_COUNT;
   auto &transform = reg.emplace<ecs::Transform>(mesh_instance);
-  transform.model = mochi::mat4<f32>::model({0}, quaternion<f32>(), {1});
+  transform.model = mochi::mat4x3<f32>::model({0}, quaternion<f32>(), {1});
   scene_nodes.push_back(mesh_instance);
 
 

@@ -8,132 +8,226 @@
 
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
-
-
 #pragma once
 
 #include "mochi/basis.hh"
-#include <functional>
+#include <cassert>
+#include <format>
 #include <type_traits>
-#include <utility>
 #include <cmath>
+#include <utility>
+#include <algorithm>
 
 
 
 namespace mochi
 {
 
-  /** 
-   * @brief A generic 2-dimensional vector.
-   * @tparam T The element type.
-   */
   template <typename T>
     requires (std::is_arithmetic_v<T> || is_norm_v<T> || std::is_same_v<T, f16>)
-  struct alignas(sizeof(T)*2) vec2
+  struct [[nodiscard]] alignas(sizeof(T)*2) vec2
   {
     public:
-      T X{}, Y{};
-
-    public:
       inline constexpr vec2() {}
-      /** @brief Construct with a single broadcasted value. */
-      inline constexpr vec2(T V): X(V), Y(V) {}
-      /** @brief Construct with specific X and Y values. */
-      inline constexpr vec2(T nX, T nY): X(nX), Y(nY) {}
+      inline constexpr vec2(T v): x(v), y(v) {}
+      inline constexpr vec2(T x, T y): x(x), y(y) {}
 
-      /** @brief Construct from another vector of different type. */
       template <typename J>
-        requires std::is_arithmetic_v<J>
-      inline constexpr vec2(vec2<J> V): X(V.X), Y(V.Y) {}
+        requires (std::is_arithmetic_v<J> || is_norm_v<J> || std::is_same_v<J, f16>)
+      inline explicit constexpr vec2(vec2<J> v): x(v.x), y(v.y) {}
+
 
     public:
-      /** @brief Calculate the squared length of the vector. */
-      [[nodiscard]] inline constexpr fun dot() const noexcept -> T { return (X*X) + (Y*Y); }
-
-      /** @brief Calculate the dot product with another vector. */
-      template <typename J>
-        requires std::is_arithmetic_v<J>
-      [[nodiscard]] inline constexpr fun dot(const vec2<J> &it) const noexcept -> T { return (X*it.X) + (Y*it.Y); }
+      T x{}, y{};
 
 
-      /** @brief Calculate the squared distance to another vector. */
-      template <typename J>
-        requires std::is_arithmetic_v<J>
-      [[nodiscard]] inline constexpr fun dist_sq(const vec2<J> &it) const noexcept -> T {
-        T dx = X -it.X;
-        T dy = Y -it.Y;
+    public:
+      [[nodiscard]] inline constexpr fun dot() const noexcept -> T { return (x*x) + (y*y); }
+
+      [[nodiscard]] inline constexpr fun dot(const vec2 &it) const noexcept -> T { return (x*it.x) + (y*it.y); }
+
+
+
+      [[nodiscard]] inline constexpr fun dist_sq(const vec2 &it) const noexcept -> T {
+        const T dx = x -it.x;
+        const T dy = y -it.y;
         return (dx*dx) + (dy*dy);
       }
 
-
-      /** @brief Calculate the length of the vector. */
-      [[nodiscard]] inline constexpr fun dist() const noexcept -> const T { return std::sqrt(this->dot()); }
+      [[nodiscard]] inline fun length() const noexcept -> T { return std::sqrt(dot()); }
       
-      /** @brief Calculate the distance to another vector. */
-      template <typename J>
-        requires std::is_arithmetic_v<J>
-      [[nodiscard]] inline constexpr fun dist(const vec2<J> &it) const noexcept -> T { return std::sqrt(this->dist_sq(it)); }
+      [[nodiscard]] inline fun dist(const vec2 &it) const noexcept -> T { return std::sqrt(dist_sq(it)); }
 
 
-      /** @brief Calculate the 2D cross product with another vector. */
-      [[nodiscard]] inline constexpr fun cross(const vec2<T>& it) const -> T { return (X*it.Y) - (Y*it.X); }
+      [[nodiscard]] inline constexpr fun cross(const vec2 &it) const noexcept -> T { return (x*it.y) - (y*it.x); }
 
 
-      /** @brief Return a normalized copy of this vector. */
-      [[nodiscard]] inline constexpr fun normalize() const noexcept -> vec2 {
-        T len = dist();
-        return vec2(X/len, Y/len);
+      inline constexpr fun normalize() const noexcept -> vec2 {
+        const T len = length();
+        return vec2(x/len, y/len);
+      }
+
+      inline constexpr fun lerp(const vec2 &it, T t) const noexcept -> vec2 {
+        return vec2(x +(it.x-x) *t, y +(it.y-y) *t);
       }
       
+      inline constexpr fun clamp(const vec2 &min, const vec2 &max) const noexcept -> vec2 {
+        return vec2(
+          std::clamp(x, min.x, max.x),
+          std::clamp(y, min.y, max.y)
+        );
+      }
+
+      inline constexpr fun min(const vec2 &it) const noexcept -> vec2 {
+        return vec2(std::min(x, it.x), std::min(y, it.y));
+      }
+
+      inline constexpr fun max(const vec2 &it) const noexcept -> vec2 {
+        return vec2(std::max(x, it.x), std::max(y, it.y));
+      }
+
+      inline constexpr fun reflect(const vec2 &normal) const noexcept -> vec2 {
+        return *this - (normal * static_cast<T>(2) * dot(normal));
+      }
+
+      inline constexpr fun project(const vec2 &it) const noexcept -> vec2 {
+        const T d = it.dot();
+        if (d == static_cast<T>(0)) return vec2(0);
+        return it * (dot(it) / d);
+      }
+
+      inline constexpr fun reject(const vec2 &it) const noexcept -> vec2 {
+        return *this - project(it);
+      }
+
+      inline fun angle_between(const vec2 &it) const noexcept -> T {
+        return std::acos(std::clamp(dot(it) / (length() * it.length()), static_cast<T>(-1), static_cast<T>(1)));
+      }
+
+      inline fun rotate(T angle_radians) const noexcept -> vec2 {
+        const T c = std::cos(angle_radians);
+        const T s = std::sin(angle_radians);
+        return vec2(x * c - y * s, x * s + y * c);
+      }
+
 
     public:
-      inline constexpr fun operator==(const vec2 &it) const noexcept -> const bool { return (X == it.X && Y == it.Y); }
-      inline constexpr fun operator!=(const vec2 &it) const noexcept -> const bool { return !(*this == it); }
+      bool operator==(const vec2&) const = default;
+      bool operator!=(const vec2&) const = default;
 
-      inline constexpr fun operator+(const vec2 &it) const -> const vec2 { return vec2(X +it.X, Y +it.Y); }
-      inline constexpr fun operator-(const vec2 &it) const -> const vec2 { return vec2(X -it.X, Y -it.Y); }
-      inline constexpr fun operator*(const vec2 &it) const -> const vec2 { return vec2(X *it.X, Y *it.Y); }
-      inline constexpr fun operator/(const vec2 &it) const -> const vec2 { return vec2(X /it.X, Y /it.Y); }
+      inline constexpr fun operator-() const noexcept -> vec2 { return vec2(-x, -y); }
 
-      inline constexpr fun operator+=(const vec2 &It) noexcept -> vec2& { X += It.X; Y += It.Y; return *this; }
-      inline constexpr fun operator-=(const vec2 &It) noexcept -> vec2& { X -= It.X; Y -= It.Y; return *this; }
-      inline constexpr fun operator*=(const vec2 &It) noexcept -> vec2& { X *= It.X; Y *= It.Y; return *this; }
-      inline constexpr fun operator/=(const vec2 &It) noexcept -> vec2& { X /= It.X; Y /= It.Y; return *this; }
+      inline constexpr fun operator+(const vec2 &it) const noexcept -> vec2 { return vec2(x +it.x, y +it.y); }
+      inline constexpr fun operator-(const vec2 &it) const noexcept -> vec2 { return vec2(x -it.x, y -it.y); }
+      inline constexpr fun operator*(const vec2 &it) const noexcept -> vec2 { return vec2(x *it.x, y *it.y); }
+      inline constexpr fun operator/(const vec2 &it) const noexcept -> vec2 { return vec2(x /it.x, y /it.y); }
+
+      inline constexpr fun operator+=(const vec2 &it) noexcept -> vec2& { x += it.x; y += it.y; return *this; }
+      inline constexpr fun operator-=(const vec2 &it) noexcept -> vec2& { x -= it.x; y -= it.y; return *this; }
+      inline constexpr fun operator*=(const vec2 &it) noexcept -> vec2& { x *= it.x; y *= it.y; return *this; }
+      inline constexpr fun operator/=(const vec2 &it) noexcept -> vec2& { x /= it.x; y /= it.y; return *this; }
 
 
-      inline constexpr fun operator+(const T it) const -> const vec2 { return vec2(X +it, Y +it); }
-      inline constexpr fun operator-(const T it) const -> const vec2 { return vec2(X -it, Y -it); }
-      inline constexpr fun operator*(const T it) const -> const vec2 { return vec2(X *it, Y *it); }
-      inline constexpr fun operator/(const T it) const -> const vec2 { return vec2(X /it, Y /it); }
+      inline constexpr fun operator+(const T it) const noexcept -> vec2 { return vec2(x +it, y +it); }
+      inline constexpr fun operator-(const T it) const noexcept -> vec2 { return vec2(x -it, y -it); }
+      inline constexpr fun operator*(const T it) const noexcept -> vec2 { return vec2(x *it, y *it); }
+      inline constexpr fun operator/(const T it) const noexcept -> vec2 { return vec2(x /it, y /it); }
 
-      inline constexpr fun operator+=(const T It) noexcept -> vec2& { X += It; Y += It; return *this; }
-      inline constexpr fun operator-=(const T It) noexcept -> vec2& { X -= It; Y -= It; return *this; }
-      inline constexpr fun operator*=(const T It) noexcept -> vec2& { X *= It; Y *= It; return *this; }
-      inline constexpr fun operator/=(const T It) noexcept -> vec2& { X /= It; Y /= It; return *this; }
+      inline constexpr fun operator+=(const T it) noexcept -> vec2& { x += it; y += it; return *this; }
+      inline constexpr fun operator-=(const T it) noexcept -> vec2& { x -= it; y -= it; return *this; }
+      inline constexpr fun operator*=(const T it) noexcept -> vec2& { x *= it; y *= it; return *this; }
+      inline constexpr fun operator/=(const T it) noexcept -> vec2& { x /= it; y /= it; return *this; }
+
+
+    public:
+      inline constexpr fun operator[](u0 idx) -> T& {
+        assert(idx < 2 && "index out of bounds for vec2.");
+        switch (idx) {
+          case 0: return x;
+          case 1: return y;
+          default: std::unreachable();
+        }
+      }
+
+      inline constexpr fun operator[](u0 idx) const -> const T& {
+        assert(idx < 2 && "index out of bounds for vec2.");
+        switch (idx) {
+          case 0: return x;
+          case 1: return y;
+          default: std::unreachable();
+        }
+      }
+
+    public:
+      static inline constexpr fun zero() noexcept -> vec2 { return vec2(0); }
+      static inline constexpr fun one() noexcept -> vec2 { return vec2(1); }
+      static inline constexpr fun up() noexcept -> vec2 { return vec2(0, 1); }
+      static inline constexpr fun down() noexcept -> vec2 { return vec2(0, -1); }
+      static inline constexpr fun left() noexcept -> vec2 { return vec2(-1, 0); }
+      static inline constexpr fun right() noexcept -> vec2 { return vec2(1, 0); }
+
   };
+
+
+
+
+  template <std::size_t i, typename T>
+  [[nodiscard]] inline constexpr auto& get(vec2<T> &v) noexcept {
+    static_assert(i < 2, "index out of bounds for vec2");
+    if constexpr (i == 0) return v.x;
+    else return v.y;
+  }
+
+  template <std::size_t i, typename T>
+  [[nodiscard]] inline constexpr const auto& get(const vec2<T> &v) noexcept {
+    static_assert(i < 2, "index out of bounds for vec2");
+    if constexpr (i == 0) return v.x;
+    else return v.y;
+  }
+
+  template <std::size_t i, typename T>
+  [[nodiscard]] inline constexpr auto&& get(vec2<T> &&v) noexcept {
+    static_assert(i < 2, "index out of bounds for vec2");
+    if constexpr (i == 0) return std::move(v.x);
+    else return std::move(v.y);
+  }
+
+  template <std::size_t i, typename T>
+  [[nodiscard]] inline constexpr const auto&& get(const vec2<T> &&v) noexcept {
+    static_assert(i < 2, "index out of bounds for vec2");
+    if constexpr (i == 0) return std::move(v.x);
+    else return std::move(v.y);
+  }
 
 }
 
-template <typename t>
-struct std::hash<mochi::vec2<t>> {
-  std::size_t operator()(const mochi::vec2<t>& d) const noexcept {
-    std::size_t seed = 0;
+namespace std {
+  template <typename T>
+  struct tuple_size<mochi::vec2<T>>: std::integral_constant<std::size_t, 2> {};
 
-    auto hash_combine = [&seed](auto &&v) {
-      using T = std::decay_t<decltype(v)>;
-      std::size_t h;
-      
-      if constexpr (std::is_enum_v<T>)
-        h = std::hash<std::underlying_type_t<T>>{}(std::to_underlying(v));
-      else
-        h = std::hash<T>{}(v);
-      
-      seed ^= h + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
-    };
+  template <std::size_t i, typename T>
+  struct tuple_element<i, mochi::vec2<T>> {
+    static_assert(i < 2, "index out of bounds for vec2");
+    using type = T;
+  };
 
-    hash_combine(d.X);
-    hash_combine(d.Y);
+  template <typename T>
+  struct formatter<mochi::vec2<T>> {
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+    auto format(const mochi::vec2<T>& v, std::format_context& ctx) const {
+      return std::format_to(ctx.out(), "vec2{{{}, {}}}", v.x, v.y);
+    }
+  };
+}
 
-    return seed;
-  }
-};
+
+template <typename T> inline constexpr auto operator+(const T s, const mochi::vec2<T> &v) -> mochi::vec2<T> { return v+s; }
+template <typename T> inline constexpr auto operator-(const T s, const mochi::vec2<T> &v) -> mochi::vec2<T> { return mochi::vec2<T>(s - v.x, s - v.y); }
+template <typename T> inline constexpr auto operator*(const T s, const mochi::vec2<T> &v) -> mochi::vec2<T> { return v*s; }
+template <typename T> inline constexpr auto operator/(const T s, const mochi::vec2<T> &v) -> mochi::vec2<T> { return mochi::vec2<T>(s / v.x, s / v.y); }
+
+
+template <typename T>
+inline fun operator<<(std::ostream &os, const mochi::vec2<T> &v) -> std::ostream& {
+  return os << std::format("vec2{{{}, {}}}",  v.x, v.y);
+}

@@ -25,8 +25,8 @@ namespace mochi::ecs
 
   /** @brief Represents the raw camera data passed to shaders (View and Projection matrices). */
   struct camera_t {
-    mat4<f32> view;
-    mat4<f32> proj;
+    mat4x4<f32> view;
+    mat4x4<f32> proj;
   };
   
   /** @brief Buffer info describing the camera3d_t memory layout. */
@@ -40,8 +40,8 @@ namespace mochi::ecs
     f32 near = 0.1;
     f32 far = 1000;
     
-    mat4<f32> view = mat4<f32>();
-    mat4<f32> proj = mat4<f32>();
+    mat4x4<f32> view = mat4x4<f32>();
+    mat4x4<f32> proj = mat4x4<f32>();
   };
 
 }

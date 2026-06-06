@@ -16,6 +16,7 @@
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
+#include <functional>
 #include <vulkan/vulkan_core.h>
 
 

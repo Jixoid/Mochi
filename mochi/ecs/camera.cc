@@ -26,8 +26,8 @@ namespace mochi::ecs
   rhi::info<rhi::buffer> camera_i(
     sizeof(camera_t),
     rhi::vt::make_list<
-      mat4<f32>, // View
-      mat4<f32>  // Projection
+      mat4x4<f32>, // View
+      mat4x4<f32>  // Projection
     >()
   );
 

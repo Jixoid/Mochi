@@ -84,15 +84,15 @@ namespace mochi
           
           if (attr->type == cgltf_attribute_type_position) {
             for (cgltf_size v = 0; v < vertex_count; v++)
-              cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].position.X, 3);
+              cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].position.x, 3);
           } 
           ef (attr->type == cgltf_attribute_type_normal) {
             for (cgltf_size v = 0; v < vertex_count; v++)
-              cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].normal.X, 3);
+              cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].normal.x, 3);
           } 
           ef (attr->type == cgltf_attribute_type_texcoord) {
             for (cgltf_size v = 0; v < vertex_count; v++)
-              cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].uv.X, 2);
+              cgltf_accessor_read_float(attr->data, v, &temp_vertices[v].uv.x, 2);
           }
         }
 

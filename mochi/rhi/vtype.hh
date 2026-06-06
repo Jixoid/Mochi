@@ -137,9 +137,13 @@ namespace mochi::rhi
         ef constexpr (std::is_same_v<T, vec4<f64>>) return {32,  32, Format::v4float64};
 
 
-        // mat4
-        ef constexpr (std::is_same_v<T, mat4<f32>>) return {16, 16, Format::v4float32, 4};
-        ef constexpr (std::is_same_v<T, mat4<f64>>) return {32, 32, Format::v4float64, 4};
+        // mat4x4
+        ef constexpr (std::is_same_v<T, mat4x4<f32>>) return {16, 16, Format::v4float32, 4};
+        ef constexpr (std::is_same_v<T, mat4x4<f64>>) return {32, 32, Format::v4float64, 4};
+
+        // mat4x3
+        ef constexpr (std::is_same_v<T, mat4x3<f32>>) return {16, 16, Format::v4float32, 3};
+        ef constexpr (std::is_same_v<T, mat4x3<f64>>) return {32, 32, Format::v4float64, 3};
         else
           static_assert(false, "unsupported type");
       }

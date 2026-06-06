@@ -20,6 +20,7 @@
 #include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
 #include "vulkan/vulkan.hpp"
+#include <functional>
 
 
 

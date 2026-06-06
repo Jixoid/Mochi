@@ -130,7 +130,7 @@ namespace mochi
         auto &light = lights.get<ecs::PointLight>(entity);
         
         lig_data[idx].position = {transform.model.SwVec[0][3], transform.model.SwVec[1][3], transform.model.SwVec[2][3], 0.0f};
-        lig_data[idx].color = {light.color, light.intensity};
+        lig_data[idx].color = vec4{light.color, light.intensity};
         idx++;
       }
     }
@@ -190,7 +190,7 @@ namespace mochi
           );
         }
 
-        cmd.writePushConstant(rhi::listPush(std::tuple{transform.model, mesh->data()->address()}));
+        cmd.writePushConstant(rhi::listPush(std::tuple{mat4x4<f32>{transform.model}, mesh->data()->address()}));
         
 
         cmd.draw({subsur.off(), subsur.size()}, {0, 1});
@@ -242,7 +242,7 @@ namespace mochi
           );
         }
 
-        cmd.writePushConstant(rhi::listPush(std::tuple{transform.model, mesh->data()->address(), renderable.instances->address()}));
+        cmd.writePushConstant(rhi::listPush(std::tuple{mat4x4<f32>{transform.model}, mesh->data()->address(), renderable.instances->address()}));
         
 
         cmd.draw({subsur.off(), subsur.size()}, {0, renderable.active_count});

@@ -142,7 +142,7 @@ namespace mochi::module
 
 
     // push: model
-    ipush.push_back(rhi::vt::make<mat4<f32>>());
+    ipush.push_back(rhi::vt::make<mat4x4<f32>>());
 
     // push: vertex
     ipush.push_back(rhi::vt::make<u64>());

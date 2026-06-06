@@ -40,17 +40,17 @@ namespace mochi
 
       if (prefix == "v") {
         mochi::vec3<f32> pos;
-        iss >> pos.X >> pos.Y >> pos.Z;
+        iss >> pos.x >> pos.y >> pos.z;
         data.v.push_back(pos);
       }
       else if (prefix == "vt") {
         mochi::vec2<f32> uv;
-        iss >> uv.X >> uv.Y;
+        iss >> uv.x >> uv.y;
         data.vt.push_back(uv); 
       }
       else if (prefix == "vn") {
         mochi::vec3<f32> normal;
-        iss >> normal.X >> normal.Y >> normal.Z;
+        iss >> normal.x >> normal.y >> normal.z;
         data.vn.push_back(normal);
       }
       else if (prefix == "f") {
