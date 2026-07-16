@@ -6,6 +6,7 @@ add_executable(${TARGET_NAME} ${SOURCES})
 
 target_link_libraries(${TARGET_NAME} PRIVATE 
   qaos_mochi_shared
+  qaos_qcl_static
 )
 
 target_link_options(${TARGET_NAME} PUBLIC -rdynamic)

@@ -13,12 +13,11 @@
 #include "mochi/basis.hh"
 #include "mochi/asset/texture.hh"
 #include "mochi/rhi/image.hh"
-#include "mochi/module/renderer.hh"
-#include "mochi/module/memory.hh"
+#include "mochi/rhi/manager/alloc_manager.hh"
+#include "mochi/rhi/manager/transfer_manager.hh"
 #include "mochi/core.hh"
 #include "mochi/except.hh"
-#include <vulkan/vulkan_raii.hpp>
-#include <vulkan/vulkan.h>
+
 #include "stb_image.h"
 
 
@@ -26,7 +25,7 @@
 namespace mochi::asset
 {
 
-  texture2::texture2(core &core, sptr<rhi::image2> data)
+  texture2::texture2(core &core, sptr<rhi::Image2> data)
     : m_data(data)
   {}
 
@@ -36,40 +35,51 @@ namespace mochi::asset
     stbi_uc* pixels = stbi_load(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) throw mochi::asset_error("Failed to load texture!");
 
+    auto& alloc_mgr = core.sub<rhi::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+
     // Initialize texture and transfer to vram
-    m_data = rhi::image2::make(
-      core.sub<rhi::device>(), 
-      core.sub<module::memory>(),
-      texWidth, texHeight, pixels
+    m_data = alloc_mgr.allocImage2(
+      {static_cast<u32>(texWidth), static_cast<u32>(texHeight)}, 
+      rhi::Format::v4norm8U,
+      flags(rhi::ImageUsage::Sampled) | rhi::ImageUsage::TransferDst, 
+      rhi::ImageTiling::Optimal, 
+      rhi::AllocationCreateFlags(), 
+      rhi::AllocationLocation::PreferDevice
     );
+
+    transfer_mgr.copyMemoryToImage(rhi::TransferTime::Now, pixels, m_data.get());
 
     stbi_image_free(pixels);
   }
 
-  texture2::texture2(core &core, u32 width, u32 height, const void *pixels)
-  {
-    m_data = rhi::image2::make(
-      core.sub<rhi::device>(), 
-      core.sub<module::memory>(), 
-      width, height, const_cast<void*>(pixels)
+  texture2::texture2(core &core, u32 width, u32 height, const void *pixels) {
+    auto& alloc_mgr = core.sub<rhi::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+
+    m_data = alloc_mgr.allocImage2(
+      {width, height}, 
+      rhi::Format::v4norm8U,
+      flags(rhi::ImageUsage::Sampled) | rhi::ImageUsage::TransferDst, 
+      rhi::ImageTiling::Optimal, 
+      rhi::AllocationCreateFlags(), 
+      rhi::AllocationLocation::PreferDevice
     );
+    transfer_mgr.copyMemoryToImage(rhi::TransferTime::Now, const_cast<void*>(pixels), m_data.get());
   }
 
 
 
     
-  fun texture2::make(core &core, sptr<rhi::image2> data) -> sptr<texture2>
-  {
+  fun texture2::make(core &core, sptr<rhi::Image2> data) -> sptr<texture2> {
     return make_sptr<texture2>(core, data);
   }
 
-  fun texture2::make(core &core, const std::string &fpath) -> sptr<texture2>
-  {
+  fun texture2::make(core &core, const std::string &fpath) -> sptr<texture2> {
     return make_sptr<texture2>(core, fpath);
   }
 
-  fun texture2::make(core &core, u32 width, u32 height, const void *pixels) -> sptr<texture2>
-  {
+  fun texture2::make(core &core, u32 width, u32 height, const void *pixels) -> sptr<texture2> {
     return make_sptr<texture2>(core, width, height, pixels);
   }
 

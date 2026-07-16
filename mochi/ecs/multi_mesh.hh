@@ -15,7 +15,7 @@
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/rhi/buffer.hh"
-#include "src/entt/entt.hpp"
+#include "entt/entt.hpp"
 
 
 
@@ -27,8 +27,8 @@ namespace mochi::ecs
   };
 
   struct MultiMesh {
-    sptr<asset::mesh> mesh;
-    sptr<rhi::buffer> instances;
+    sptr<asset::Mesh> mesh;
+    sptr<rhi::Buffer> instances;
     u32 active_count{0};
   };
 

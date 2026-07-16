@@ -16,7 +16,7 @@
 #include "mochi/math/math.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "mochi/types.hh"
-#include "src/entt/entt.hpp"
+#include "entt/entt.hpp"
 
 
 

@@ -12,11 +12,6 @@
 
 #pragma once
 
-#include "mochi/basis.hh"
-
-#define ef else if
-
-
 
 namespace mochi
 {
@@ -24,39 +19,38 @@ namespace mochi
   struct core;
   
 
-  namespace module
-  {
+  namespace module {
     struct display;
     struct renderer;
     struct memory;
   }
 
 
-  namespace rhi
-  {
-    struct device;
+  namespace rhi {
+    struct DeviceManager;
+    struct AllocManager;
+    struct ShaderManager;
+    struct PipelineManager;
+    struct TransferManager;
+    struct SyncManager;
+    struct CommandManager;
+    struct SwapchainManager;
+    struct ResourceManager;
 
-    struct slotPush;
-    struct slotDesc;
-    struct slotVertex;
+    struct MaterialManager;
+
+    struct PipelineMeta;
+    struct Pipeline;
     
-    struct listDesc;
-    struct listPush;
-
-    struct pipeline;
-    struct buffer;
-    struct shader;
-    struct image2;
-
-    /** @brief Information structure for a type. */
-    template <typename T>
-    struct info;
+    struct Buffer;
+    struct Shader;
+    struct Image;
+    struct Image2;
   }
 
 
-  namespace asset
-  {
-    struct mesh;
+  namespace asset {
+    struct Mesh;
     struct texture2;
     struct matrial;
   }

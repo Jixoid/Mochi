@@ -20,6 +20,7 @@ add_compile_options(-Wno-gnu-alignof-expression)
 add_compile_definitions($<$<CONFIG:Debug>:_DBG> $<$<CONFIG:RelWithDebInfo>:_DBG>)
 add_compile_definitions(_mochi_debug_ownership)
 add_compile_definitions(_mochi_debug_validator)
+add_compile_definitions(_mochi_driver_debug_statistics)
 
 
 # Sanitizer
@@ -110,41 +111,41 @@ pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
 
 
 
-
 # Engine
 file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mochi/*.cc")
+file(GLOB_RECURSE DRIVER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/drivers/vulkan/*.cc")
 
 
-add_library(qaos_mochi_shared SHARED ${SOURCES} ${RES_OBJECTS})
-
+add_library(qaos_mochi_shared SHARED ${SOURCES} ${RES_OBJECTS} ${DRIVER_SOURCES})
+target_include_directories(qaos_mochi_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qaos_mochi_shared PUBLIC
   glfw_
   Vulkan::Vulkan
   PkgConfig::SHADERC
   ext_cgltf
   ext_stb
-  ext_vma
-  ext_entt
+  VulkanMemoryAllocator
+  EnTT
 )
 
-target_include_directories(qaos_mochi_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
-
-add_library(qaos_mochi_static STATIC ${SOURCES} ${RES_OBJECTS})
-
+add_library(qaos_mochi_static STATIC ${SOURCES} ${RES_OBJECTS} ${DRIVER_SOURCES})
+target_include_directories(qaos_mochi_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qaos_mochi_static PUBLIC
   glfw_
   Vulkan::Vulkan
   PkgConfig::SHADERC
   ext_cgltf
   ext_stb
-  ext_vma
-  ext_entt
+  VulkanMemoryAllocator
+  EnTT
 )
-
-target_include_directories(qaos_mochi_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 
 
 # Test App
 add_subdirectory(app)
+
+# Editor
+add_subdirectory(editor)
+

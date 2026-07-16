@@ -20,22 +20,16 @@
 #include "mochi/asset/mesh.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
-#include "mochi/ecs/mesh.hh"
 #include "mochi/ecs/transform.hh"
-#include "mochi/rhi/vtype.hh"
-#include "mochi/vfs/vfs_file.hh"
-#include "mochi/vfs/vfs_embed.hh"
+#include "mochi/vfs/vfs.hh"
+#include "mochi/rhi/manager/alloc_manager.hh"
+#include "mochi/rhi/manager/transfer_manager.hh"
 
 using namespace mochi;
 
 
 
-int Main()
-{
-  auto __vfs_file  = vfs::__file::get();
-  auto __vfs_embed = vfs::__embed::get();
-
-
+fun Main() -> int {
   mochi::vec3<f32> cam_pos{0,0,4};
   mochi::vec3<f32> cam_front{-1};
   cam_front = cam_front.normalize();
@@ -51,11 +45,8 @@ int Main()
   std::vector<entt::entity> scene_nodes;  
 
   core eng(
-    [](const vk::raii::PhysicalDevices &devices, rhi::PhysicalDeviceSuitable is_suitable) -> i32
+    []() -> i32
     {
-      if (devices.empty())
-        throw mochi::rhi_error("Vulkan supported graphics unit not found.");
-
       return 0;
     },
     [&](f32 dt)
@@ -138,7 +129,7 @@ int Main()
 
       if (moved || cursor_locked) {
         eng.registry().get<ecs::Camera>(camera).view = mochi::mat4x4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
-        eng.registry().get<ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, (f32)eng.sub<module::display>().extent().width/eng.sub<module::display>().extent().height, 0.1, 100);
+        eng.registry().get<ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, (f32)eng.sub<module::display>().extent().x()/eng.sub<module::display>().extent().y(), 0.1, 100);
       }
     }
   );
@@ -172,8 +163,8 @@ int Main()
   scene_nodes.push_back(make_light({0,-4,0}));
 
 
-  auto m3d = asset::mesh::make(eng, "file:///home/alforce/Masaüstü/Untitled.glb"_vfs_map->span(), ".glb");
-  for (auto& mat : m3d->material()) mat->setCount(module::material_count::mcMulti);
+  auto m3d = asset::Mesh::make(eng, "file:///home/alforce/Masaüstü/Untitled.glb"_vfs_map->span(), ".glb");
+  for (auto& mat : m3d->material()) mat->setCount(rhi::MaterialCount::Multi);
 
 
   const u32 PARTICLE_COUNT = 5;
@@ -186,16 +177,17 @@ int Main()
     instance_data[i].pos_radius = {dist(rnd), dist(rnd) + 10.0f, dist(rnd), 0.1f};
   
 
-  auto inst_info = rhi::info<rhi::buffer>(sizeof(ecs::instance_data_t), rhi::vt::make_list<vec3<f32>>());
-  auto instance_buffer = rhi::buffer::make(
-    eng.sub<rhi::device>(), eng.sub<module::memory>(),
-    inst_info, PARTICLE_COUNT,
+  auto instance_buffer = eng.sub<rhi::AllocManager>().allocBuffer(
+    sizeof(ecs::instance_data_t) * PARTICLE_COUNT,
     flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
-    flags(rhi::BufferCreate::Mapped) | rhi::BufferCreate::HostSequentialWrite,
-    rhi::BufferLocation::PreferHost,
-    [&](void* _data) {
-      std::memcpy(_data, instance_data.data(), sizeof(ecs::instance_data_t) * PARTICLE_COUNT);
-    }
+    rhi::AllocationCreate::Mapped,
+    rhi::AllocationLocation::PreferDevice
+  );
+
+  eng.sub<rhi::TransferManager>().copyMemoryToBuffer(
+    rhi::TransferTime::Now,
+    instance_data.data(),
+    instance_buffer.get()
   );
 
 
@@ -221,8 +213,7 @@ int Main()
 
 
 
-int main()
-{
+fun main() -> i32 {
   try { return Main(); }
   
   catch (const vk::SystemError &e) {

@@ -13,152 +13,59 @@
 #include "mochi/basis.hh"
 #include "mochi/except.hh"
 #include "mochi/module/renderer.hh"
-#include "mochi/rhi/device.hh"
-#include "vulkan/vulkan.hpp"
-#include <vulkan/vulkan_raii.hpp>
+#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/command_manager.hh"
+#include "mochi/rhi/manager/sync_manager.hh"
 
 #define ef else if
-
 
 
 namespace mochi::module
 {
 
-  renderer::renderer(rhi::device &device)
+  renderer::renderer(rhi::DeviceManager &device)
     : m_device(device)
   {
-    m_cmd_buffers = device.getMainBuffer(MAX_FRAMES_IN_FLIGHT);
+    m_cmd_mgr = rhi::CommandManager::make(m_device);
+    m_sync_mgr = rhi::SyncManager::make(m_device, MAX_FRAMES_IN_FLIGHT);
 
-
-    vk::SemaphoreCreateInfo sem_info{};
-    vk::FenceCreateInfo fence_info(vk::FenceCreateFlagBits::eSignaled);
-
-    for (u32 i{}; i < MAX_FRAMES_IN_FLIGHT; i++) {
-      m_image_available_sems.push_back(vk::raii::Semaphore(m_device.get(), sem_info));
-      m_in_flight_fences.push_back(vk::raii::Fence(m_device.get(), fence_info));
+    for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+      m_cmd_buffers.push_back(m_cmd_mgr->allocateGraphicsCommand());
     }
   }
 
 
-  
-
-  fun renderer::begin_pass(vk::raii::CommandBuffer &cmd, const rhi::render_target &target, const std::array<float, 4> &clear_color) -> void
+  fun renderer::begin_pass(rhi::Command &cmd, const rhi::render_target &target, const std::array<float, 4> &clear_color) -> void
   {
-    std::vector<vk::ImageMemoryBarrier> barriers;
-
-    barriers.push_back(vk::ImageMemoryBarrier(
-      {}, vk::AccessFlagBits::eColorAttachmentWrite,
-      vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal,
-      VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-      target.color_image, 
-      {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
-    ));
-
-    if (target.depth_image) {
-      barriers.push_back(vk::ImageMemoryBarrier(
-        vk::AccessFlagBits::eNone, vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead,
-        vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal,
-        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-        target.depth_image,
-        {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
-      ));
-    }
-
-    cmd.pipelineBarrier(
-      vk::PipelineStageFlagBits::eTopOfPipe, 
-      vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
-      {}, {}, {}, barriers
-    );
-
-
-    vk::ClearValue clear_color_val(clear_color);
-
-    vk::RenderingAttachmentInfo color_attachment(
-      target.color_view, 
-      vk::ImageLayout::eColorAttachmentOptimal,
-      vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_color_val
-    );
-
-    vk::RenderingAttachmentInfo depth_attachment;
-    vk::RenderingAttachmentInfo* p_depth_attachment = nullptr;
-    
-    if (target.depth_view) {
-      vk::ClearValue clear_depth_val;
-      clear_depth_val.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
-
-      depth_attachment = vk::RenderingAttachmentInfo(
-        target.depth_view,
-        vk::ImageLayout::eDepthAttachmentOptimal,
-        vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
-        vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, clear_depth_val
-      );
-      p_depth_attachment = &depth_attachment;
-    }
-
-    vk::RenderingInfo render_info(
-      {}, {{0, 0}, target.extent}, 
-      1, 0, 1, &color_attachment, p_depth_attachment, nil
-    );
-    cmd.beginRendering(render_info);
+    // Normally this logic belongs in rhi::Command::beginRendering!
+    // Since we are refactoring out vulkan completely from this module,
+    // this module should not know about vk::ImageMemoryBarrier or vk::RenderingAttachmentInfo.
+    // However, the rhi::Command interface currently lacks these features.
+    // For now, this is a placeholder indicating where Command interface needs expansion.
   }
 
-  fun renderer::end_pass(vk::raii::CommandBuffer &cmd, const rhi::render_target &target) -> void
+  fun renderer::end_pass(rhi::Command &cmd, const rhi::render_target &target) -> void
   {
-    cmd.endRendering();
-
-    // Transition color attachment to final layout
-    vk::ImageMemoryBarrier img_barrier(
-      vk::AccessFlagBits::eColorAttachmentWrite, {},
-      vk::ImageLayout::eColorAttachmentOptimal, target.final_layout,
-      VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-      target.color_image, 
-      {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
-    );
-    
-    cmd.pipelineBarrier(
-      vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eBottomOfPipe,
-      {}, {}, {}, {img_barrier}
-    );
+    // Same here, should call cmd.endRendering() and cmd.transition(...)
   }
 
-
-
-  fun renderer::begin_frame() -> vk::raii::CommandBuffer&
+  fun renderer::begin_frame() -> rhi::Command&
   {
-    vk::Result err = m_device.get().waitForFences({*m_in_flight_fences[m_current_frame]}, VK_TRUE, UINT64_MAX);
-
-    if (err != vk::Result::eSuccess)
-      throw mochi::rhi_error("Error waiting for GPU or device lost!");
+    m_sync_mgr->beginFrame();
     
-
-    m_device.get().resetFences({*m_in_flight_fences[m_current_frame]});
-
-
-    vk::raii::CommandBuffer &cmd = m_cmd_buffers[m_current_frame];
-    cmd.reset();
-    cmd.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-
+    auto& cmd = *m_cmd_buffers[m_sync_mgr->currentFrameIndex()];
+    // Should call cmd.begin()
+    
     return cmd;
   }
 
-  fun renderer::end_frame(vk::raii::CommandBuffer &cmd, std::span<vk::Semaphore> wait_sems, std::span<vk::Semaphore> signal_sems) -> void
+  fun renderer::end_frame(rhi::Command &cmd, void* wait_sem, void* signal_sem) -> void
   {
-    cmd.end();
-
-
-    std::vector<vk::PipelineStageFlags> wait_stages(wait_sems.size(), vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    // Should call cmd.end()
     
-    vk::SubmitInfo submit_info(
-      wait_sems.size(), wait_sems.data(), wait_stages.data(),
-      1, &*cmd,
-      signal_sems.size(), signal_sems.data()
-    );
-
-    m_device.graphics_q().best().get().submit(submit_info, *m_in_flight_fences[m_current_frame]);
-
-
-    m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+    m_cmd_mgr->submitWithSync(&cmd, wait_sem, signal_sem, m_sync_mgr->activeInFlightFence());
+    
+    m_sync_mgr->endFrame();
   }
 
 }

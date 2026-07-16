@@ -17,15 +17,13 @@
 #include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
 #include <span>
-#include <vulkan/vulkan_raii.hpp>
-#include <vulkan/vulkan.h>
+#include <span>
 
 
 
 namespace mochi::asset
 {
 
-  /** @brief Represents a single vertex in a mesh, including position, normal, color, and UV data. */
   struct vertex_t {
     vec3<f32> position;
     vec3<f32> normal;
@@ -33,50 +31,28 @@ namespace mochi::asset
     vec2<f32> uv;
   };
   
-  /** @brief Buffer info describing the vertex_t memory layout. */
-  extern rhi::info<rhi::buffer> vertex_i;
-
-
   
-
-  /** @brief Represents a 3D model/mesh entity loaded into a Vulkan buffer. */
-  struct mesh
-  {
+  
+  struct Mesh {
     public:
-      /**
-       * @brief Construct a mesh directly from an existing buffer.
-       * @param data The buffer containing vertex data.
-       */
-      explicit mesh(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material, std::vector<int> map);
+      explicit Mesh(sptr<rhi::Buffer> data, std::vector<offs> offs, std::vector<sptr<asset::Material>> material, std::vector<int> map);
       
-      explicit mesh(core &core, std::span<char> file, std::string_view ext);
+      explicit Mesh(core &core, std::span<char> file, std::string_view ext);
       
     public:
-      /**
-       * @brief Factory method to create a mesh from an existing buffer.
-       * @param core The mochi core instance.
-       * @param data The buffer containing vertex data.
-       * @return Pointer to the newly created mesh.
-       */
-      static inline fun make(sptr<rhi::buffer> data, std::vector<offs> offs, std::vector<sptr<asset::material>> material, std::vector<int> map) -> sptr<mesh> {
-        return make_sptr<mesh>(data, offs, material, map);
+      static fun make(sptr<rhi::Buffer> data, std::vector<offs> offs, std::vector<sptr<asset::Material>> material, std::vector<int> map) {
+        return make_sptr(new Mesh(data, offs, material, map));
       }
       
-      /**
-       * @brief Factory method to load and create a mesh from a file.
-       * @param core The mochi core instance.
-       * @param fpath The file path to the 3D model.
-       * @return Pointer to the newly created mesh.
-       */
-      static inline fun make(core &core, std::span<char> file, std::string_view ext) -> sptr<mesh> {
-        return make_sptr<mesh>(core, file, ext);
+      static  fun make(core &core, std::span<char> file, std::string_view ext) {
+        return make_sptr(new Mesh(core, file, ext));
       }
       
 
     private:
-      sptr<rhi::buffer> m_data;
+      sptr<rhi::Buffer> m_data;
       std::vector<offs> m_offs;
-      std::vector<sptr<asset::material>> m_material;
+      std::vector<sptr<asset::Material>> m_material;
       std::vector<int>  m_map;
 
     public:

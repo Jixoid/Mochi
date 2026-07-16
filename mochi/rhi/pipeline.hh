@@ -14,11 +14,9 @@
 
 #include "mochi/basis.hh"
 #include "mochi/rhi/rhi.hh"
+#include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
 #include "mochi/rhi/shader.hh"
-#include "mochi/rhi/listPush.hh"
-#include "mochi/rhi/listDesc.hh"
-#include "mochi/rhi/slotVertex.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -26,72 +24,171 @@
 
 namespace mochi::rhi
 {
+  // Enums
+  enum struct VertexInputRate: u8 {
+    PerVertex   = 0,
+    PerInstance = 1,
+  };
 
-  template<>
-  struct info<pipeline>
-  {
-    public:
-      explicit inline info(nil_t): m_push() {}
-      explicit info(std::vector<info<listPush>> pushlist, std::vector<info<slotVertex>> vertex, std::vector<info<listDesc>> descset);
+  enum struct DescriptorType: u32 {
+    UniformBuffer         = 6,
+    UniformBufferDynamic  = 8,
+    StorageBuffer         = 7,
+    StorageBufferDynamic  = 9,
+    TextureSampler        = 1,
+    StorageImage          = 3,
+    SeparateImage         = 2,
+    SeparateSampler       = 0,
+    AccelerationStructure = 1000150000,
+  };
 
+  enum struct PipelineKind: u32 {
+    Graphic    = 0,
+    Compute    = 1,
+    RayTracing = 1000165000,
+  };
 
-    protected:
-      std::vector<info<listPush>>   m_push;
-      std::vector<info<slotVertex>> m_vertex;
-      std::vector<info<listDesc>>    m_descset;
+  enum struct PolygonMode: u8 {
+    Fill  = 0,
+    Line  = 1,
+    Point = 2,
+  };
 
-      std::vector<vk::PushConstantRange> vk_PushConstant;
-      std::vector<vk::VertexInputBindingDescription> vk_vertexBinding;
-      std::vector<vk::VertexInputAttributeDescription> vk_vertexAttribute;
-      std::vector<std::vector<vk::DescriptorSetLayoutBinding>> vk_DescBindings;
-
-
-    public:
-      inline fun& push() { return m_push; }
-      inline fun& vertex() { return m_vertex; }
-      inline fun& desc() { return m_descset; }
-
-      inline fun& pushConstant() { return vk_PushConstant; }
-      inline fun  vertexBinding() { return vk::PipelineVertexInputStateCreateInfo({}, vk_vertexBinding, vk_vertexAttribute); }
-      inline fun& descBindings() { return vk_DescBindings; }
+  enum struct PrimitiveTopology: u8 {
+    PointList     = 0,
+    LineList      = 1,
+    LineStrip     = 2,
+    TriangleList  = 3,
+    TriangleStrip = 4,
+    TriangleFan   = 5,
+    PatchList     = 10
   };
 
 
 
+  // Helpers
+  struct PushConstantSlot {
+    public:
+      explicit PushConstantSlot(ShaderStageFlags stage, std::vector<vt> types)
+        : m_stage(stage)
+        , m_types(types)
+      {}
 
-  struct pipeline
-  {
     private:
-      explicit pipeline(
-        rhi::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
-        PolygonMode polymode, PrimitiveTopology primitiveTopology,
-        Format color_format, Format depth_format
-      );
+      ShaderStageFlags m_stage;
+      std::vector<vt> m_types;
+
+    public:
+      fun  stage() const { return m_stage; }
+      fun& types() const { return m_types; }
+  };
+  using PushConstantList = std::vector<PushConstantSlot>;
+
+
+  struct VertexBindSlot {
+    public:
+      explicit VertexBindSlot(u64 stride, std::vector<vt> items, VertexInputRate inputRate, u8 index)
+        : m_stride(stride)
+        , m_items(items)
+        , m_inputRate(inputRate)
+        , m_index(index)
+      {}
+
+    private:
+      u64 m_stride;
+      std::vector<vt> m_items;
+      VertexInputRate m_inputRate;
+      u8 m_index;
+
+    public:
+      fun& items() const { return m_items; }
+      fun  stride() const { return m_stride; }
+      fun  inputRate() const { return m_inputRate; }
+      fun  index() const { return m_index; }
+  };
+  using VertexBindList = std::vector<VertexBindSlot>;
+
+
+  struct DescriptorSlotOne {
+    public:
+      explicit DescriptorSlotOne(DescriptorType kind, ShaderStageFlags stage)
+        : m_kind(kind)
+        , m_stage(stage)
+      {}
+
+    private:
+      DescriptorType m_kind;
+      ShaderStageFlags m_stage;
+
+    public:
+      fun kind() const { return m_kind; }
+      fun stage() const { return m_stage; }
+  };
+  using DescriptorSlot = std::vector<DescriptorSlotOne>;
+  using DescriptorList = std::vector<DescriptorSlot>;
+
+
+
+  // External
+  struct PipelineMeta;
+  struct Pipeline;
+
+  extern "C" fun MochiRHI_MakePipelineMeta(PushConstantList push, VertexBindList vert, DescriptorList desc) -> PipelineMeta*;
+  extern "C" fun MochiRHI_MakePipeline(
+    rhi::DeviceManager &dmng, PipelineMeta *info, std::vector<sptr<Shader>> shaders,
+    PolygonMode polymode, PrimitiveTopology primitiveTopology,
+    Format color_format, Format depth_format
+  ) -> Pipeline*;
+
+
+
+  // Interface
+  struct PipelineMeta: noncopy {
+    protected:
+      PipelineMeta() = default;
+
+    public:
+      virtual ~PipelineMeta() = default;
+
+      static fun make(PushConstantList push, VertexBindList vert, DescriptorList desc) {
+        return make_sptr(MochiRHI_MakePipelineMeta(std::move(push), std::move(vert), std::move(desc)));
+      }
+
+    protected:
+      PushConstantList m_push;
+      VertexBindList m_vert;
+      DescriptorList m_desc;
+
+    public:
+      fun& push() const { return m_push; }
+      fun& vert() const { return m_vert; }
+      fun& desc() const { return m_desc; }
+  };
+
+
+  struct Pipeline: noncopy {
+    protected:
+      Pipeline() = default;
       
     public:
-      static inline fun make(
-        rhi::device &device, info<pipeline> info, std::vector<sptr<shader>> shaders,
+      virtual ~Pipeline() = default;
+
+      static fun make(
+        rhi::DeviceManager &dmng, PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       ) {
-        return make_sptr(new pipeline(device, info, std::move(shaders), polymode, primitiveTopology, color_format, depth_format));
+        return make_sptr(MochiRHI_MakePipeline(dmng, meta, std::move(shaders), polymode, primitiveTopology, color_format, depth_format));
       }
     
 
-    private:
-      info<pipeline> m_dbg_info;
-
+    protected:
+      PipelineMeta *m_meta;
       PipelineKind m_kind;
-      vk::raii::PipelineLayout vk_layout;
-      vk::raii::Pipeline       vk_pipeline;
-      std::vector<vk::raii::DescriptorSetLayout> vk_desc_layouts;
       
     public:
-      inline fun& info() { return m_dbg_info; }
-      inline fun& get() { return vk_pipeline; }
-      inline fun  kind() { return m_kind; }
-      inline fun& layout() { return vk_layout; }
-      inline fun& desc_layouts() { return vk_desc_layouts; }
+      fun meta() { return m_meta; }
+      fun kind() const { return m_kind; }
   };
   
 }

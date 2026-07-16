@@ -14,27 +14,20 @@
 
 #include "mochi/basis.hh"
 #include "mochi/math/math.hh"
-#include "mochi/rhi/buffer.hh"
 #include <vulkan/vulkan_raii.hpp>
-#include "src/entt/entt.hpp"
+#include "entt/entt.hpp"
 
 
 
 namespace mochi::ecs
 {
 
-  /** @brief Represents the raw point light data passed to shaders. */
   struct point_light_t {
     vec4<f32> position;
     vec4<f32> color;
   };
   
-  /** @brief Buffer info describing the light3d_t memory layout. */
-  extern rhi::info<rhi::buffer> point_light_i;
 
-
-
-  /** @brief Represents a light entity. */
   struct PointLight {
     vec3<f32> color = {1,1,1};
     f32 intensity = 10;

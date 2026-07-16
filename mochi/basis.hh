@@ -51,8 +51,10 @@ using i128 = signed __int128;
 /** @brief Architecture-dependent signed integer. */
 #if INTPTR_MAX == INT64_MAX
   using i0 = i64;
+  using isize = i64;
 #else
   using i0 = i32;
+  using isize = i32;
 #endif
 
 
@@ -74,8 +76,10 @@ using u128 = unsigned __int128;
 /** @brief Architecture-dependent unsigned integer. */
 #if INTPTR_MAX == INT64_MAX
   using u0 = u64;
+  using usize = u64;
 #else
   using u0 = u32;
+  using usize = u32;
 #endif
 
 /** @brief A representation of a resource handle. */
@@ -340,31 +344,19 @@ public:
 
 /// Data
 
-/** @brief A generic raw data representation. */
-struct data
-{
+/// @brief A generic raw data representation.
+struct data {
   public:
-    /** @brief Default constructor. */
-    inline data() {}
-
-    /** 
-     * @brief Construct from pointer and size.
-     * @param ptr Pointer to the data.
-     * @param size Size of the data in bytes.
-     */
-    inline data(void* ptr, u0 size)
-      : m_ptr(ptr)
-      , m_size(size)
-    {}
-
+    data() {}
+    data(void* ptr, usize size): m_ptr(ptr), m_size(size) {}
 
   private:
     void* m_ptr{};
-    u0    m_size{};
+    usize m_size{};
 
   public:
-    inline fun& ptr() { return m_ptr; }
-    inline fun& size() { return m_size; }
+    fun ptr() { return m_ptr; }
+    fun size() { return m_size; }
 };
 
 
@@ -372,31 +364,18 @@ struct data
 
 /// Offs
 
-/** @brief A generic raw offs representation. */
-struct offs
-{
+/// @brief A generic raw offs representation.
+struct offs {
   public:
-    /** @brief Default constructor. */
-    inline offs() {}
-
-    /** 
-     * @brief Construct from pointer and size.
-     * @param off Offset to the data.
-     * @param size Size of the data in bytes.
-     */
-    inline offs(u0 off, u0 size)
-      : m_off(off)
-      , m_size(size)
-    {}
-
+    offs() {}
+    offs(usize off, usize size): m_off(off), m_size(size) {}
 
   private:
-    u0 m_off{};
-    u0 m_size{};
+    usize m_off{}, m_size{};
 
   public:
-    inline fun& off() { return m_off; }
-    inline fun& size() { return m_size; }
+    fun off() { return m_off; }
+    fun size() { return m_size; }
 };
 
 
@@ -464,6 +443,22 @@ struct flags
     explicit constexpr operator MaskType() const noexcept { return m_mask; }
 };
 
+template <typename>
+struct flagOperator: std::false_type {};
+
+#define FlagEnable(X) \
+template <> \
+struct flagOperator<X>: std::true_type {};
+
+
+template <typename T>
+  requires flagOperator<T>::value
+inline fun operator |(T a, T b) -> flags<T> { return flags<T>(a) | flags<T>(b); }
+
+template <typename T>
+  requires flagOperator<T>::value
+inline fun operator &(T a, T b) -> flags<T> { return flags<T>(a) & flags<T>(b); }
+
 
 
 
@@ -475,6 +470,17 @@ template <typename T>
 using ulock = std::unique_lock<T>;
 
 
+
+/// NonCopy
+struct noncopy {
+  protected:
+    constexpr noncopy() = default;
+    ~noncopy() = default;
+
+  public:
+    noncopy(const noncopy&) = delete;
+    fun operator=(const noncopy&) -> noncopy& = delete;
+};
 
 
 /// Pointer

@@ -18,46 +18,52 @@
 #include "mochi/ecs/multi_mesh.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/transform.hh"
-#include "mochi/rhi/cmd.hh"
+#include "mochi/rhi/command.hh"
 #include "mochi/rhi/image.hh"
-#include "mochi/rhi/listPush.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/buffer.hh"
-#include "mochi/rhi/device.hh"
-#include "mochi/module/resource.hh"
+#include "mochi/rhi/manager/device_manager.hh"
 #include "mochi/module/display.hh"
 #include "mochi/module/memory.hh"
 #include "mochi/module/renderer.hh"
-#include "mochi/rhi/slotPush.hh"
-#include "vulkan/vulkan.hpp"
 #include <chrono>
-#include <vulkan/vulkan_raii.hpp>
+#include <format>
+#include <iostream>
 
 
 
 namespace mochi
 {
 
+  extern "C" {
+    extern const char* MochiRHI_DriverInfo;
+    extern const u32   MochiRHI_DriverVers[4];
+  }
+
+
   core::core(
-    std::function<i32 (const vk::raii::PhysicalDevices&, rhi::PhysicalDeviceSuitable)> GpuPicker,
+    std::function<i32 ()> GpuPicker,
     std::function<void (f32 dt)> Idle
-  )
-    : m_idle(Idle)
+  ) : m_idle(Idle)
   {
-    rhi::vulkan_extension vkext{
-      .instance_extensions = module::display::extensions(),
-    };
-    auto device     = make_uptr(new rhi::device("Mochi Test", {1,0,0,0}, GpuPicker, &vkext));
+    std::cerr << std::format("Mochi Engine starting {{rhi: {}}}", MochiRHI_DriverInfo) << std::endl;
 
-    auto memory     = make_uptr(new module::memory(*device));
-    auto resource = make_uptr(new module::resource(*device, *memory));
-    auto display   = make_uptr(new module::display(*device, *memory, "Mochi Test", 800, 600));
+    auto device   = rhi::DeviceManager::make("Mochi Test", {1,0,0,0}, GpuPicker);
+    auto alloc    = rhi::AllocManager::make(*device);
+    auto transfer = rhi::TransferManager::make(*device);
+
+    auto memory   = make_uptr(new module::memory(*device, nullptr)); // FIXME: Pass AllocManager properly
+    auto shader   = rhi::ShaderManager::make(*device);
+    auto material = rhi::MaterialManager::make(*device, *shader);
+    auto display  = make_uptr(new module::display(*device, *memory, "Mochi Test", 800, 600));
     auto renderer = make_uptr(new module::renderer(*device));
-
 
     m_modules = decltype(m_modules)(
       std::move(device),
-      std::move(resource),
+      std::move(alloc),
+      std::move(transfer),
+      std::move(shader),
+      std::move(material),
       std::move(memory),
       std::move(display),
       std::move(renderer)
@@ -66,16 +72,18 @@ namespace mochi
 
   core::~core()
   {
-    sub<rhi::device>().get().waitIdle();
+    sub<rhi::DeviceManager>().waitIdle();
     
     m_registry.clear();
 
-    std::get<uptr<rhi::device>>(m_modules).reset();
-    
     std::get<uptr<module::renderer>>(m_modules).reset();
     std::get<uptr<module::display>>(m_modules).reset();
     std::get<uptr<module::memory>>(m_modules).reset();
-    std::get<uptr<module::resource>>(m_modules).reset();
+    std::get<uptr<rhi::MaterialManager>>(m_modules).reset();
+    std::get<uptr<rhi::ShaderManager>>(m_modules).reset();
+    std::get<uptr<rhi::TransferManager>>(m_modules).reset();
+    std::get<uptr<rhi::AllocManager>>(m_modules).reset();
+    std::get<uptr<rhi::DeviceManager>>(m_modules).reset();
   }
 
 
@@ -97,7 +105,7 @@ namespace mochi
   }
 
 
-  fun core::paint(rhi::cmd &cmd, rhi::render_target &target) -> void
+  fun core::paint(rhi::Command &cmd, rhi::render_target &target) -> void
   {
     auto &mem = sub<module::memory>();
 
@@ -127,7 +135,7 @@ namespace mochi
       *((u32*)lig_data) = lig_count; // First 4 bytes hold the count
       
       u32 idx = 1;
-      for (auto entity : lights) {
+      for (auto entity: lights) {
         auto &transform = lights.get<ecs::Transform>(entity);
         auto &light = lights.get<ecs::PointLight>(entity);
         
@@ -139,15 +147,15 @@ namespace mochi
 
 
     auto extent = sub<module::display>().extent(); 
-    cmd.get().setViewport(0, {vk::Viewport(0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f)});
-    cmd.get().setScissor(0, {vk::Rect2D({0, 0}, extent)});
+    cmd.setViewport(0, {rhi::Viewport(0, (f32)extent.x(), 0, (f32)extent.y(), 0, 1)});
+    cmd.setScissor(0, {rhi::Rect2D(0, 0, extent.x(), extent.y())});
 
     
 
     // Render loop
-    rhi::pipeline *last_pipeline{};
-    rhi::buffer   *last_buffer{};
-    rhi::image2   *last_image{};
+    rhi::Pipeline *last_pipeline{};
+    rhi::Buffer   *last_buffer{};
+    rhi::Image2   *last_image{};
 
 
     auto view = m_registry.view<ecs::Transform, ecs::Mesh>();
@@ -169,32 +177,17 @@ namespace mochi
         auto desc = material->desc(target);
 
         if (desc->pipeline.get() != last_pipeline) {
-          cmd.setPipeline(desc->pipeline.get());
+          cmd.bindPipeline(desc->pipeline.get());
           last_pipeline = desc->pipeline.get();
         }
 
-        cmd.get().bindDescriptorSets(
-          vk::PipelineBindPoint::eGraphics,
-          *desc->pipeline->layout(),
-          0,
-          {*desc->desc_sets[0]},
-          {}
-        );
-
-
-        if (material->is_texture()) {
-          cmd.get().bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            *desc->pipeline->layout(),
-            1,
-            {*desc->desc_sets[1]},
-            {}
-          );
-        }
-
-        cmd.writePushConstant(rhi::listPush(std::tuple{mat4x4<f32>{transform.model}, mesh->data()->address()}));
+        struct PC {
+          mat4x4<f32> model;
+          u64 vertex_addr;
+        };
+        PC pc = { transform.model, mesh->data()->address() };
+        cmd.pushConstant(flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel, 0, data(&pc, sizeof(pc)));
         
-
         cmd.draw({subsur.off(), subsur.size()}, {0, 1});
         i++;
       }
@@ -221,32 +214,18 @@ namespace mochi
         auto desc = material->desc(target);
 
         if (desc->pipeline.get() != last_pipeline) {
-          cmd.setPipeline(desc->pipeline.get());
+          cmd.bindPipeline(desc->pipeline.get());
           last_pipeline = desc->pipeline.get();
         }
 
-        cmd.get().bindDescriptorSets(
-          vk::PipelineBindPoint::eGraphics,
-          *desc->pipeline->layout(),
-          0,
-          {*desc->desc_sets[0]},
-          {}
-        );
-
-
-        if (material->is_texture()) {
-          cmd.get().bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            *desc->pipeline->layout(),
-            1,
-            {*desc->desc_sets[1]},
-            {}
-          );
-        }
-
-        cmd.writePushConstant(rhi::listPush(std::tuple{mat4x4<f32>{transform.model}, mesh->data()->address(), renderable.instances->address()}));
+        struct PC_Multi {
+          mat4x4<f32> model;
+          u64 vertex_addr;
+          u64 instance_addr;
+        };
+        PC_Multi pc = { transform.model, mesh->data()->address(), renderable.instances->address() };
+        cmd.pushConstant(flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel, 0, data(&pc, sizeof(pc)));
         
-
         cmd.draw({subsur.off(), subsur.size()}, {0, renderable.active_count});
         i++;
       }
@@ -258,36 +237,27 @@ namespace mochi
 
   fun core::draw() -> void
   {
-    auto &dev = sub<rhi::device>();
+    auto &dev = sub<rhi::DeviceManager>();
     auto &ren = sub<module::renderer>();
     auto &disp = sub<module::display>();
 
 
-    dev.flushTransferBuf();
-
-
     auto &cmd = ren.begin_frame();
 
-    u32 current_frame = ren.current_frame();
-    vk::Semaphore wait_sem = ren.get_image_available_sem(current_frame);
+    void* wait_sem = &ren.get_image_available_sem();
 
     u32 image_index = disp.acquire_next_image(wait_sem);
     auto target = disp.get_render_target(image_index);
-    vk::Semaphore signal_sem = disp.get_render_finished_sem(image_index);
 
     ren.begin_pass(cmd, target, {0.1f, 0.1f, 0.1f, 1.0f});
 
-    rhi::cmd mochi_cmd(&cmd);
-
-    /* paint */ paint(mochi_cmd, target);
+    /* paint */ paint(cmd, target);
 
     ren.end_pass(cmd, target);
 
-    vk::Semaphore w[] = {wait_sem};
-    vk::Semaphore s[] = {signal_sem};
-    ren.end_frame(cmd, w, s);
+    ren.end_frame(cmd, wait_sem, nullptr); // FIXME: Provide correct signal_sem
 
-    disp.present(signal_sem, image_index);
+    disp.present(nullptr, image_index);
   }
   
 }

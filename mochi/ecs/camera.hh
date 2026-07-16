@@ -13,28 +13,21 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/math/math.hh"
-#include "mochi/rhi/buffer.hh"
 #include <vulkan/vulkan_raii.hpp>
-#include "src/entt/entt.hpp"
+#include "entt/entt.hpp"
+#include "mochi/math/mat4x4.hh"
 
 
 
 namespace mochi::ecs
 {
 
-  /** @brief Represents the raw camera data passed to shaders (View and Projection matrices). */
   struct camera_t {
     mat4x4<f32> view;
     mat4x4<f32> proj;
   };
-  
-  /** @brief Buffer info describing the camera3d_t memory layout. */
-  extern rhi::info<rhi::buffer> camera_i;
 
 
-
-  /** @brief Represents a camera entity. */
   struct Camera {
     f32 fov = 60;
     f32 near = 0.1;

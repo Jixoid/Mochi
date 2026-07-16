@@ -1,0 +1,52 @@
+import ["qstd"]
+
+
+styles {
+
+  choice {
+    margins: {top: 10}
+  }
+
+}
+
+
+root qstd::form "root" {
+  size: {w: 800, h: 600}
+  color: "monet(SurfaceContainerLow)"
+
+  node qstd::layout_vert "Panel_Left" {
+    anchors: {
+      left: @^ "<-",
+      top:  @^ "<-",
+      bot:  @^ "->",
+    }
+    width: 200
+    color: "monet(SurfaceContainerHigh)"
+    borderRadius: 0
+  }
+
+  node qstd::layout_vert "Panel_Right" {
+    anchors: {
+      righ: @^ "->",
+      top:  @^ "<-",
+      bot:  @^ "->",
+    }
+    width: 200
+    color: "monet(SurfaceContainerHigh)"
+    borderRadius: 0
+  }
+
+
+  node qstd::layout_vert "Panel_Bottom" {
+    anchors: {
+      left: @"Panel_Left" "->",
+      righ: @"Panel_Right" "<-",
+      bot:  @^ "->",
+    }
+    height: 200
+    color: "monet(SurfaceContainerHigh)"
+    borderRadius: 0
+
+  }
+
+}

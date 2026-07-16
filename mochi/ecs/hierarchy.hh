@@ -13,14 +13,13 @@
 #pragma once
 
 #include <vulkan/vulkan_raii.hpp>
-#include "src/entt/entt.hpp"
+#include "entt/entt.hpp"
 
 
 
 namespace mochi::ecs
 {
 
-  /** @brief Represents the hierarchy relationship of an entity. */
   struct Hierarchy {
     entt::entity parent = entt::null;
     std::vector<entt::entity> children;

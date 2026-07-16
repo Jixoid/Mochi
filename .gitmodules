@@ -1,0 +1,9 @@
+[submodule "thirdparty/entt"]
+	path = thirdparty/entt
+	url = https://github.com/skypjack/entt.git
+[submodule "thirdparty/vma"]
+	path = thirdparty/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "thirdparty/nimbus"]
+	path = thirdparty/nimbus
+	url = https://github.com/Jixoid/Nimbus.git

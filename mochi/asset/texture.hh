@@ -14,8 +14,7 @@
 
 #include "mochi/basis.hh"
 #include "mochi/rhi/image.hh"
-#include <vulkan/vulkan_raii.hpp>
-#include <vulkan/vulkan.h>
+
 
 
 
@@ -31,7 +30,7 @@ namespace mochi::asset
        * @param core The mochi core instance.
        * @param data The Vulkan image containing the texture data.
        */
-      explicit texture2(core &core, sptr<rhi::image2> data);
+      explicit texture2(core &core, sptr<rhi::Image2> data);
 
       /**
        * @brief Construct a 2D texture by loading an image file from disk.
@@ -56,7 +55,7 @@ namespace mochi::asset
        * @param data The Vulkan image containing the texture data.
        * @return Pointer to the newly created texture.
        */
-      static fun make(core &core, sptr<rhi::image2> data) -> sptr<texture2>;
+      static fun make(core &core, sptr<rhi::Image2> data) -> sptr<texture2>;
 
       /**
        * @brief Factory method to load and create a 2D texture from a file.
@@ -78,7 +77,7 @@ namespace mochi::asset
 
 
     private:
-      sptr<rhi::image2> m_data{nil};
+      sptr<rhi::Image2> m_data{nil};
 
     public:
       /** @brief Access the underlying Vulkan image holding the texture data. */

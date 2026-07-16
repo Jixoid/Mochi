@@ -14,6 +14,8 @@
 
 #include "mochi/basis.hh"
 #include "mochi/rhi/buffer.hh"
+#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/alloc_manager.hh"
 #include "mochi/types.hh"
 #include <cassert>
 
@@ -25,18 +27,17 @@ namespace mochi::module
   struct memory
   {
     public:
-      explicit memory(rhi::device &device);
+      explicit memory(rhi::DeviceManager &device, sptr<rhi::AllocManager> alloc_mgr);
       ~memory();
 
 
     private:
-      rhi::device &m_device;
+      rhi::DeviceManager &m_device;
+      sptr<rhi::AllocManager> m_alloc_mgr;
 
       
     #pragma region Limits
     private:
-      VmaAllocator m_allocator{nil};
-
       bool m_sharedMemory{};
 
       u32 m_pushConstant;
@@ -50,9 +51,6 @@ namespace mochi::module
 
 
     public:
-      /** @brief Get the vma handle. */
-      inline fun allocator() { return m_allocator; }
-      
       inline fun sharedMemory() { return m_sharedMemory; }
 
       inline fun pushConstant() { return m_pushConstant; }
@@ -65,12 +63,12 @@ namespace mochi::module
 
     
     private:
-      sptr<rhi::buffer> m_camera_ubo;
-      sptr<rhi::buffer> m_light_ubo;
+      sptr<rhi::Buffer> m_camera_ubo;
+      sptr<rhi::Buffer> m_light_ubo;
 
     public:
-      fun camera_ubo(u64 required_count = 0) -> sptr<rhi::buffer>;
-      fun light_ubo(u64 required_count = 0) -> sptr<rhi::buffer>;
+      fun camera_ubo(u64 required_count = 0) -> sptr<rhi::Buffer>;
+      fun light_ubo(u64 required_count = 0) -> sptr<rhi::Buffer>;
   };
 
 }
