@@ -15,19 +15,17 @@
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/except.hh"
-#include "mochi/module/memory.hh"
 #include "mochi/reader/reader.hh"
 #include "mochi/rhi/image.hh"
-#include "mochi/rhi/device.hh"
+#include "mochi/rhi/manager/alloc_manager.hh"
+#include "mochi/rhi/manager/transfer_manager.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
-#include "mochi/core.hh"
-#include <cstring>
+#include "mochi/core/core.hh"
 #include <string>
 #include <string_view>
-#include <vulkan/vulkan_raii.hpp>
-#include <vulkan/vulkan.h>
+
 #include "stb_image.h"
 
 
@@ -35,21 +33,7 @@
 namespace mochi::asset
 {
   
-  rhi::info<rhi::buffer> vertex_i(
-    sizeof(vertex_t),
-    rhi::vt::make_list<
-      vec3<f32>, // Position
-      vec3<f32>, // Normal
-      vec3<f32>, // Color
-      vec2<f32>  // UV
-    >()
-  );
-
-
-
-
-  inline fun build_vertices(wf_obj &raw_data) -> std::vector<vertex_t> 
-  {
+  inline fun build_vertices(wf_obj &raw_data) -> std::vector<vertex_t> {
     std::vector<vertex_t> vertexs;
 
     for (const auto &face: raw_data.f) 
@@ -101,47 +85,52 @@ namespace mochi::asset
     return vertexs;
   }
 
-  inline fun include_images(core &core, gltf_image &raw_image) -> sptr<rhi::image2>
-  {
+  inline fun include_images(Core &core, gltf_image &raw_image) -> sptr<rhi::Image2> {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load_from_memory(raw_image.data.data(), raw_image.data.size(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) throw mochi::asset_error("Failed to load texture!");
 
-    
-    auto ret = rhi::image2::make(
-      core.sub<rhi::device>(), 
-      core.sub<module::memory>(),
-      texWidth, texHeight, pixels
+    auto& alloc_mgr = core.sub<rhi::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+
+    auto img = alloc_mgr.allocImage2(
+      { (u32)texWidth, (u32)texHeight },
+      rhi::Format::v4norm8U,
+      flags(rhi::ImageUsage::TransferDst) | rhi::ImageUsage::Sampled,
+      rhi::ImageTiling::Optimal,
+      rhi::AllocationCreateFlags(),
+      rhi::AllocationLocation::PreferDevice
     );
+    
+    transfer_mgr.copyMemoryToImage(rhi::TransferTime::Now, pixels, img.get());
 
     stbi_image_free(pixels);
 
-    return ret;
+    return img;
   }
 
 
 
-  mesh::mesh(sptr<rhi::buffer> data, std::vector<::offs> offs, std::vector<sptr<asset::material>> material, std::vector<int> map)
+  Mesh::Mesh(sptr<rhi::Buffer> data, std::vector<::offs> offs, std::vector<sptr<asset::Material>> material, std::vector<int> map)
     : m_data(data)
     , m_offs(offs)
     , m_material(material)
     , m_map(map)
   {}
 
-  mesh::mesh(core &core, std::span<char> file, std::string_view ext)
-  {
+  Mesh::Mesh(Core &core, std::span<char> file, std::string_view ext) {
     ::data mfile{file.data(), file.size_bytes()};
     
     std::vector<vertex_t> final_data;
     std::vector<::offs>   final_offs;
-    std::vector<sptr<asset::material>> final_material;
+    std::vector<sptr<asset::Material>> final_material;
     std::vector<int>      final_map;
 
 
     if (ext == ".obj") {
       auto raw = read<ft_wavefront>(mfile);
 
-      auto asset = make_sptr<asset::material>(core);
+      auto asset = make_sptr<asset::Material>(core);
       asset->setColor({0,0,0});
 
       final_data = std::move(build_vertices(raw));
@@ -157,22 +146,22 @@ namespace mochi::asset
 
       for (auto &X: raw.images) {
         if (X.data.empty()) {
-          auto mat = make_sptr<asset::material>(core);
+          auto mat = make_sptr<asset::Material>(core);
           mat->setColor({0.5f, 0.5f, 0.5f});
           final_material.push_back(mat);
         }
         else {
           auto img = include_images(core, X);
-          auto tex = make_sptr<asset::texture2>(core, img);
+          auto tex = make_sptr<asset::Texture2>(core, img);
 
-          auto mat = make_sptr<asset::material>(core);
+          auto mat = make_sptr<asset::Material>(core);
           mat->setTexture(tex);
           
           final_material.push_back(mat);
         }
       }
 
-      auto default_mat = make_sptr<asset::material>(core);
+      auto default_mat = make_sptr<asset::Material>(core);
       default_mat->setColor({0.8f, 0.8f, 0.8f});
       final_material.push_back(default_mat);
       int default_idx = final_material.size() - 1;
@@ -181,23 +170,25 @@ namespace mochi::asset
       for (int idx : raw.image_map) {
         if (idx == -1) {
           final_map.push_back(default_idx);
-        } else {
+        }
+        else {
           final_map.push_back(idx);
         }
       }
     }
 
 
-    m_data = rhi::buffer::make(
-      core.sub<rhi::device>(), core.sub<module::memory>(),
-      vertex_i, final_data.size(),
+    auto& alloc_mgr = core.sub<rhi::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+
+    m_data = alloc_mgr.allocBuffer(
+      sizeof(vertex_t) * final_data.size(),
       flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
-      rhi::BufferCreate::HostSequentialWrite,
-      rhi::BufferLocation::PreferDevice,
-      [&final_data](void* _data) {
-        memcpy(_data, final_data.data(), vertex_i.stride() * final_data.size());
-      }
+      rhi::AllocationCreate::Mapped,
+      rhi::AllocationLocation::PreferDevice
     );
+
+    transfer_mgr.copyMemoryToBuffer(rhi::TransferTime::Now, final_data.data(), m_data.get());
     m_offs = std::move(final_offs);
     m_map = std::move(final_map);
     m_material = std::move(final_material);

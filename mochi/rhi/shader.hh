@@ -13,37 +13,51 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/rhi.hh"
 #include "mochi/types.hh"
 #include <string_view>
 #include <span>
-#include <vulkan/vulkan_raii.hpp>
-
 
 
 namespace mochi::rhi
 {
+  // Enums
+  enum struct ShaderStage: u32 {
+    Vertex       = 0x00000001,
+    Pixel        = 0x00000010,
+    Compute      = 0x00000020,
+    Task         = 0x00000040,
+    Mesh         = 0x00000080,
+    RayGen       = 0x00000100,
+    AnyHit       = 0x00000200,
+    ClosestHit   = 0x00000400,
+    Miss         = 0x00000800,
+    Intersection = 0x00001000,
+    Callable     = 0x00002000,
+  };
+  using ShaderStageFlags = flags<ShaderStage>;
 
-  struct shader
-  {
-    private:
-      explicit shader(rhi::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry);
+
+  // External
+  extern "C" fun MochiRHI_MakeShader(rhi::DeviceManager &dmng, ShaderStage stage, std::span<u32> span, std::string_view entry) -> Shader*;
+  
+
+  // Interface
+  struct Shader: noncopy {
+    protected:
+      Shader() = default;
     
     public:
-      static inline fun make(rhi::device &device, ShaderStage stage, std::span<u32> span, std::string_view entry) {
-        return make_sptr(new shader(device, stage, span, entry));
+      virtual ~Shader() = default;
+      
+      static fun make(rhi::DeviceManager &dmng, ShaderStage stage, std::span<u32> span, std::string_view entry = "main"){
+        return make_sptr(MochiRHI_MakeShader(dmng, stage, span, entry));
       }
 
-
-    protected:
-      std::string m_entry;
-      vk::raii::ShaderModule vk_module;
-      ShaderStage m_stage;
-
     public:
-      inline fun& entry() { return m_entry; }
-      inline fun  stage() { return m_stage; }
-      inline fun& module() { return vk_module; }
+      virtual fun entry() const -> const std::string& = 0;
+      virtual fun stage() const -> ShaderStage = 0;
   };
 
 }
+
+FlagEnable(mochi::rhi::ShaderStage)

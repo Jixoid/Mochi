@@ -9,31 +9,30 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
 #include "mochi/basis.hh"
-#include "vulkan/vulkan.hpp"
-#include <vulkan/vulkan_raii.hpp>
+#include "mochi/rhi/rhi.hh"
 
 
 
 namespace mochi::rhi
 {
 
-  struct render_target
-  {
-    vk::Image     color_image{nil};
-    vk::ImageView color_view{nil};
-    vk::Format    color_format{};
-    
-    vk::Image     depth_image{nil};
-    vk::ImageView depth_view{nil};
-    vk::Format    depth_format{};
+  // Interface
+  struct RenderTarget: noncopy {
+    protected:
+      explicit RenderTarget() = default;
 
-    vk::Extent2D  extent{};
-    
-    vk::ImageLayout final_layout{vk::ImageLayout::eShaderReadOnlyOptimal};
+      RenderTarget(RenderTarget&& other) noexcept = default;
+      RenderTarget& operator=(RenderTarget&& other) noexcept = default;
+
+    public:
+      virtual ~RenderTarget() = default;
+
+    public:
+      virtual fun depth_format() -> Format = 0;
+      virtual fun color_format() -> Format = 0;
   };
 
 }

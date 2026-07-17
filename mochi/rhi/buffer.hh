@@ -13,63 +13,53 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/image.hh"
-#include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
-#include <functional>
-#include <vulkan/vulkan_core.h>
 
 
 
 namespace mochi::rhi
 {
-
-  template<>
-  struct info<buffer>
-  {
-    public:
-      explicit inline info<buffer>(u64 stride, std::vector<vt> items): m_stride(stride), m_items(items) {}
-
-
-    private:
-      std::vector<vt> m_items;
-      u64 m_stride;
-
-    public:
-      inline fun& items() const { return m_items; }
-      inline fun  stride() const { return m_stride; }
+  // Enums
+  enum struct BufferUsage: u32 {
+    TransferSrc              = 0x00000001,
+    TransferDst              = 0x00000002,
+    UniformBuffer            = 0x00000010,
+    StorageBuffer            = 0x00000020,
+    IndexBuffer              = 0x00000040,
+    VertexBuffer             = 0x00000080,
+    IndirectBuffer           = 0x00000100,
+    DeviceAddress            = 0x00020000,
+    SamplerDescriptorBuffer  = 0x00200000,
+    ResourceDescriptorBuffer = 0x00400000,
+    DescriptorHeap           = 0x10000000,
   };
+  using BufferUsageFlags = flags<BufferUsage>;
 
 
-
-
-  struct buffer
-  {
-    private:
-      explicit buffer(rhi::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location);
-      
-    public:
-      ~buffer();
-      
-      static fun make(rhi::device &device, module::memory &memory, info<buffer> info, u64 count, BufferUsageFlags usage, BufferCreateFlags create, BufferLocation location, std::function<void (void*)> data = nil) -> sptr<buffer>;
-    
-
-    private:
-      info<buffer> m_info;
-      rhi::device &m_device;
-      u64   m_size{};
-      void* m_mapped{};
-      VmaAllocator m_allocator{nil};
-      VkBuffer m_buffer{nil};
-      VmaAllocation m_allocation{nil};
-      VmaAllocationInfo m_alloc_info{};
+  // Interface
+  struct Buffer: noncopy {
+    protected:
+      Buffer() {};
 
     public:
-      inline fun info() { return &m_info; }
-      inline fun size() const { return m_size; }
-      inline fun mapped() const { return m_mapped; }
-      inline fun get() const { return m_buffer; }
-      fun address() const -> VkDeviceAddress;
+      virtual ~Buffer() = default;
+      
+    public:
+      virtual fun size() const -> u64 = 0;
+      
+      /// @brief map gpu resource to cpu
+      virtual fun map() -> void = 0;
+      /// @brief remove the mapping of the gpu resource to cpu
+      virtual fun unmap() -> void = 0;
+      /// @brief flush the cpu cache
+      virtual fun flush(offs) -> void = 0;
+
+      /// @brief return the mapped gpu resource
+      virtual fun mapped() const -> void* = 0;
+      /// @brief return the gpu resource pointer
+      virtual fun address() const -> u64 = 0;
   };
 
 }
+
+FlagEnable(mochi::rhi::BufferUsage)

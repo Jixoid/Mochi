@@ -12,10 +12,10 @@
 
 #pragma once
 
-#include "mochi/core.hh"
+#include "mochi/core/core.hh"
 #include <cassert>
 #include <vulkan/vulkan_raii.hpp>
-#include "src/entt/entt.hpp"
+#include "entt/entt.hpp"
 
 
 

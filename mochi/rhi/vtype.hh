@@ -23,16 +23,8 @@
 namespace mochi::rhi
 {
 
-  struct vt
-  {
+  struct vt {
     private:
-      /** 
-       * @brief Construct a new vt object.
-       * @param size Size in bytes.
-       * @param align Alignment in bytes.
-       * @param format Vulkan format.
-       * @param count Vulkan sub count (default is 1).
-       */
       vt(u64 size, u64 align, Format format, u8 count = 1)
         : m_size(size)
         , m_align(align)
@@ -42,13 +34,9 @@ namespace mochi::rhi
 
 
     public:
-      /**
-       * @brief Create a vt instance mapped to the specified type T.
-       * @tparam T The C++ type to map.
-       * @return vt The mapped Vulkan type info.
-       */
+      /// @brief Create a vt instance mapped to the specified type T.
       template <typename T>
-      static inline fun make() -> vt {
+      static fun make() -> vt {
         // primitive
         if constexpr (std::is_same_v<T, u8>)  return {1, 1, Format::int8U};
         ef constexpr (std::is_same_v<T, u16>) return {2, 2, Format::int16U};
@@ -149,13 +137,9 @@ namespace mochi::rhi
       }
 
 
-      /**
-       * @brief Create a list of vt instances for the given types.
-       * @tparam Ts The C++ types to map.
-       * @return std::vector<vt> The list of mapped Vulkan type infos.
-       */
+      /// @brief Create a list of vt instances for the given types.
       template <typename... Ts>
-      static inline fun make_list() -> std::vector<vt> {
+      static fun make_list() -> std::vector<vt> {
         return { vt::make<Ts>()... };
       }
 
@@ -166,10 +150,10 @@ namespace mochi::rhi
       u8 m_count;
 
     public:
-      inline fun size() const { return m_size; }
-      inline fun align() const { return m_align; }
-      inline fun format() const { return m_format; }
-      inline fun count() const { return m_count; }
+      fun size() const { return m_size; }
+      fun align() const { return m_align; }
+      fun format() const { return m_format; }
+      fun count() const { return m_count; }
   };
 
 }

@@ -12,6 +12,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <iostream>
 #include <istream>
 #include <string>
@@ -32,32 +33,31 @@
   #include <windows.h>
 #endif
 
+namespace fs = std::filesystem;
 
 
-namespace vfs::__file
+
+namespace mochi::vfs::__file
 {
 
-	struct mapped__file: mapped
-  {
+	struct Mapped__file: Mapped {
     public:
-      explicit mapped__file(std::string fpath);
-      ~mapped__file();
+      explicit Mapped__file(std::string fpath);
+      ~Mapped__file();
 
     private:
       #if defined(__unix__) || defined(__APPLE__)
-      int fd{-1};
+      	int fd{-1};
       #elif defined(_WIN32)
-      void* hFile;
-      void* hMapping;
+				void* hFile;
+				void* hMapping;
       #endif
-
   };
 
 
 	#if defined(__unix__) || defined(__APPLE__)
 
-	mapped__file::mapped__file(std::string fpath)
-	{
+	Mapped__file::Mapped__file(std::string fpath) {
 		m_data = (void*)(-1);
 
 		if (!std::filesystem::is_regular_file(fpath))
@@ -76,14 +76,14 @@ namespace vfs::__file
 			throw mochi::io_error("System error: " + std::to_string(errno));
 	}
 
-	mapped__file::~mapped__file() {
+	Mapped__file::~Mapped__file() {
 		if (m_data != MAP_FAILED) munmap(m_data, m_size);
 		if (fd != -1) close(fd);
 	}
 
 	#elif defined(_WIN32)
 
-	mapped__file::mapped__file(std::string fpath)
+	Mapped__file::Mapped__file(std::string fpath)
 	{
 		if (!std::filesystem::is_regular_file(fpath))
 			throw mochi::io_error("file not found: "+fpath+".");
@@ -122,7 +122,7 @@ namespace vfs::__file
 		}
 	}
 
-	mapped__file::~mapped__file() {
+	Mapped__file::~Mapped__file() {
 		UnmapViewOfFile(m_data);
 		CloseHandle(hMapping);
 		CloseHandle(hFile);
@@ -131,28 +131,33 @@ namespace vfs::__file
 	#endif
 
 
+	struct Provider__file: Provider {
+		public:
+			Provider__file() {
+				exists = [](Provider*, std::string_view fpath) -> bool {
+					return fs::exists(fpath);
+				};
 
-	fun get() -> vfs_raii
-	{
-		return vfs_raii("file", new vfs_provider{
-			.init =	[]() -> void* {return nil; },
-			.fini = [](void* _Data) {},
+				open_ro = [](Provider*, std::string_view fpath) static -> sptr<std::istream> {
+					return make_sptr(new std::ifstream(std::string(fpath)));
+				};
 
-			.open_ro = [](void*, std::string_view fpath) -> sptr<std::istream>
-			{
-				return make_sptr(new std::ifstream(std::string(fpath)));
-			},
+				open_map = [](Provider*, std::string_view fpath) -> sptr<Mapped> {
+					return make_sptr(new Mapped__file(std::string(fpath)));
+				};
 
-			.open_map = [](void*, std::string_view fpath) -> sptr<mapped>
-			{
-				return make_sptr(new mapped__file(std::string(fpath)));
-			},
+				open_rw = [](Provider*, std::string_view fpath) -> sptr<std::iostream> {
+					auto file = new std::fstream(std::string(fpath), std::ios::out);
 
-			.open_rw = [](void*, std::string_view fpath) -> sptr<std::iostream>
-			{
-				return make_sptr(new std::fstream(std::string(fpath)));
-			}
-		});
-	}
+					if (!file->is_open())std::cerr << "ERROR " << fpath << std::endl;
+
+					return make_sptr(file);
+				};
+			};
+	};
+
+
+	fun __attribute__((constructor(65535))) __init() { mochi::vfs::provider_reg("file", new Provider__file()); }
+	fun __attribute__((destructor(65535)))  __fini() { mochi::vfs::provider_del("file"); }
 
 }

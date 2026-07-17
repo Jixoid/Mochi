@@ -13,6 +13,7 @@
 #version 450
 
 #extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 
 layout(location = 0) out vec4 out_color;
@@ -27,11 +28,10 @@ layout(location = 1) in vec3 normal_world;
 #endif
 
 
-layout(set = 0, binding = 0, row_major) uniform CameraBuffer
-{
+layout(buffer_reference, std430, row_major) readonly buffer CameraBuffer {
 	mat4 view;
 	mat4 proj;
-} camera;
+};
 
 
 struct light_t {
@@ -39,13 +39,24 @@ struct light_t {
 	vec4 color;
 };
 
-layout(set = 0, binding = 1) uniform LightBuffer
-{
+layout(buffer_reference, std430) readonly buffer LightBuffer {
 	uvec4 a;
 	uvec4 b;
 	light_t s[32];
-	
-} light;
+};
+
+layout(push_constant) uniform PushConstant {
+  mat4 model;
+  uint64_t vertex_addr;
+  CameraBuffer camera;
+  LightBuffer  light;
+  
+  #if defined(WITH_MULTI_INST)
+    uint64_t inst_addr;
+  #endif
+
+  uint texture_id;
+} push;
 
 #if defined(WITH_TEXTURE)
 	layout(set = 1, binding = 0) uniform sampler2D texSampler;
@@ -60,8 +71,7 @@ const float PI = 3.14159265359;
 
 
 
-float DistributionGGX(vec3 N, vec3 H, float roughness)
-{
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
 	float a      = roughness * roughness;
 	float a2     = a * a;
 	float NdotH  = max(dot(N, H), 0.0);
@@ -69,46 +79,43 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 	return a2 / (PI * denom * denom);
 }
 
-float GeometrySchlickGGX(float NdotX, float roughness)
-{
+float GeometrySchlickGGX(float NdotX, float roughness) {
 	float r = roughness + 1.0;
 	float k = (r * r) / 8.0;
 	return NdotX / (NdotX * (1.0 - k) + k);
 }
 
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
-{
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 	return GeometrySchlickGGX(max(dot(N, V), 0.0), roughness) * GeometrySchlickGGX(max(dot(N, L), 0.0), roughness);
 }
 
-vec3 FresnelSchlick(float cosTheta, vec3 F0)
-{
+vec3 FresnelSchlick(float cosTheta, vec3 F0) {
 	return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 
 
-void main()
-{
+void main() {
+	vec4 albedo;
 	#if defined(WITH_COLOR)
-		vec4 albedo = vec4(color, 1.0);
+		albedo = vec4(color, 1.0);
 	#elif defined(WITH_TEXTURE)
-		vec4 albedo = texture(texSampler, uv);
+		albedo = texture(texSampler, uv);
 	#endif
 
 
 	vec3 N      = normalize(normal_world);
-	vec3 camPos = -transpose(mat3(camera.view)) * camera.view[3].xyz;
+	vec3 camPos = -transpose(mat3(push.camera.view)) * push.camera.view[3].xyz;
 	vec3 V      = normalize(camPos - pos_world);
 	vec3 F0     = mix(vec3(0.04), albedo.xyz, METALLIC);
 
 	vec3 Lo = vec3(0.0);
 
-	int activeLightCount = int(light.a.x);
+	int activeLightCount = int(push.light.a.x);
 	for(int i = 0; i < activeLightCount; i++) {
-		vec3  lightPos       = light.s[i].pos.xyz;
-		vec3  lightCol       = light.s[i].color.xyz;
-		float lightIntensity = light.s[i].color.w;
+		vec3  lightPos       = push.light.s[i].pos.xyz;
+		vec3  lightCol       = push.light.s[i].color.xyz;
+		float lightIntensity = push.light.s[i].color.w;
 
 		vec3  L           = normalize(lightPos - pos_world);
 		vec3  H           = normalize(V + L);

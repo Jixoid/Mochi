@@ -9,22 +9,18 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
-#include <vulkan/vulkan_raii.hpp>
-#include "src/entt/entt.hpp"
 
 
 
 namespace mochi::ecs
 {
 
-  /** @brief Represents a renderable entity with geometry and material data. */
   struct Mesh {
-    sptr<asset::mesh> mesh;
+    sptr<asset::Mesh> mesh;
     entt::entity skeleton = entt::null;
   };
 
