@@ -63,6 +63,7 @@ namespace mochi::rhi::vulkan
 
     // push: texture_id
     ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, rhi::vt::make_list<u32>()));
+    
 
     // Pipeline
     static std::unordered_map<MaterialMethod, std::string> ShSource = {

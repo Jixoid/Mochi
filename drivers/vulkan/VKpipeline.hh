@@ -30,10 +30,12 @@ namespace mochi::rhi::vulkan
       std::vector<vk::PushConstantRange> vk_PushConstant;
       std::vector<vk::VertexInputBindingDescription> vk_vertexBinding;
       std::vector<vk::VertexInputAttributeDescription> vk_vertexAttribute;
+      u32 m_push_data_end{0}; // byte offset right after last field (before struct padding)
 
     public:
       fun& pushConstant() const { return vk_PushConstant; }
       fun  vertexBinding() const { return vk::PipelineVertexInputStateCreateInfo({}, vk_vertexBinding, vk_vertexAttribute); }
+      fun  push_data_end() const { return m_push_data_end; }
   };
 
 

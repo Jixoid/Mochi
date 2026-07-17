@@ -49,18 +49,16 @@ layout(location = 1) out vec3 frag_normal_world;
 #endif
 
 
-layout(buffer_reference, std430, row_major) readonly buffer CameraBuffer
-{
+layout(buffer_reference, std430, row_major) readonly buffer CameraBuffer {
   mat4 view;
   mat4 proj;
 };
 
-layout(push_constant) uniform PushConstant
-{
+layout(push_constant) uniform PushConstant {
   mat4 model;
   VertexBuffer vertexs;
   CameraBuffer camera;
-  uint64_t light_addr; // unused in vert, but needed for layout matching
+  uint64_t light_addr;
   
   #if defined(WITH_MULTI_INST)
     InstBuffer insts;
@@ -73,8 +71,7 @@ layout(push_constant) uniform PushConstant
 
 
 
-void main()
-{
+void main() {
   vertex_t vex = push.vertexs.v[gl_VertexIndex];
 
   #if defined(WITH_MULTI_INST)
@@ -90,10 +87,12 @@ void main()
 
   mat4 trueModel = transpose(push.model);
 
+
+  vec4 worldPos;
   #if defined(WITH_MULTI_INST)
-    vec4 worldPos = trueModel * vec4(vex.pos + ins.pos.xyz, 1.0);
+    worldPos = trueModel * vec4(vex.pos + ins.pos.xyz, 1.0);
   #elif defined(WITH_SINGLE_INST)
-    vec4 worldPos = trueModel * vec4(vex.pos, 1.0);
+    worldPos = trueModel * vec4(vex.pos, 1.0);
   #endif
 
   frag_pos_world = worldPos.xyz;

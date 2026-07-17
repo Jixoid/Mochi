@@ -28,8 +28,7 @@ layout(location = 1) in vec3 normal_world;
 #endif
 
 
-layout(buffer_reference, std430, row_major) readonly buffer CameraBuffer
-{
+layout(buffer_reference, std430, row_major) readonly buffer CameraBuffer {
 	mat4 view;
 	mat4 proj;
 };
@@ -40,17 +39,15 @@ struct light_t {
 	vec4 color;
 };
 
-layout(buffer_reference, std430) readonly buffer LightBuffer
-{
+layout(buffer_reference, std430) readonly buffer LightBuffer {
 	uvec4 a;
 	uvec4 b;
 	light_t s[32];
 };
 
-layout(push_constant) uniform PushConstant
-{
+layout(push_constant) uniform PushConstant {
   mat4 model;
-  uint64_t vertex_addr; // unused in frag
+  uint64_t vertex_addr;
   CameraBuffer camera;
   LightBuffer  light;
   
@@ -74,8 +71,7 @@ const float PI = 3.14159265359;
 
 
 
-float DistributionGGX(vec3 N, vec3 H, float roughness)
-{
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
 	float a      = roughness * roughness;
 	float a2     = a * a;
 	float NdotH  = max(dot(N, H), 0.0);
@@ -83,31 +79,28 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 	return a2 / (PI * denom * denom);
 }
 
-float GeometrySchlickGGX(float NdotX, float roughness)
-{
+float GeometrySchlickGGX(float NdotX, float roughness) {
 	float r = roughness + 1.0;
 	float k = (r * r) / 8.0;
 	return NdotX / (NdotX * (1.0 - k) + k);
 }
 
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
-{
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 	return GeometrySchlickGGX(max(dot(N, V), 0.0), roughness) * GeometrySchlickGGX(max(dot(N, L), 0.0), roughness);
 }
 
-vec3 FresnelSchlick(float cosTheta, vec3 F0)
-{
+vec3 FresnelSchlick(float cosTheta, vec3 F0) {
 	return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 
 
-void main()
-{
+void main() {
+	vec4 albedo;
 	#if defined(WITH_COLOR)
-		vec4 albedo = vec4(color, 1.0);
+		albedo = vec4(color, 1.0);
 	#elif defined(WITH_TEXTURE)
-		vec4 albedo = texture(texSampler, uv);
+		albedo = texture(texSampler, uv);
 	#endif
 
 

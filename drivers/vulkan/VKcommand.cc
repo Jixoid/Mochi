@@ -11,10 +11,12 @@
 
 
 #include "mochi/basis.hh"
+#include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKconvert.hh"
 #include "drivers/vulkan/VKcommand.hh"
 #include "drivers/vulkan/VKpipeline.hh"
 #include "drivers/vulkan/VKrender_target.hh"
+#include "mochi/debug/debug.hh"
 #include "mochi/rhi/pipeline.hh"
 
 
@@ -142,31 +144,23 @@ namespace mochi::rhi::vulkan
 
   fun VK_Command::bindDescriptorHeap(sptr<rhi::Buffer> resource_heap, sptr<rhi::Buffer> sampler_heap, u64 resource_size, u64 sampler_size) -> void {
     if (resource_heap) {
-      VkBindHeapInfoEXT heap_info = {};
-      heap_info.sType = VK_STRUCTURE_TYPE_BIND_HEAP_INFO_EXT;
+      vk::BindHeapInfoEXT heap_info = {};
       heap_info.heapRange.address = resource_heap->address();
       heap_info.heapRange.size = resource_size;
       heap_info.reservedRangeOffset = 0;
       heap_info.reservedRangeSize = 0;
 
-      auto PFN_vkCmdBindResourceHeapEXT = reinterpret_cast<::PFN_vkCmdBindResourceHeapEXT>(vkGetDeviceProcAddr(m_cmd.getDevice(), "vkCmdBindResourceHeapEXT"));
-      if (PFN_vkCmdBindResourceHeapEXT) {
-        PFN_vkCmdBindResourceHeapEXT(*m_cmd, &heap_info);
-      }
+      m_cmd.bindResourceHeapEXT(heap_info);
     }
     
     if (sampler_heap) {
-      VkBindHeapInfoEXT heap_info = {};
-      heap_info.sType = VK_STRUCTURE_TYPE_BIND_HEAP_INFO_EXT;
+      vk::BindHeapInfoEXT heap_info = {};
       heap_info.heapRange.address = sampler_heap->address();
       heap_info.heapRange.size = sampler_size;
       heap_info.reservedRangeOffset = 0;
       heap_info.reservedRangeSize = 0;
 
-      auto PFN_vkCmdBindSamplerHeapEXT = reinterpret_cast<::PFN_vkCmdBindSamplerHeapEXT>(vkGetDeviceProcAddr(m_cmd.getDevice(), "vkCmdBindSamplerHeapEXT"));
-      if (PFN_vkCmdBindSamplerHeapEXT) {
-        PFN_vkCmdBindSamplerHeapEXT(*m_cmd, &heap_info);
-      }
+      m_cmd.bindSamplerHeapEXT(heap_info);
     }
   }
 

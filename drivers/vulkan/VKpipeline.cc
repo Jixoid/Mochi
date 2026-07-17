@@ -57,6 +57,7 @@ namespace mochi::rhi::vulkan
         total_size += typ.size() * typ.count();
       }
     }
+    m_push_data_end = total_size; // offset after last byte, before struct-level padding
     total_size = align_size(total_size, max_align);
 
     if (total_size > 0) {
@@ -157,9 +158,9 @@ namespace mochi::rhi::vulkan
       std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
       shader_stages.reserve(shaders.size());
       
-      VkDescriptorMappingSourcePushIndexEXT push_index = {};
+      vk::DescriptorMappingSourcePushIndexEXT push_index = {};
       push_index.heapOffset = 0;
-      push_index.pushOffset = meta->pushConstant().empty() ? 0 : (meta->pushConstant()[0].size - sizeof(uint32_t));
+      push_index.pushOffset = meta->push_data_end() > sizeof(uint32_t) ? (meta->push_data_end() - sizeof(uint32_t)) : 0;
       push_index.heapIndexStride = static_cast<VK_DeviceManager&>(device).descriptor_size();
       push_index.heapArrayStride = 0;
       push_index.pEmbeddedSampler = nullptr;
