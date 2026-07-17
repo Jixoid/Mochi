@@ -11,7 +11,7 @@
 
 
 #include "drivers/vulkan/manager/VKdevice_manager.hh"
-#include "drivers/vulkan/manager/VKsync_manager.hh"
+#include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKimage.hh"
 #include "drivers/vulkan/VKsampler.hh"
 #include "mochi/rhi/manager/alloc_manager.hh"
@@ -22,6 +22,7 @@
 #include "mochi/except.hh"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
+#include <format>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
@@ -91,6 +92,15 @@ namespace mochi::rhi::vulkan
         
       if (!f_is_suitable(vk_phys_dev))
         throw rhi_error("the selected GPU is not supported by mochi.");
+
+      auto dev_props = vk_phys_dev.getProperties();
+      static const char* dev_type_names[] = { "Other", "Integrated", "Discrete", "Virtual", "CPU" };
+      auto type_idx = static_cast<u32>(dev_props.deviceType);
+      debug::debug(Module, debug::MsgType::Hint, std::format(
+        "gpu selected: {} ({})",
+        dev_props.deviceName.data(),
+        type_idx < 5 ? dev_type_names[type_idx] : "Unknown"
+      ));
     }
 
 
@@ -256,7 +266,6 @@ namespace mochi::rhi::vulkan
       rhi::AllocationCreateFlags(rhi::AllocationCreate::Mapped), // Host mapped
       rhi::AllocationLocation::Auto
     );
-    m_descriptor_heap->map();
 
     m_sampler_heap = alloc_mgr.allocBuffer(
       m_sampler_descriptor_size * max_textures,
@@ -264,7 +273,8 @@ namespace mochi::rhi::vulkan
       rhi::AllocationCreateFlags(rhi::AllocationCreate::Mapped), // Host mapped
       rhi::AllocationLocation::Auto
     );
-    m_sampler_heap->map();
+
+    debug::debug(Module, debug::MsgType::Hint, std::format("descriptor heap initialized (capacity: {})", max_textures));
   }
 
   fun VK_DeviceManager::writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 {

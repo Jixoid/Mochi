@@ -27,23 +27,13 @@
 #include "mochi/rhi/manager/device_manager.hh"
 #include "mochi/rhi/render_target.hh"
 #include <chrono>
-#include <format>
-#include <iostream>
 
 
 
 namespace mochi
 {
 
-  extern "C" {
-    extern const char* MochiRHI_DriverInfo;
-    extern const u32   MochiRHI_DriverVers[4];
-  }
-
-
   Core::Core() {
-    std::cerr << std::format("Mochi Engine starting {{rhi: {}}}", MochiRHI_DriverInfo) << std::endl;
-
     auto device = rhi::DeviceManager::make("Mochi Test", {1,0,0,0}, [](){return 0;});
     auto alloc   = rhi::AllocManager::make(*device);
     

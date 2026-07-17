@@ -11,6 +11,7 @@
 
 
 #include "drivers/vulkan/manager/VKmaterial_manager.hh"
+#include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKrender_target.hh"
 #include "mochi/basis.hh"
 #include "mochi/except.hh"
@@ -19,6 +20,7 @@
 #include "mochi/rhi/manager/device_manager.hh"
 #include "mochi/rhi/manager/material_manager.hh"
 #include "mochi/vfs/vfs.hh"
+#include <format>
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -81,9 +83,14 @@ namespace mochi::rhi::vulkan
 
     auto it = m_materials.find(props);
 
-    if (it != m_materials.end())
+    if (it != m_materials.end()) {
       return it->second;
+    }
 
+    debug::debug(Module, debug::MsgType::Hint, std::format(
+      "material building (method={}, albedo={})",
+      static_cast<u32>(props.method), static_cast<u32>(props.albedo)
+    ));
 
     std::vector<std::string> Macros = {
       ShAlbedo[props.albedo],
