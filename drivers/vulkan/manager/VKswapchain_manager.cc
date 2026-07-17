@@ -16,6 +16,7 @@
 #include <format>
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
+#include "mochi/debug/debug.hh"
 #include "mochi/except.hh"
 #include "mochi/rhi/render_target.hh"
 
@@ -146,10 +147,7 @@ namespace mochi::rhi::vulkan
       m_targets.push_back(std::move(rtg));
     }
 
-    debug::debug(Module, debug::MsgType::Hint, std::format(
-      "swapchain (re)created {}x{}, {} images",
-      m_extent.width, m_extent.height, m_images.size()
-    ));
+    ME_LOG_VERB("swapchain (re)created {}x{}, {} images", m_extent.width, m_extent.height, m_images.size());
   }
 
   fun VK_SwapchainManager::init(void* windowHandle, u32 width, u32 height) -> void {
@@ -167,7 +165,7 @@ namespace mochi::rhi::vulkan
   }
 
   fun VK_SwapchainManager::resize(u32 width, u32 height) -> void {
-    debug::debug(Module, debug::MsgType::Hint, std::format("swapchain resize {}x{}", width, height));
+    ME_LOG_VERB("swapchain resize {}x{}", width, height);
     m_width = width;
     m_height = height;
     create_resources();
@@ -177,14 +175,14 @@ namespace mochi::rhi::vulkan
     try {
       auto [result, img_idx] = m_swapchain.acquireNextImage(UINT64_MAX, static_cast<VkSemaphore>(signalSemaphore), nullptr);
       if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
-        debug::debug(Module, debug::MsgType::Warning, "swapchain out of date, recreating");
+        ME_LOG_WARN("swapchain out of date, recreating")
         create_resources();
         return acquireNextImage(signalSemaphore);
       }
       return img_idx;
     }
     catch (const vk::OutOfDateKHRError &) {
-      debug::debug(Module, debug::MsgType::Warning, "swapchain out of date, recreating");
+      ME_LOG_WARN("swapchain out of date, recreating")
       create_resources();
       return acquireNextImage(signalSemaphore);
     }

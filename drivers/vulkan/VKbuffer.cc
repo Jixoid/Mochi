@@ -42,8 +42,10 @@ namespace mochi::rhi::vulkan
 
   fun VK_Buffer::map() -> void {
     #ifdef _mochi_debug_validator
-      if (m_mapped) [[unlikely]]
-        debug::debug(Module, debug::MsgType::Error, "resource already mapped");
+      if (m_mapped) [[unlikely]] {
+        ME_LOG_ERROR("resource already mapped")
+        return;
+      }
     #endif
 
     vmaMapMemory(m_vma_allocator, m_allocation, &m_mapped);
@@ -51,8 +53,10 @@ namespace mochi::rhi::vulkan
   
   fun VK_Buffer::unmap() -> void {
     #ifdef _mochi_debug_validator
-      if (!m_mapped) [[unlikely]]
-        debug::debug(Module, debug::MsgType::Error, "resource not mapped");
+      if (!m_mapped) [[unlikely]] {
+        ME_LOG_ERROR("resource not mapped")
+        return;
+      }
     #endif
     
     vmaUnmapMemory(m_vma_allocator, m_allocation);
@@ -60,8 +64,10 @@ namespace mochi::rhi::vulkan
 
   fun VK_Buffer::flush(offs off) -> void {
     #ifdef _mochi_debug_validator
-      if (!m_mapped) [[unlikely]]
-        debug::debug(Module, debug::MsgType::Error, "resource not mapped");
+      if (!m_mapped) [[unlikely]] {
+        ME_LOG_ERROR("resource not mapped")
+        return;
+      }
     #endif
     
     vmaFlushAllocation(m_vma_allocator, m_allocation, off.off(), off.size());

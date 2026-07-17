@@ -176,4 +176,11 @@ namespace mochi::rhi
     return static_cast<vk::Format>(in);
   }
 
+  template <typename T>
+    requires (std::is_same_v<T, Format>)
+  inline fun VKDeConvert(vk::Format in) -> Format
+  {
+    return static_cast<Format>(in);
+  }
+
 }

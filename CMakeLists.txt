@@ -20,6 +20,7 @@ add_compile_options(-Wno-gnu-alignof-expression)
 add_compile_definitions($<$<CONFIG:Debug>:_DBG> $<$<CONFIG:RelWithDebInfo>:_DBG>)
 add_compile_definitions(_mochi_debug_khronos_validator)
 add_compile_definitions(_mochi_debug_validator)
+add_compile_definitions(_mochi_debug_level=0)
 add_compile_definitions(_mochi_driver_debug_statistics)
 
 

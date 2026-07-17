@@ -15,8 +15,8 @@
 #include "mochi/manager/window_manager.hh"
 #include "mochi/manager/render_manager.hh"
 #include "mochi/manager/scene_manager.hh"
+#include "mochi/manager/material_manager.hh"
 #include "mochi/rhi/manager/device_manager.hh"
-#include "mochi/rhi/manager/material_manager.hh"
 #include "mochi/rhi/manager/alloc_manager.hh"
 #include "mochi/rhi/manager/transfer_manager.hh"
 #include "mochi/rhi/manager/shader_manager.hh"
@@ -54,7 +54,7 @@ namespace mochi
         uptr<rhi::TransferManager>,
         uptr<rhi::ShaderManager>,
         uptr<rhi::PipelineManager>,
-        uptr<rhi::MaterialManager>,
+        uptr<manager::MaterialManager>,
         uptr<manager::SceneManager>,
         uptr<manager::WindowManager>,
         uptr<manager::RenderManager>

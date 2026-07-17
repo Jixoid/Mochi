@@ -22,7 +22,7 @@
 
 
 
-namespace mochi::rhi
+namespace mochi::manager
 {
   // Enums
   enum struct MaterialMethod: u8 { Bare, PBR };
@@ -39,7 +39,7 @@ namespace mochi::rhi
     rhi::PolygonMode polymode;
     rhi::PrimitiveTopology primitiveTopology;
 
-    Format color_format, depth_format;
+    rhi::Format color_format, depth_format;
 
     fun operator ==(const MaterialProps &it) const -> bool = default;
   };
@@ -49,42 +49,11 @@ namespace mochi::rhi
     sptr<rhi::Pipeline> pipeline;
   };
 
-
-  // External
-  extern "C" fun MochiRHI_MakeMaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng) -> MaterialManager*;
-
-
-  // Interface
-  struct MaterialManager: noncopy {
-    protected:
-      MaterialManager(rhi::DeviceManager &device, ShaderManager &smng, rhi::PipelineManager &pmng)
-        : m_dmng(device)
-        , m_smng(smng)
-        , m_pmng(pmng)
-      {}
-
-    public:
-      virtual ~MaterialManager() = default;
-
-      static fun make(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng) {
-        return make_uptr(MochiRHI_MakeMaterialManager(device, smng, pmng));
-      }
-      
-    protected:
-      rhi::DeviceManager &m_dmng;
-      rhi::ShaderManager &m_smng;
-      rhi::PipelineManager &m_pmng;
-
-    public:
-      virtual fun getMaterialDesc(rhi::RenderTarget &target, MaterialProps props) -> sptr<MaterialDesc> = 0;
-  };
-  
 }
 
-
 template<>
-struct std::hash<mochi::rhi::MaterialProps> {
-  fun operator()(const mochi::rhi::MaterialProps &d) const noexcept -> std::size_t {
+struct std::hash<mochi::manager::MaterialProps> {
+  fun operator()(const mochi::manager::MaterialProps &d) const noexcept -> std::size_t {
     std::size_t seed = 0;
 
     auto hash_combine = [&seed](auto &&v) {
@@ -112,3 +81,27 @@ struct std::hash<mochi::rhi::MaterialProps> {
     return seed;
   }
 };
+
+namespace mochi::manager
+{
+  // Interface
+  struct MaterialManager: noncopy {
+    public:
+      MaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng)
+        : m_dmng(device)
+        , m_smng(smng)
+        , m_pmng(pmng)
+      {}
+      
+    private:
+      rhi::DeviceManager &m_dmng;
+      rhi::ShaderManager &m_smng;
+      rhi::PipelineManager &m_pmng;
+      
+      std::unordered_map<MaterialProps, sptr<MaterialDesc>> m_materials;
+    
+    public:
+      fun getMaterialDesc(rhi::RenderTarget &target, MaterialProps props) -> sptr<MaterialDesc>;
+  };
+  
+}

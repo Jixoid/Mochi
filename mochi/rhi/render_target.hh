@@ -12,6 +12,7 @@
 #pragma once
 
 #include "mochi/basis.hh"
+#include "mochi/rhi/rhi.hh"
 
 
 
@@ -28,6 +29,10 @@ namespace mochi::rhi
 
     public:
       virtual ~RenderTarget() = default;
+
+    public:
+      virtual fun depth_format() -> Format = 0;
+      virtual fun color_format() -> Format = 0;
   };
 
 }

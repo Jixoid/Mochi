@@ -128,9 +128,9 @@ namespace mochi::rhi::vulkan
       );
 
       if (cache_hit)
-        debug::debug(Module, debug::MsgType::Hint, "pipeline cache loaded");
+        ME_LOG_VERB("pipeline cache loaded")
       else
-        debug::debug(Module, debug::MsgType::Hint, "pipeline cache empty, building fresh");
+        ME_LOG_VERB("pipeline cache empty, building fresh")
 
       vk_pipelineCache = vk::raii::PipelineCache(static_cast<VK_DeviceManager&>(device).get(), cache_info);
     }

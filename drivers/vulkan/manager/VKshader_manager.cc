@@ -45,7 +45,7 @@ namespace mochi::rhi::vulkan
 
     if (sign != 0) {  
       if (vfs::exists(path)) {
-        debug::debug(Module, debug::MsgType::Hint, "shader reading");
+        ME_LOG_VERB("shader reading")
 
         auto file = vfs::open_map(path);
         std::span<u32> code((u32*)file->data(), file->size()/4);
@@ -54,7 +54,7 @@ namespace mochi::rhi::vulkan
       }
     }
 
-    debug::debug(Module, debug::MsgType::Hint, "shader compiling");
+    ME_LOG_VERB("shader compiling")
 
 
     static std::unordered_map<rhi::ShaderStage, shaderc_shader_kind> ToKind = {
@@ -77,11 +77,11 @@ namespace mochi::rhi::vulkan
       throw std::unexpected("Shader compilation error: " + module.GetErrorMessage());
 
 
-    debug::debug(Module, debug::MsgType::Hint, "shader compiled");
+    ME_LOG_VERB("shader compiled")
 
     
     if (sign != 0) {
-      debug::debug(Module, debug::MsgType::Hint, "shader writing");
+      ME_LOG_VERB("shader writing")
 
       vfs::open_rw(path)->write((char*)module.begin(), (module.end()-module.begin())*4).flush();
     }

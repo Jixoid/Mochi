@@ -11,7 +11,9 @@
 
 #pragma once
 
+#include "drivers/vulkan/VKconvert.hh"
 #include "mochi/rhi/render_target.hh"
+#include "mochi/rhi/rhi.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -37,11 +39,11 @@ namespace mochi::rhi::vulkan
       )
         : color_image(color_image)
         , color_view(color_view)
-        , color_format(color_format)
+        , m_color_format(color_format)
 
         , depth_image(depth_image)
         , depth_view(depth_view)
-        , depth_format(depth_format)
+        , m_depth_format(depth_format)
 
         , extent(extent)
 
@@ -51,15 +53,20 @@ namespace mochi::rhi::vulkan
     public:
       vk::Image     color_image;
       vk::ImageView color_view;
-      vk::Format    color_format;
+      vk::Format    m_color_format;
       
       vk::Image     depth_image;
       vk::ImageView depth_view;
-      vk::Format    depth_format;
+      vk::Format    m_depth_format;
       
       vk::Extent2D  extent;
       
       vk::ImageLayout final_layout;
+
+    public:
+      fun depth_format() -> Format override { return VKDeConvert<Format>(m_depth_format); };
+      fun color_format() -> Format override { return VKDeConvert<Format>(m_color_format); };
+
   };
 
 }

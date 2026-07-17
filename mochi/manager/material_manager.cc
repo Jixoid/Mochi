@@ -10,37 +10,23 @@
 */
 
 
-#include "drivers/vulkan/manager/VKmaterial_manager.hh"
-#include "drivers/vulkan/VKdriver.hh"
-#include "drivers/vulkan/VKrender_target.hh"
 #include "mochi/basis.hh"
+#include "mochi/debug/debug.hh"
 #include "mochi/except.hh"
+#include "mochi/manager/material_manager.hh"
 #include "mochi/rhi/render_target.hh"
 #include "mochi/types.hh"
-#include "mochi/rhi/manager/device_manager.hh"
-#include "mochi/rhi/manager/material_manager.hh"
 #include "mochi/vfs/vfs.hh"
 #include <format>
 #include <vulkan/vulkan_raii.hpp>
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::manager
 {
 
-  extern "C" fun MochiRHI_MakeMaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng) -> rhi::MaterialManager* {
-    return new VK_MaterialManager(device, smng, pmng);
-  }
-
-
-  VK_MaterialManager::VK_MaterialManager(rhi::DeviceManager &device, ShaderManager &smng, rhi::PipelineManager &pmng)
-    : rhi::MaterialManager(device, smng, pmng)
-  {}
-
   
-  fun VK_MaterialManager::getMaterialDesc(rhi::RenderTarget &_target, MaterialProps props) -> sptr<MaterialDesc> {
-    const auto& target = static_cast<const VK_RenderTarget&>(_target);
-    
+  fun MaterialManager::getMaterialDesc(rhi::RenderTarget &target, MaterialProps props) -> sptr<MaterialDesc> {
     // Info Pipeline
     rhi::PushConstantList ipush;
 
@@ -88,10 +74,7 @@ namespace mochi::rhi::vulkan
       return it->second;
     }
 
-    debug::debug(Module, debug::MsgType::Hint, std::format(
-      "material building (method={}, albedo={})",
-      static_cast<u32>(props.method), static_cast<u32>(props.albedo)
-    ));
+    ME_LOG_VERB("material building (method={}, albedo={})", static_cast<u32>(props.method), static_cast<u32>(props.albedo));
 
     std::vector<std::string> Macros = {
       ShAlbedo[props.albedo],
@@ -127,8 +110,8 @@ namespace mochi::rhi::vulkan
     auto pipe = rhi::Pipeline::make(
       m_dmng, m_pmng, sign, ipipe.get(), {vert, frag},
       props.polymode, props.primitiveTopology,
-      static_cast<rhi::Format>(static_cast<uint32_t>(target.color_format)),
-      static_cast<rhi::Format>(target.depth_format)
+      target.color_format(),
+      target.depth_format()
     );
 
     

@@ -16,7 +16,7 @@
 namespace mochi::rhi::vulkan
 {
 
-  debug::ModuleInfo Module("driver.vulkan");
+  debug::ModuleInfo debug_module("DRV.VK", debug::LogType::Verbose);
 
   extern "C" {
     const char* MochiRHI_DriverInfo = "Vulkan";

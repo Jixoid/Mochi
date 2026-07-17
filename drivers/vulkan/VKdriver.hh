@@ -17,6 +17,6 @@
 namespace mochi::rhi::vulkan
 {
 
-  extern debug::ModuleInfo Module;
+  extern debug::ModuleInfo debug_module;
   
 }

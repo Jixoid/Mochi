@@ -97,11 +97,10 @@ namespace mochi::rhi::vulkan
       auto dev_props = vk_phys_dev.getProperties();
       static const char* dev_type_names[] = { "Other", "Integrated", "Discrete", "Virtual", "CPU" };
       auto type_idx = static_cast<u32>(dev_props.deviceType);
-      debug::debug(Module, debug::MsgType::Hint, std::format(
-        "gpu selected: {} ({})",
+      ME_LOG_VERB("gpu selected: {} ({})",
         dev_props.deviceName.data(),
         type_idx < 5 ? dev_type_names[type_idx] : "Unknown"
-      ));
+      )
     }
 
 
@@ -280,7 +279,7 @@ namespace mochi::rhi::vulkan
       rhi::AllocationLocation::Auto
     );
 
-    debug::debug(Module, debug::MsgType::Hint, std::format("descriptor heap initialized (capacity: {})", max_textures));
+    ME_LOG_VERB("descriptor heap initialized (capacity: {})", max_textures)
   }
 
   fun VK_DeviceManager::writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 {

@@ -22,6 +22,7 @@ namespace mochi
     struct WindowManager;
     struct RenderManager;
     struct SceneManager;
+    struct MaterialManager;
   }
 
 
@@ -35,8 +36,6 @@ namespace mochi
     struct CommandManager;
     struct SwapchainManager;
     struct ResourceManager;
-
-    struct MaterialManager;
 
     struct PipelineMeta;
     struct Pipeline;

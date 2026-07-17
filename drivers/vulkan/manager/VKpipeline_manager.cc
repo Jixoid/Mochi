@@ -39,7 +39,7 @@ namespace mochi::rhi::vulkan
     if (!vfs::exists(path))
       return {};
 
-    debug::debug(Module, debug::MsgType::Hint, "pipeline cache reading");
+    ME_LOG_VERB("pipeline cache reading")
 
     auto file = vfs::open_map(path);
     auto *ptr = reinterpret_cast<const u8*>(file->data());
@@ -52,7 +52,7 @@ namespace mochi::rhi::vulkan
     if (sign == 0 || data.empty())
       return;
 
-    debug::debug(Module, debug::MsgType::Hint, "pipeline cache writing");
+    ME_LOG_VERB("pipeline cache writing")
 
     auto path = std::format(".cache/mochi/vulkan/pipelines/{:x}.bin", sign);
     vfs::open_rw(path)->write(reinterpret_cast<const char*>(data.data()), data.size()).flush();

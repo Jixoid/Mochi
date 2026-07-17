@@ -13,7 +13,7 @@
 
 #include "mochi/asset/texture.hh"
 #include "mochi/basis.hh"
-#include "mochi/rhi/manager/material_manager.hh"
+#include "mochi/manager/material_manager.hh"
 #include "mochi/core/core.hh"
 #include "mochi/rhi/render_target.hh"
 #include <variant>
@@ -32,7 +32,7 @@ namespace mochi::asset
       std::variant<vec3<f32>, sptr<asset::Texture2>> m_albedo;
       rhi::PolygonMode m_polymode{rhi::PolygonMode::Fill};
       rhi::PrimitiveTopology m_primitiveTopology{rhi::PrimitiveTopology::TriangleList};
-      rhi::MaterialCount m_count{rhi::MaterialCount::Single};
+      manager::MaterialCount m_count{manager::MaterialCount::Single};
 
     public:
       fun is_color() { return std::holds_alternative<vec3<f32>>(m_albedo); }
@@ -50,9 +50,9 @@ namespace mochi::asset
       fun setPrimitiveTopology(rhi::PrimitiveTopology val) { m_primitiveTopology = val; }
 
       fun count() { return m_count; }
-      fun setCount(rhi::MaterialCount val) { m_count = val; }
+      fun setCount(manager::MaterialCount val) { m_count = val; }
 
-      fun desc(rhi::RenderTarget &target) -> sptr<rhi::MaterialDesc>;
+      fun desc(rhi::RenderTarget &target) -> sptr<manager::MaterialDesc>;
   };
 
 }
