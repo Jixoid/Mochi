@@ -12,6 +12,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <iostream>
 #include <istream>
 #include <string>
@@ -146,7 +147,11 @@ namespace mochi::vfs::__file
 				};
 
 				open_rw = [](Provider*, std::string_view fpath) -> sptr<std::iostream> {
-					return make_sptr(new std::fstream(std::string(fpath)));
+					auto file = new std::fstream(std::string(fpath), std::ios::out);
+
+					if (!file->is_open())std::cerr << "ERROR " << fpath << std::endl;
+
+					return make_sptr(file);
 				};
 			};
 	};

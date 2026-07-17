@@ -26,7 +26,7 @@ namespace mochi::rhi::vulkan
   
   struct VK_MaterialManager final: rhi::MaterialManager {
     public:
-      VK_MaterialManager(rhi::DeviceManager &device, ShaderManager &smng);
+      VK_MaterialManager(rhi::DeviceManager &device, ShaderManager &smng, rhi::PipelineManager &pmng);
 
     public:
       std::unordered_map<MaterialProps, sptr<MaterialDesc>> m_materials;

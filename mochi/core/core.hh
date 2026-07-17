@@ -53,6 +53,7 @@ namespace mochi
         uptr<rhi::AllocManager>,
         uptr<rhi::TransferManager>,
         uptr<rhi::ShaderManager>,
+        uptr<rhi::PipelineManager>,
         uptr<rhi::MaterialManager>,
         uptr<manager::SceneManager>,
         uptr<manager::WindowManager>,

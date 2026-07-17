@@ -54,7 +54,8 @@ namespace mochi
 
     auto memory   = make_uptr(new manager::SceneManager(*device, *alloc));
     auto shader   = rhi::ShaderManager::make(*device);
-    auto material = rhi::MaterialManager::make(*device, *shader);
+    auto pipeline   = rhi::PipelineManager::make(*device);
+    auto material = rhi::MaterialManager::make(*device, *shader, *pipeline);
     auto display  = make_uptr(new manager::WindowManager(*device, *memory, "Mochi Test", 800, 600));
     auto renderer = make_uptr(new manager::RenderManager(*device));
 
@@ -63,6 +64,7 @@ namespace mochi
       std::move(alloc),
       std::move(transfer),
       std::move(shader),
+      std::move(pipeline),
       std::move(material),
       std::move(memory),
       std::move(display),
@@ -79,6 +81,7 @@ namespace mochi
     std::get<uptr<manager::WindowManager>>(m_modules).reset();
     std::get<uptr<manager::SceneManager>>(m_modules).reset();
     std::get<uptr<rhi::MaterialManager>>(m_modules).reset();
+    std::get<uptr<rhi::PipelineManager>>(m_modules).reset();
     std::get<uptr<rhi::ShaderManager>>(m_modules).reset();
     std::get<uptr<rhi::TransferManager>>(m_modules).reset();
     std::get<uptr<rhi::AllocManager>>(m_modules).reset();

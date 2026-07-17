@@ -26,13 +26,13 @@
 namespace mochi::rhi::vulkan
 {
 
-  extern "C" fun MochiRHI_MakeMaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng) -> rhi::MaterialManager* {
-    return new VK_MaterialManager(device, smng);
+  extern "C" fun MochiRHI_MakeMaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng) -> rhi::MaterialManager* {
+    return new VK_MaterialManager(device, smng, pmng);
   }
 
 
-  VK_MaterialManager::VK_MaterialManager(rhi::DeviceManager &device, ShaderManager &smng)
-    : rhi::MaterialManager(device, smng)
+  VK_MaterialManager::VK_MaterialManager(rhi::DeviceManager &device, ShaderManager &smng, rhi::PipelineManager &pmng)
+    : rhi::MaterialManager(device, smng, pmng)
   {}
 
   
@@ -90,21 +90,34 @@ namespace mochi::rhi::vulkan
       ShCount[props.count],
     };
 
-    auto sign = std::hash<MaterialProps>()(props);
 
-    auto vert = m_smng.compileGLSL(sign, rhi::ShaderStage::Vertex, vfs::open_map(ShSource[props.method]+".vert")->span(), Macros);
-    auto frag = m_smng.compileGLSL(sign, rhi::ShaderStage::Pixel,  vfs::open_map(ShSource[props.method]+".frag")->span(), Macros);
+    auto hash_combine = [](usize seed, auto &&v) -> usize {
+      using T = std::decay_t<decltype(v)>;
+      std::size_t h;
+      
+      if constexpr (std::is_enum_v<T>)
+        h = std::hash<std::underlying_type_t<T>>{}(std::to_underlying(v));
+      else
+        h = std::hash<T>{}(v);
+      
+      return seed ^ (h + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2));
+    };
+
+    auto sign = std::hash<MaterialProps>()(props);
+    auto sign_v = hash_combine(sign, rhi::ShaderStage::Vertex);
+    auto sign_p = hash_combine(sign, rhi::ShaderStage::Pixel);
+
+    auto vert = m_smng.compileGLSL(sign_v, rhi::ShaderStage::Vertex, vfs::open_map(ShSource[props.method]+".vert")->span(), Macros);
+    auto frag = m_smng.compileGLSL(sign_p, rhi::ShaderStage::Pixel,  vfs::open_map(ShSource[props.method]+".frag")->span(), Macros);
 
     if (!vert || !frag)
       throw mochi::rhi_error("Shaders failed to compile.");
 
 
-    rhi::DescriptorList idesc; // Remains empty for VK_EXT_descriptor_heap
-
-    auto ipipe = rhi::PipelineMeta::make(ipush, {}, idesc);
+    auto ipipe = rhi::PipelineMeta::make(ipush, {});
     
     auto pipe = rhi::Pipeline::make(
-      m_device, ipipe.get(), {vert, frag},
+      m_dmng, m_pmng, sign, ipipe.get(), {vert, frag},
       props.polymode, props.primitiveTopology,
       static_cast<rhi::Format>(static_cast<uint32_t>(target.color_format)),
       static_cast<rhi::Format>(target.depth_format)

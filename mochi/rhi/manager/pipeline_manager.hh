@@ -14,6 +14,8 @@
 
 #include "mochi/basis.hh"
 #include "mochi/types.hh"
+#include <span>
+#include <vector>
 
 
 namespace mochi::rhi
@@ -31,11 +33,15 @@ namespace mochi::rhi
       virtual ~PipelineManager() = default;
 
       static fun make(rhi::DeviceManager &device) {
-        return make_sptr(MochiRHI_MakePipelineManager(device));
+        return make_uptr(MochiRHI_MakePipelineManager(device));
       }
 
     protected:
       rhi::DeviceManager &m_dmng;
+
+    public:
+      virtual fun loadCache(u64 sign) -> std::vector<u8> = 0;
+      virtual fun saveCache(u64 sign, std::span<const u8> data) -> void = 0;
   };
 
 }

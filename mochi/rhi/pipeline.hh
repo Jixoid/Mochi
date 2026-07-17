@@ -17,6 +17,7 @@
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
 #include "mochi/rhi/shader.hh"
+#include "mochi/rhi/manager/pipeline_manager.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -109,33 +110,15 @@ namespace mochi::rhi
   using VertexBindList = std::vector<VertexBindSlot>;
 
 
-  struct DescriptorSlotOne {
-    public:
-      explicit DescriptorSlotOne(DescriptorType kind, ShaderStageFlags stage)
-        : m_kind(kind)
-        , m_stage(stage)
-      {}
-
-    private:
-      DescriptorType m_kind;
-      ShaderStageFlags m_stage;
-
-    public:
-      fun kind() const { return m_kind; }
-      fun stage() const { return m_stage; }
-  };
-  using DescriptorSlot = std::vector<DescriptorSlotOne>;
-  using DescriptorList = std::vector<DescriptorSlot>;
-
-
 
   // External
   struct PipelineMeta;
   struct Pipeline;
 
-  extern "C" fun MochiRHI_MakePipelineMeta(PushConstantList push, VertexBindList vert, DescriptorList desc) -> PipelineMeta*;
+  extern "C" fun MochiRHI_MakePipelineMeta(PushConstantList push, VertexBindList vert) -> PipelineMeta*;
   extern "C" fun MochiRHI_MakePipeline(
-    rhi::DeviceManager &dmng, PipelineMeta *info, std::vector<sptr<Shader>> shaders,
+    rhi::DeviceManager &dmng, rhi::PipelineManager &pmng, u64 sign,
+    PipelineMeta *info, std::vector<sptr<Shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format color_format, Format depth_format
   ) -> Pipeline*;
@@ -150,19 +133,17 @@ namespace mochi::rhi
     public:
       virtual ~PipelineMeta() = default;
 
-      static fun make(PushConstantList push, VertexBindList vert, DescriptorList desc) {
-        return make_sptr(MochiRHI_MakePipelineMeta(std::move(push), std::move(vert), std::move(desc)));
+      static fun make(PushConstantList push, VertexBindList vert) {
+        return make_sptr(MochiRHI_MakePipelineMeta(std::move(push), std::move(vert)));
       }
 
     protected:
       PushConstantList m_push;
       VertexBindList m_vert;
-      DescriptorList m_desc;
 
     public:
       fun& push() const { return m_push; }
       fun& vert() const { return m_vert; }
-      fun& desc() const { return m_desc; }
   };
 
 
@@ -174,11 +155,12 @@ namespace mochi::rhi
       virtual ~Pipeline() = default;
 
       static fun make(
-        rhi::DeviceManager &dmng, PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
+        rhi::DeviceManager &dmng, rhi::PipelineManager &pmng, u64 sign,
+        PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       ) {
-        return make_sptr(MochiRHI_MakePipeline(dmng, meta, std::move(shaders), polymode, primitiveTopology, color_format, depth_format));
+        return make_sptr(MochiRHI_MakePipeline(dmng, pmng, sign, meta, std::move(shaders), polymode, primitiveTopology, color_format, depth_format));
       }
     
 

@@ -13,6 +13,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 #include "mochi/rhi/pipeline.hh"
+#include "mochi/rhi/manager/pipeline_manager.hh"
 #include "mochi/rhi/shader.hh"
 #include "vk_mem_alloc.h"
 
@@ -23,38 +24,36 @@ namespace mochi::rhi::vulkan
 
   struct VK_PipelineMeta final: public rhi::PipelineMeta {
     public:
-      explicit VK_PipelineMeta(PushConstantList push, VertexBindList vert, DescriptorList desc);
+      explicit VK_PipelineMeta(PushConstantList push, VertexBindList vert);
 
     private:
       std::vector<vk::PushConstantRange> vk_PushConstant;
       std::vector<vk::VertexInputBindingDescription> vk_vertexBinding;
       std::vector<vk::VertexInputAttributeDescription> vk_vertexAttribute;
-      std::vector<std::vector<vk::DescriptorSetLayoutBinding>> vk_DescBindings;
 
     public:
       fun& pushConstant() const { return vk_PushConstant; }
       fun  vertexBinding() const { return vk::PipelineVertexInputStateCreateInfo({}, vk_vertexBinding, vk_vertexAttribute); }
-      fun& descBindings() const { return vk_DescBindings; }
   };
 
 
   struct VK_Pipeline final: public rhi::Pipeline {
     public:
       explicit VK_Pipeline(
-        rhi::DeviceManager &device, PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
+        rhi::DeviceManager &device, rhi::PipelineManager &pmng, u64 sign,
+        PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       );
 
     private:
+      vk::raii::PipelineCache  vk_pipelineCache;
       vk::raii::PipelineLayout vk_layout;
       vk::raii::Pipeline       vk_pipeline;
-      std::vector<vk::raii::DescriptorSetLayout> vk_desc_layouts;
       
     public:
       fun& get() { return vk_pipeline; }
       fun& layout() { return vk_layout; }
-      fun& desc_layouts() { return vk_desc_layouts; }
   };
 
 }

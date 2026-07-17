@@ -51,24 +51,29 @@ namespace mochi::rhi
 
 
   // External
-  extern "C" fun MochiRHI_MakeMaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng) -> MaterialManager*;
+  extern "C" fun MochiRHI_MakeMaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng) -> MaterialManager*;
 
 
   // Interface
   struct MaterialManager: noncopy {
     protected:
-      MaterialManager(rhi::DeviceManager &device, ShaderManager &smng): m_device(device), m_smng(smng) {}
+      MaterialManager(rhi::DeviceManager &device, ShaderManager &smng, rhi::PipelineManager &pmng)
+        : m_dmng(device)
+        , m_smng(smng)
+        , m_pmng(pmng)
+      {}
 
     public:
       virtual ~MaterialManager() = default;
 
-      static fun make(rhi::DeviceManager &device, rhi::ShaderManager &smng) {
-        return make_uptr(MochiRHI_MakeMaterialManager(device, smng));
+      static fun make(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng) {
+        return make_uptr(MochiRHI_MakeMaterialManager(device, smng, pmng));
       }
       
     protected:
-      rhi::DeviceManager &m_device;
+      rhi::DeviceManager &m_dmng;
       rhi::ShaderManager &m_smng;
+      rhi::PipelineManager &m_pmng;
 
     public:
       virtual fun getMaterialDesc(rhi::RenderTarget &target, MaterialProps props) -> sptr<MaterialDesc> = 0;

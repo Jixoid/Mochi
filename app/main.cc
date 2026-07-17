@@ -12,9 +12,8 @@
 
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <random>
 #include "mochi/core/core.hh"
-#include "mochi/ecs/multi_mesh.hh"
+#include "mochi/ecs/mesh.hh"
 #include "mochi/except.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/ecs/camera.hh"
@@ -24,8 +23,6 @@
 #include "mochi/math/quaternion.hh"
 #include "mochi/math/vec3.hh"
 #include "mochi/vfs/vfs.hh"
-#include "mochi/rhi/manager/alloc_manager.hh"
-#include "mochi/rhi/manager/transfer_manager.hh"
 
 
 
@@ -74,40 +71,10 @@ fun Main() -> int {
 
 
   auto m3d = mochi::asset::Mesh::make(Mochi, "file:///home/alforce/Masaüstü/Untitled.glb"_vfs_map->span(), ".glb");
-  for (auto& mat : m3d->material()) mat->setCount(mochi::rhi::MaterialCount::Multi);
-
-
-  const u32 PARTICLE_COUNT = 5;
-  std::vector<mochi::ecs::instance_data_t> instance_data(PARTICLE_COUNT);
-  
-  std::mt19937 rnd(1337);
-  std::uniform_real_distribution<f32> dist(-5.0f, 5.0f);
-  
-  for (u32 i = 0; i < PARTICLE_COUNT; i++)
-    instance_data[i].pos_radius = {dist(rnd), dist(rnd) + 10.0f, dist(rnd), 0.1f};
-  
-
-  auto instance_buffer = Mochi.sub<mochi::rhi::AllocManager>().allocBuffer(
-    sizeof(mochi::ecs::instance_data_t) * PARTICLE_COUNT,
-    mochi::rhi::BufferUsage::DeviceAddress | mochi::rhi::BufferUsage::TransferDst,
-    mochi::rhi::AllocationCreate::Mapped | mochi::rhi::AllocationCreate::HostSequentialWrite,
-    mochi::rhi::AllocationLocation::PreferDevice
-  );
-
-  Mochi.sub<mochi::rhi::TransferManager>().copyMemoryToBuffer(
-    mochi::rhi::TransferTime::Now,
-    instance_data.data(),
-    instance_buffer.get()
-  );
-
-
-
 
   auto mesh_instance = Reg.create();
-  auto &mesh_comp = Reg.emplace<mochi::ecs::MultiMesh>(mesh_instance);
+  auto &mesh_comp = Reg.emplace<mochi::ecs::Mesh>(mesh_instance);
   mesh_comp.mesh = m3d;
-  mesh_comp.instances = instance_buffer;
-  mesh_comp.active_count = PARTICLE_COUNT;
   auto &transform = Reg.emplace<mochi::ecs::Transform>(mesh_instance);
   transform.model = mochi::mat4x3<f32>::model({0}, mochi::quaternion<f32>(), {1});
   scene_nodes.push_back(mesh_instance);

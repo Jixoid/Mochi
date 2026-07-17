@@ -40,8 +40,8 @@ namespace mochi::rhi::vulkan
     u64 sign, ShaderStage stage, std::span<char> code,
     std::span<std::string> macros, std::string_view entry
   ) -> sptr<Shader>
-  { 
-    auto path = std::format(".cache/mochi/shaders/{:x}.spv", sign);
+  {
+    auto path = std::format(".cache/mochi/vulkan/shaders/{:x}.spv", sign);
 
     if (sign != 0) {  
       if (vfs::exists(path)) {
@@ -83,7 +83,7 @@ namespace mochi::rhi::vulkan
     if (sign != 0) {
       debug::debug(Module, debug::MsgType::Hint, "shader writing");
 
-      vfs::open_rw(path)->write((char*)module.begin(), (module.end()-module.begin())*4);
+      vfs::open_rw(path)->write((char*)module.begin(), (module.end()-module.begin())*4).flush();
     }
     
     return make_sptr(new VK_Shader(m_dmng, stage, std::span<u32>((u32*)module.begin(), module.end()), entry));

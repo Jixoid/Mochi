@@ -9,12 +9,15 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
+#include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKconvert.hh"
 #include "drivers/vulkan/VKpipeline.hh"
 #include "drivers/vulkan/manager/VKdevice_manager.hh"
 #include "drivers/vulkan/VKshader.hh"
 #include <vulkan/vulkan_raii.hpp>
+#include "mochi/debug/debug.hh"
 #include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/pipeline_manager.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/shader.hh"
 #include "vk_mem_alloc.h"
@@ -24,24 +27,24 @@
 namespace mochi::rhi::vulkan
 {
 
-  extern "C" fun MochiRHI_MakePipelineMeta(PushConstantList push, VertexBindList vert, DescriptorList desc) -> PipelineMeta* {
-    return new VK_PipelineMeta(std::move(push), std::move(vert), std::move(desc));
+  extern "C" fun MochiRHI_MakePipelineMeta(PushConstantList push, VertexBindList vert) -> PipelineMeta* {
+    return new VK_PipelineMeta(std::move(push), std::move(vert));
   }
   
   extern "C" fun MochiRHI_MakePipeline(
-    rhi::DeviceManager &device, PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
+    rhi::DeviceManager &device, rhi::PipelineManager &pmng, u64 sign,
+    PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format color_format, Format depth_format
   ) -> Pipeline* {
-    return new VK_Pipeline(device, meta, std::move(shaders), polymode, primitiveTopology, color_format, depth_format);
+    return new VK_Pipeline(device, pmng, sign, meta, std::move(shaders), polymode, primitiveTopology, color_format, depth_format);
   }
 
 
   constexpr inline fun align_size(u64 size, u64 alignment) { if (alignment == 0) return size; else return ((size+alignment -1) /alignment) *alignment; }
 
 
-  VK_PipelineMeta::VK_PipelineMeta(PushConstantList push, VertexBindList vert, DescriptorList desc)
-  {
+  VK_PipelineMeta::VK_PipelineMeta(PushConstantList push, VertexBindList vert) {
     u16 total_size{};
     rhi::ShaderStageFlags all_stages{};
 
@@ -91,58 +94,49 @@ namespace mochi::rhi::vulkan
 
       //ibuf.index() = binding_idx;
     }
-      
-
-    vk_DescBindings.reserve(desc.size());
-
-    for (auto &desc: desc) {
-      std::vector<vk::DescriptorSetLayoutBinding> current_set_bindings;
-      
-      u32 binding_idx{};
-      for (auto &slot: desc) {
-        current_set_bindings.push_back(vk::DescriptorSetLayoutBinding(
-          binding_idx++,
-          VKConvert<DescriptorType>(slot.kind()),
-          1,
-          VKConvert<ShaderStageFlags>(slot.stage()),
-          nil
-        ));
-      }
-      
-      vk_DescBindings.push_back(std::move(current_set_bindings));
-    }
 
     
     m_push = std::move(push);
     m_vert = std::move(vert);
-    m_desc = std::move(desc);
   }
 
 
   VK_Pipeline::VK_Pipeline(
-    rhi::DeviceManager &device, PipelineMeta *_meta, std::vector<sptr<Shader>> shaders,
+    rhi::DeviceManager &device, rhi::PipelineManager &pmng, u64 sign,
+    PipelineMeta *_meta, std::vector<sptr<Shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format __color_format, Format __depth_format
   )
-    : vk_layout(nil), vk_pipeline(nil)
+    : vk_pipelineCache(nil), vk_layout(nil), vk_pipeline(nil)
   {
     auto meta = static_cast<VK_PipelineMeta*>(_meta);
 
     bool is_compute = (shaders.size() == 1 && shaders[0]->stage() == ShaderStage::Compute);
 
 
-    std::vector<vk::DescriptorSetLayout> raw_layouts;
+    // Pipeline Cache
+    bool cache_hit = false;
+    {
+      auto cached = (sign != 0) ? pmng.loadCache(sign) : std::vector<u8>{};
+      cache_hit = !cached.empty();
 
-    for (auto &bindings_for_set: meta->descBindings()) {
-      vk::DescriptorSetLayoutCreateInfo set_info({}, bindings_for_set);
-      
-      vk_desc_layouts.push_back(vk::raii::DescriptorSetLayout(static_cast<VK_DeviceManager&>(device).get(), set_info));
-      
-      raw_layouts.push_back(*vk_desc_layouts.back());
+      vk::PipelineCacheCreateInfo cache_info(
+        {},
+        cached.size(),
+        cached.empty() ? nullptr : cached.data()
+      );
+
+      if (cache_hit)
+        debug::debug(Module, debug::MsgType::Hint, "pipeline cache loaded");
+      else
+        debug::debug(Module, debug::MsgType::Hint, "pipeline cache empty, building fresh");
+
+      vk_pipelineCache = vk::raii::PipelineCache(static_cast<VK_DeviceManager&>(device).get(), cache_info);
     }
-    
 
-    vk::PipelineLayoutCreateInfo layout_info({}, raw_layouts, meta->pushConstant());
+
+
+    vk::PipelineLayoutCreateInfo layout_info({}, {}, meta->pushConstant());
     vk_layout = vk::raii::PipelineLayout(static_cast<VK_DeviceManager&>(device).get(), layout_info);
 
 
@@ -156,7 +150,7 @@ namespace mochi::rhi::vulkan
       vk::ComputePipelineCreateInfo compute_info({}, compute_stage, *vk_layout);
       
 
-      vk_pipeline = vk::raii::Pipeline(static_cast<VK_DeviceManager&>(device).get(), nil, compute_info);
+      vk_pipeline = vk::raii::Pipeline(static_cast<VK_DeviceManager&>(device).get(), vk_pipelineCache, compute_info);
     } 
     else {
       m_kind = PipelineKind::Graphic;
@@ -245,7 +239,14 @@ namespace mochi::rhi::vulkan
       pipeline_info.pNext = &create_flags2;
 
 
-      vk_pipeline = vk::raii::Pipeline(static_cast<VK_DeviceManager&>(device).get(), nil, pipeline_info);
+      vk_pipeline = vk::raii::Pipeline(static_cast<VK_DeviceManager&>(device).get(), vk_pipelineCache, pipeline_info);
+    }
+
+
+    // Save cache
+    if (sign != 0 && !cache_hit) {
+      auto cache_data = vk_pipelineCache.getData();
+      pmng.saveCache(sign, std::span<const u8>(cache_data.data(), cache_data.size()));
     }
   }
   
