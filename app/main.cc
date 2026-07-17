@@ -159,7 +159,13 @@ fun Main() -> int {
 
     if (moved || cursor_locked) {
       Mochi.registry().get<mochi::ecs::Camera>(camera).view = mochi::mat4x4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
-      Mochi.registry().get<mochi::ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, (f32)Mochi.sub<mochi::manager::WindowManager>().extent().x()/Mochi.sub<mochi::manager::WindowManager>().extent().y(), 0.1, 100);
+    }
+
+    // Projection güncelleme — her frame (resize'da da güncel kalması için)
+    {
+      auto ext = Mochi.sub<mochi::manager::WindowManager>().extent();
+      f32 aspect = (ext.y() > 0) ? (f32)ext.x() / (f32)ext.y() : 1.0f;
+      Mochi.registry().get<mochi::ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, aspect, 0.1f, 100.0f);
     }
   };
 

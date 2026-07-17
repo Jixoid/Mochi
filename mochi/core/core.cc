@@ -237,10 +237,12 @@ namespace mochi
 
 
   fun Core::draw() -> void {
-    auto &dev = sub<rhi::DeviceManager>();
-    auto &ren = sub<manager::RenderManager>();
+    auto &dev  = sub<rhi::DeviceManager>();
+    auto &ren  = sub<manager::RenderManager>();
     auto &disp = sub<manager::WindowManager>();
 
+    if (disp.resized())
+      disp.recreate_swapchain();
 
     auto &cmd = ren.begin_frame();
 
