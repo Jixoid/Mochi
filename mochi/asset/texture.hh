@@ -9,79 +9,47 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
 #include "mochi/basis.hh"
 #include "mochi/rhi/image.hh"
-
+#include "mochi/rhi/sampler.hh"
 
 
 
 namespace mochi::asset
 {
 
-  /** @brief Represents a 2D texture asset loaded into a Vulkan image. */
-  struct texture2
-  {
+  struct Texture2 {
     public:
-      /**
-       * @brief Construct a 2D texture directly from an existing Vulkan image.
-       * @param core The mochi core instance.
-       * @param data The Vulkan image containing the texture data.
-       */
-      explicit texture2(core &core, sptr<rhi::Image2> data);
+      explicit Texture2(Core &core, sptr<rhi::Image2> data);
 
-      /**
-       * @brief Construct a 2D texture by loading an image file from disk.
-       * @param core The mochi core instance.
-       * @param fpath The file path to the image.
-       */
-      explicit texture2(core &core, const std::string &fpath);
+      explicit Texture2(Core &core, const std::string &fpath);
 
-      /**
-       * @brief Construct a 2D texture from raw RGBA8 pixel data in memory.
-       * @param core The mochi core instance.
-       * @param width Image width in pixels.
-       * @param height Image height in pixels.
-       * @param pixels Pointer to RGBA8 pixel data.
-       */
-      explicit texture2(core &core, u32 width, u32 height, const void *pixels);
+      explicit Texture2(Core &core, u32 width, u32 height, const void *pixels);
 
     public:
-      /**
-       * @brief Factory method to create a 2D texture from an existing Vulkan image.
-       * @param core The mochi core instance.
-       * @param data The Vulkan image containing the texture data.
-       * @return Pointer to the newly created texture.
-       */
-      static fun make(core &core, sptr<rhi::Image2> data) -> sptr<texture2>;
+      static fun make(Core &core, sptr<rhi::Image2> data) -> sptr<Texture2>;
 
-      /**
-       * @brief Factory method to load and create a 2D texture from a file.
-       * @param core The mochi core instance.
-       * @param fpath The file path to the image.
-       * @return Pointer to the newly created texture.
-       */
-      static fun make(core &core, const std::string &fpath) -> sptr<texture2>;
+      static fun make(Core &core, const std::string &fpath) -> sptr<Texture2>;
 
-      /**
-       * @brief Factory method to create a 2D texture from raw RGBA8 pixel data.
-       * @param core The mochi core instance.
-       * @param width Image width in pixels.
-       * @param height Image height in pixels.
-       * @param pixels Pointer to RGBA8 pixel data.
-       * @return Pointer to the newly created texture.
-       */
-      static fun make(core &core, u32 width, u32 height, const void *pixels) -> sptr<texture2>;
+      static fun make(Core &core, u32 width, u32 height, const void *pixels) -> sptr<Texture2>;
 
 
     private:
-      sptr<rhi::Image2> m_data{nil};
+      sptr<rhi::Image2> m_data;
+      sptr<rhi::ImageView2> m_view;
+      sptr<rhi::Sampler2> m_sampler;
+      u32 m_id{0}; // ID in the global descriptor heap
 
     public:
-      /** @brief Access the underlying Vulkan image holding the texture data. */
-      inline fun data() { return m_data; }
+      fun data() const -> sptr<rhi::Image2> { return m_data; }
+      fun view() const -> sptr<rhi::ImageView2> { return m_view; }
+      fun sampler() const -> sptr<rhi::Sampler2> { return m_sampler; }
+      
+      fun id() const -> u32 { return m_id; }
+      
+      fun set_id(u32 id) { m_id = id; }
   };
 
 }

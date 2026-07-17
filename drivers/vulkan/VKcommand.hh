@@ -16,6 +16,7 @@
 #include "mochi/basis.hh"
 #include "mochi/rhi/command.hh"
 #include "mochi/rhi/pipeline.hh"
+#include "mochi/rhi/render_target.hh"
 #include <vulkan/vulkan_raii.hpp>
 
 
@@ -33,8 +34,14 @@ namespace mochi::rhi::vulkan
       VK_Pipeline *m_pipe{};
     
     public:
-      fun bindPipeline(Pipeline *pipe) -> void override;
-      fun pushConstant(ShaderStageFlags stage, u32 off, data dat) -> void override;
+      fun begin() -> void override;
+      fun end() -> void override;
+      fun beginRendering(const RenderTarget &target, const std::array<float, 4> &clear_color) -> void override;
+      fun endRendering(const RenderTarget &target) -> void override;
+
+      fun bindPipeline(rhi::Pipeline *pipe) -> void override;
+      fun bindDescriptorHeap(sptr<rhi::Buffer> resource_heap, sptr<rhi::Buffer> sampler_heap, u64 resource_size, u64 sampler_size) -> void override;
+      fun pushConstant(rhi::ShaderStageFlags stage, u32 off, data dat) -> void override;
 
       fun draw(offs vertex, offs inst) -> void override;
       fun dispatch(extent<3,u32> ext) -> void override;

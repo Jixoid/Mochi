@@ -36,7 +36,7 @@ namespace fs = std::filesystem;
 
 
 
-namespace vfs::__file
+namespace mochi::vfs::__file
 {
 
 	struct Mapped__file: Mapped {
@@ -152,7 +152,7 @@ namespace vfs::__file
 	};
 
 
-	fun __attribute__((constructor(65535))) __init() { vfs::provider_reg("file", new Provider__file()); }
-	fun __attribute__((destructor(65535)))  __fini() { vfs::provider_del("file"); }
+	fun __attribute__((constructor(65535))) __init() { mochi::vfs::provider_reg("file", new Provider__file()); }
+	fun __attribute__((destructor(65535)))  __fini() { mochi::vfs::provider_del("file"); }
 
 }

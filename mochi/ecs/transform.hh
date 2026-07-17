@@ -9,11 +9,10 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/math/math.hh"
+#include "mochi/math/mat4x3.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "entt/entt.hpp"
 
@@ -22,7 +21,6 @@
 namespace mochi::ecs
 {
 
-  /** @brief Represents the local and global transform of an entity. */
   struct Transform {
     mat4x3<f32> model = mat4x3<f32>();
   };

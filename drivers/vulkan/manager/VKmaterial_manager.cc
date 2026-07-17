@@ -11,6 +11,7 @@
 
 
 #include "drivers/vulkan/manager/VKmaterial_manager.hh"
+#include "drivers/vulkan/VKrender_target.hh"
 #include "mochi/basis.hh"
 #include "mochi/except.hh"
 #include "mochi/rhi/render_target.hh"
@@ -35,22 +36,31 @@ namespace mochi::rhi::vulkan
   {}
 
   
-  fun VK_MaterialManager::getMaterialDesc(rhi::render_target &target, MaterialProps props) -> sptr<MaterialDesc> {
+  fun VK_MaterialManager::getMaterialDesc(rhi::RenderTarget &_target, MaterialProps props) -> sptr<MaterialDesc> {
+    const auto& target = static_cast<const VK_RenderTarget&>(_target);
+    
     // Info Pipeline
     rhi::PushConstantList ipush;
 
     
     // push: model
-    ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex, rhi::vt::make_list<mat4x4<f32>>()));
+    ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, rhi::vt::make_list<mat4x4<f32>>()));
 
     // push: vertex
-    ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex, rhi::vt::make_list<u64>()));
+    ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, rhi::vt::make_list<u64>()));
     
+    // push: camera
+    ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, rhi::vt::make_list<u64>()));
+    
+    // push: light
+    ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, rhi::vt::make_list<u64>()));
+
     // push: instance
     if (props.count == MaterialCount::Multi)
-      ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex, rhi::vt::make_list<u64>()));
+      ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, rhi::vt::make_list<u64>()));
 
-
+    // push: texture_id
+    ipush.push_back(rhi::PushConstantSlot(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, rhi::vt::make_list<u32>()));
 
     // Pipeline
     static std::unordered_map<MaterialMethod, std::string> ShSource = {
@@ -89,7 +99,9 @@ namespace mochi::rhi::vulkan
       throw mochi::rhi_error("Shaders failed to compile.");
 
 
-    auto ipipe = rhi::PipelineMeta::make(ipush, {},{});
+    rhi::DescriptorList idesc; // Remains empty for VK_EXT_descriptor_heap
+
+    auto ipipe = rhi::PipelineMeta::make(ipush, {}, idesc);
     
     auto pipe = rhi::Pipeline::make(
       m_device, ipipe.get(), {vert, frag},

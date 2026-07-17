@@ -20,7 +20,7 @@
 
 
 
-namespace vfs
+namespace mochi::vfs
 {
 	std::unordered_map<std::string, Provider*> providers __attribute__((init_priority(65534)));
 	std::shared_mutex providers_mtx __attribute__((init_priority(65534)));

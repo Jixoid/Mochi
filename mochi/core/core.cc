@@ -11,21 +11,21 @@
 
 
 #include "mochi/basis.hh"
-#include "mochi/core.hh"
+#include "mochi/core/core.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/mesh.hh"
-#include "mochi/ecs/camera.hh"
 #include "mochi/ecs/multi_mesh.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/transform.hh"
+#include "mochi/manager/render_manager.hh"
+#include "mochi/manager/scene_manager.hh"
+#include "mochi/manager/window_manager.hh"
 #include "mochi/rhi/command.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/rhi/manager/device_manager.hh"
-#include "mochi/module/display.hh"
-#include "mochi/module/memory.hh"
-#include "mochi/module/renderer.hh"
+#include "mochi/rhi/render_target.hh"
 #include <chrono>
 #include <format>
 #include <iostream>
@@ -41,22 +41,22 @@ namespace mochi
   }
 
 
-  core::core(
-    std::function<i32 ()> GpuPicker,
-    std::function<void (f32 dt)> Idle
-  ) : m_idle(Idle)
-  {
+  Core::Core() {
     std::cerr << std::format("Mochi Engine starting {{rhi: {}}}", MochiRHI_DriverInfo) << std::endl;
 
-    auto device   = rhi::DeviceManager::make("Mochi Test", {1,0,0,0}, GpuPicker);
-    auto alloc    = rhi::AllocManager::make(*device);
+    auto device = rhi::DeviceManager::make("Mochi Test", {1,0,0,0}, [](){return 0;});
+    auto alloc   = rhi::AllocManager::make(*device);
+    
+    // Initialize descriptor heap for bindless
+    device->initDescriptorHeap(*alloc);
+    
     auto transfer = rhi::TransferManager::make(*device);
 
-    auto memory   = make_uptr(new module::memory(*device, nullptr)); // FIXME: Pass AllocManager properly
+    auto memory   = make_uptr(new manager::SceneManager(*device, *alloc));
     auto shader   = rhi::ShaderManager::make(*device);
     auto material = rhi::MaterialManager::make(*device, *shader);
-    auto display  = make_uptr(new module::display(*device, *memory, "Mochi Test", 800, 600));
-    auto renderer = make_uptr(new module::renderer(*device));
+    auto display  = make_uptr(new manager::WindowManager(*device, *memory, "Mochi Test", 800, 600));
+    auto renderer = make_uptr(new manager::RenderManager(*device));
 
     m_modules = decltype(m_modules)(
       std::move(device),
@@ -70,15 +70,14 @@ namespace mochi
     );
   }
 
-  core::~core()
-  {
+  Core::~Core() {
     sub<rhi::DeviceManager>().waitIdle();
     
     m_registry.clear();
 
-    std::get<uptr<module::renderer>>(m_modules).reset();
-    std::get<uptr<module::display>>(m_modules).reset();
-    std::get<uptr<module::memory>>(m_modules).reset();
+    std::get<uptr<manager::RenderManager>>(m_modules).reset();
+    std::get<uptr<manager::WindowManager>>(m_modules).reset();
+    std::get<uptr<manager::SceneManager>>(m_modules).reset();
     std::get<uptr<rhi::MaterialManager>>(m_modules).reset();
     std::get<uptr<rhi::ShaderManager>>(m_modules).reset();
     std::get<uptr<rhi::TransferManager>>(m_modules).reset();
@@ -89,11 +88,10 @@ namespace mochi
 
 
 
-  fun core::run() -> void
-  {
+  fun Core::run() -> void {
     auto last_time = std::chrono::high_resolution_clock::now();
     
-    while (sub<module::display>().proc_events()) {
+    while (sub<manager::WindowManager>().proc_events()) {
       auto current_time = std::chrono::high_resolution_clock::now();
       float dt = std::chrono::duration<float, std::chrono::seconds::period>(current_time-last_time).count();
       last_time = current_time;
@@ -105,9 +103,8 @@ namespace mochi
   }
 
 
-  fun core::paint(rhi::Command &cmd, rhi::render_target &target) -> void
-  {
-    auto &mem = sub<module::memory>();
+  fun Core::paint(rhi::Command &cmd, rhi::RenderTarget &target) -> void {
+    auto &mem = sub<manager::SceneManager>();
 
     // Update camera system
     auto cameras = m_registry.view<ecs::Transform, ecs::Camera>();
@@ -146,21 +143,27 @@ namespace mochi
     }
 
 
-    auto extent = sub<module::display>().extent(); 
+    auto extent = sub<manager::WindowManager>().extent(); 
     cmd.setViewport(0, {rhi::Viewport(0, (f32)extent.x(), 0, (f32)extent.y(), 0, 1)});
     cmd.setScissor(0, {rhi::Rect2D(0, 0, extent.x(), extent.y())});
 
     
 
     // Render loop
+    auto heap = sub<rhi::DeviceManager>().descriptor_heap();
+    auto sampler_heap = sub<rhi::DeviceManager>().sampler_heap();
+    cmd.bindDescriptorHeap(heap, sampler_heap, heap->size(), sampler_heap->size());
+
     rhi::Pipeline *last_pipeline{};
     rhi::Buffer   *last_buffer{};
     rhi::Image2   *last_image{};
 
+    u64 cam_addr = cam_ubo ? cam_ubo->address() : 0;
+    u64 lig_addr = lig_ubo ? lig_ubo->address() : 0;
+
 
     auto view = m_registry.view<ecs::Transform, ecs::Mesh>();
-    for (auto entity: view)
-    {
+    for (auto entity: view) {
       auto &transform = view.get<ecs::Transform>(entity);
       auto &renderable = view.get<ecs::Mesh>(entity);
 
@@ -171,8 +174,7 @@ namespace mochi
 
       
       u32 i{};
-      for (auto &subsur: mesh->offs())
-      {
+      for (auto &subsur: mesh->offs()) {
         auto material = renderable.mesh->material()[renderable.mesh->map()[i]];
         auto desc = material->desc(target);
 
@@ -184,8 +186,12 @@ namespace mochi
         struct PC {
           mat4x4<f32> model;
           u64 vertex_addr;
+          u64 camera_addr;
+          u64 light_addr;
+          u32 texture_id;
         };
-        PC pc = { transform.model, mesh->data()->address() };
+        u32 tex_id = material->is_texture() ? material->texture()->id() : 0;
+        PC pc = { transform.model, mesh->data()->address(), cam_addr, lig_addr, tex_id };
         cmd.pushConstant(flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel, 0, data(&pc, sizeof(pc)));
         
         cmd.draw({subsur.off(), subsur.size()}, {0, 1});
@@ -196,9 +202,8 @@ namespace mochi
 
 
     auto views = m_registry.view<ecs::Transform, ecs::MultiMesh>();
-    for (auto entity: views)
-    {
-      auto &transform = view.get<ecs::Transform>(entity);
+    for (auto entity: views) {
+      auto &transform = views.get<ecs::Transform>(entity);
       auto &renderable = views.get<ecs::MultiMesh>(entity);
 
       if (!renderable.mesh)
@@ -208,8 +213,7 @@ namespace mochi
 
       
       u32 i{};
-      for (auto &subsur: mesh->offs())
-      {
+      for (auto &subsur: mesh->offs()) {
         auto material = renderable.mesh->material()[renderable.mesh->map()[i]];
         auto desc = material->desc(target);
 
@@ -221,9 +225,13 @@ namespace mochi
         struct PC_Multi {
           mat4x4<f32> model;
           u64 vertex_addr;
+          u64 camera_addr;
+          u64 light_addr;
           u64 instance_addr;
+          u32 texture_id;
         };
-        PC_Multi pc = { transform.model, mesh->data()->address(), renderable.instances->address() };
+        u32 tex_id = material->is_texture() ? material->texture()->id() : 0;
+        PC_Multi pc = { transform.model, mesh->data()->address(), cam_addr, lig_addr, renderable.instances->address(), tex_id };
         cmd.pushConstant(flags(rhi::ShaderStage::Vertex) | rhi::ShaderStage::Pixel, 0, data(&pc, sizeof(pc)));
         
         cmd.draw({subsur.off(), subsur.size()}, {0, renderable.active_count});
@@ -235,19 +243,18 @@ namespace mochi
   }
 
 
-  fun core::draw() -> void
-  {
+  fun Core::draw() -> void {
     auto &dev = sub<rhi::DeviceManager>();
-    auto &ren = sub<module::renderer>();
-    auto &disp = sub<module::display>();
+    auto &ren = sub<manager::RenderManager>();
+    auto &disp = sub<manager::WindowManager>();
 
 
     auto &cmd = ren.begin_frame();
 
-    void* wait_sem = &ren.get_image_available_sem();
+    void* wait_sem = ren.get_image_available_sem();
 
     u32 image_index = disp.acquire_next_image(wait_sem);
-    auto target = disp.get_render_target(image_index);
+    auto &target = disp.get_render_target(image_index);
 
     ren.begin_pass(cmd, target, {0.1f, 0.1f, 0.1f, 1.0f});
 
@@ -255,9 +262,10 @@ namespace mochi
 
     ren.end_pass(cmd, target);
 
-    ren.end_frame(cmd, wait_sem, nullptr); // FIXME: Provide correct signal_sem
+    void* signal_sem = disp.getRenderFinishedSemaphore(image_index);
+    ren.end_frame(cmd, wait_sem, signal_sem);
 
-    disp.present(nullptr, image_index);
+    disp.present(signal_sem, image_index);
   }
   
 }

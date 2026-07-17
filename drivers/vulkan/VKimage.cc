@@ -42,7 +42,7 @@ namespace mochi::rhi::vulkan
 
   fun VK_Image2::makeView() const -> sptr<ImageView2> {
     vk::ImageViewCreateInfo view_info(
-      {}, m_image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Srgb,
+      {}, m_image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Unorm,
       {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
     );
     auto e_view = vk::raii::ImageView(static_cast<VK_DeviceManager&>(m_device).get(), view_info);

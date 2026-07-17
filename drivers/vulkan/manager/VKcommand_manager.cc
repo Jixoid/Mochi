@@ -56,6 +56,23 @@ namespace mochi::rhi::vulkan
   }
 
   fun VK_CommandManager::submitWithSync(Command* cmd, void* waitSem, void* sigSem, void* fence) -> void {
-    // Implement proper submission with sync
+    auto* vk_cmd = static_cast<VK_Command*>(cmd);
+    
+    vk::Semaphore wait_semaphore = static_cast<VkSemaphore>(waitSem);
+    vk::Semaphore signal_semaphore = static_cast<VkSemaphore>(sigSem);
+    vk::Fence submit_fence = static_cast<VkFence>(fence);
+    vk::PipelineStageFlags wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+
+    vk::SubmitInfo submit_info(
+      waitSem ? 1 : 0, waitSem ? &wait_semaphore : nullptr, wait_stages,
+      1, &vk_cmd->get().operator*(),
+      sigSem ? 1 : 0, sigSem ? &signal_semaphore : nullptr
+    );
+
+    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    u32 family = vk_dmng.main_q().family();
+    
+    auto& queue = vk_dmng.active_queue(family);
+    queue.submit(submit_info, submit_fence);
   }
 }

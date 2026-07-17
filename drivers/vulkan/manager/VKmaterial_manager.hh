@@ -32,7 +32,7 @@ namespace mochi::rhi::vulkan
       std::unordered_map<MaterialProps, sptr<MaterialDesc>> m_materials;
 
     public:
-      fun getMaterialDesc(rhi::render_target &target, MaterialProps props) -> sptr<MaterialDesc>;
+      fun getMaterialDesc(rhi::RenderTarget &target, MaterialProps props) -> sptr<MaterialDesc>;
   };
   
 }

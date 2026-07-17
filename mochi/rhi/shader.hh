@@ -20,7 +20,6 @@
 
 namespace mochi::rhi
 {
-
   // Enums
   enum struct ShaderStage: u32 {
     Vertex       = 0x00000001,

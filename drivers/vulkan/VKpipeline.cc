@@ -42,20 +42,25 @@ namespace mochi::rhi::vulkan
 
   VK_PipelineMeta::VK_PipelineMeta(PushConstantList push, VertexBindList vert, DescriptorList desc)
   {
-    u16 off{};
-    for (auto &push: push) {
-      u16 size{};
+    u16 total_size{};
+    rhi::ShaderStageFlags all_stages{};
 
-      auto legoff = off;
-      for (auto &typ: push.types()) {
-        off = align_size(off, typ.align());
-        off += typ.size() * typ.count();
+    u64 max_align = 0;
+    for (auto &p: push) {
+      all_stages |= p.stage();
+      for (auto &typ: p.types()) {
+        max_align = std::max<u64>(max_align, typ.align());
+        total_size = align_size(total_size, typ.align());
+        total_size += typ.size() * typ.count();
       }
+    }
+    total_size = align_size(total_size, max_align);
 
+    if (total_size > 0) {
       vk_PushConstant.push_back(vk::PushConstantRange(
-        VKConvert<ShaderStageFlags>(push.stage()),
-        legoff,
-        off-legoff
+        VKConvert<ShaderStageFlags>(all_stages),
+        0,
+        total_size
       ));
     }
 
@@ -157,10 +162,41 @@ namespace mochi::rhi::vulkan
       m_kind = PipelineKind::Graphic;
       std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
       shader_stages.reserve(shaders.size());
+      
+      VkDescriptorMappingSourcePushIndexEXT push_index = {};
+      push_index.heapOffset = 0;
+      push_index.pushOffset = meta->pushConstant().empty() ? 0 : (meta->pushConstant()[0].size - sizeof(uint32_t));
+      push_index.heapIndexStride = static_cast<VK_DeviceManager&>(device).descriptor_size();
+      push_index.heapArrayStride = 0;
+      push_index.pEmbeddedSampler = nullptr;
+      push_index.useCombinedImageSamplerIndex = VK_TRUE;
+      push_index.samplerHeapOffset = 0;
+      push_index.samplerPushOffset = push_index.pushOffset;
+      push_index.samplerHeapIndexStride = static_cast<VK_DeviceManager&>(device).sampler_descriptor_size();
+      push_index.samplerHeapArrayStride = 0;
+      
+      VkDescriptorSetAndBindingMappingEXT mapping = {};
+      mapping.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_AND_BINDING_MAPPING_EXT;
+      mapping.descriptorSet = 1;
+      mapping.firstBinding = 0;
+      mapping.bindingCount = 1;
+      mapping.resourceMask = VK_SPIRV_RESOURCE_TYPE_COMBINED_SAMPLED_IMAGE_BIT_EXT;
+      mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT;
+      mapping.sourceData.pushIndex = push_index;
+      
+      VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = {};
+      mapping_info.sType = VK_STRUCTURE_TYPE_SHADER_DESCRIPTOR_SET_AND_BINDING_MAPPING_INFO_EXT;
+      mapping_info.mappingCount = 1;
+      mapping_info.pMappings = &mapping;
+
       for (auto &sh: shaders) {
-        shader_stages.push_back(vk::PipelineShaderStageCreateInfo(
+        auto stage = vk::PipelineShaderStageCreateInfo(
           {}, VKConvert<ShaderStage>(sh->stage()), static_cast<vulkan::VK_Shader*>(sh.get())->get(), sh->entry().c_str()
-        ));
+        );
+        if (sh->stage() == ShaderStage::Pixel) {
+            stage.pNext = &mapping_info;
+        }
+        shader_stages.push_back(stage);
       }
 
       std::array<vk::DynamicState, 2> dynamic_states = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -195,13 +231,18 @@ namespace mochi::rhi::vulkan
         depth_format, vk::Format::eUndefined
       );
 
+      VkPipelineCreateFlags2CreateInfo create_flags2 = {};
+      create_flags2.sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO;
+      create_flags2.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+      create_flags2.pNext = &rendering_info;
+
       auto VertexInput = meta->vertexBinding();
       vk::GraphicsPipelineCreateInfo pipeline_info(
         {}, shader_stages, &VertexInput, &input_assembly, nil,
         &viewport_state, &rasterizer, &multisampling, &depth_stencil,
-        &color_blending, &dynamic_info, *vk_layout
+        &color_blending, &dynamic_info, nullptr // VK_NULL_HANDLE for Descriptor Heaps
       );
-      pipeline_info.pNext = &rendering_info;
+      pipeline_info.pNext = &create_flags2;
 
 
       vk_pipeline = vk::raii::Pipeline(static_cast<VK_DeviceManager&>(device).get(), nil, pipeline_info);

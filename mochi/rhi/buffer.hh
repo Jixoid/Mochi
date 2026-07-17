@@ -21,19 +21,21 @@ namespace mochi::rhi
 {
   // Enums
   enum struct BufferUsage: u32 {
-    TransferSrc    = 0x00000001,
-    TransferDst    = 0x00000002,
-    UniformBuffer  = 0x00000010,
-    StorageBuffer  = 0x00000020,
-    IndexBuffer    = 0x00000040,
-    VertexBuffer   = 0x00000080,
-    IndirectBuffer = 0x00000100,
-    DeviceAddress  = 0x00020000,
+    TransferSrc              = 0x00000001,
+    TransferDst              = 0x00000002,
+    UniformBuffer            = 0x00000010,
+    StorageBuffer            = 0x00000020,
+    IndexBuffer              = 0x00000040,
+    VertexBuffer             = 0x00000080,
+    IndirectBuffer           = 0x00000100,
+    DeviceAddress            = 0x00020000,
+    SamplerDescriptorBuffer  = 0x00200000,
+    ResourceDescriptorBuffer = 0x00400000,
+    DescriptorHeap           = 0x10000000,
   };
   using BufferUsageFlags = flags<BufferUsage>;
 
 
-  
   // Interface
   struct Buffer: noncopy {
     protected:

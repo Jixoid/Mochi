@@ -24,7 +24,6 @@ namespace mochi::rhi::vulkan
 
     private:
       std::vector<vk::raii::Semaphore> m_image_available_sems;
-      std::vector<vk::raii::Semaphore> m_render_finished_sems;
       std::vector<vk::raii::Fence>     m_in_flight_fences;
 
       u32 m_current_frame{};
@@ -38,6 +37,5 @@ namespace mochi::rhi::vulkan
 
       fun activeInFlightFence() -> void* override;
       fun activeImageAvailableSemaphore() -> void* override;
-      fun activeRenderFinishedSemaphore() -> void* override;
   };
 }

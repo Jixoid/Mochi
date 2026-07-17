@@ -9,21 +9,19 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/module/display.hh"
+#include "mochi/manager/window_manager.hh"
+#include "mochi/manager/render_manager.hh"
+#include "mochi/manager/scene_manager.hh"
 #include "mochi/rhi/manager/device_manager.hh"
 #include "mochi/rhi/manager/material_manager.hh"
 #include "mochi/rhi/manager/alloc_manager.hh"
 #include "mochi/rhi/manager/transfer_manager.hh"
 #include "mochi/rhi/manager/shader_manager.hh"
-#include "mochi/module/renderer.hh"
-#include "mochi/module/memory.hh"
 #include <cassert>
 #include <functional>
-#include <tuple>
 #include "mochi/rhi/command.hh"
 #include "entt/entt.hpp"
 
@@ -32,26 +30,21 @@
 namespace mochi
 {
 
-  struct core {
+  struct Core {
     public:
-      explicit core(
-        std::function<i32 ()> GpuPicker,
-        std::function<void (f32 dt)> Idle
-      );
+      explicit Core();
+      ~Core();
 
-      ~core();
-
-
+    
     // Properties
     private:
       entt::registry m_registry;
+      std::function<fun (f32 dt) -> void> m_idle;
 
     public:
       fun& registry() { return m_registry; }
+      fun& idle() { return m_idle; }
       
-    private:
-      std::function<void (f32 dt)> m_idle;
-
 
     // Sub Module
     private:
@@ -61,9 +54,9 @@ namespace mochi
         uptr<rhi::TransferManager>,
         uptr<rhi::ShaderManager>,
         uptr<rhi::MaterialManager>,
-        uptr<module::memory>,
-        uptr<module::display>,
-        uptr<module::renderer>
+        uptr<manager::SceneManager>,
+        uptr<manager::WindowManager>,
+        uptr<manager::RenderManager>
       > m_modules;
 
     public:
@@ -78,7 +71,7 @@ namespace mochi
       fun run() -> void;
 
     private:
-      fun paint(rhi::Command &cmd, rhi::render_target &target) -> void;
+      fun paint(rhi::Command &cmd, rhi::RenderTarget &target) -> void;
       fun draw() -> void;
   };
 

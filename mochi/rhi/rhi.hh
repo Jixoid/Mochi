@@ -19,8 +19,7 @@
 namespace mochi::rhi
 {
 
-  enum struct Format: u32
-  {
+  enum struct Format: u32 {
     /// 8-bit
     int8U    = 13, // FORMAT_R8_UINT
     int8S    = 14, // FORMAT_R8_SINT

@@ -10,10 +10,12 @@
 */
 
 #include "drivers/vulkan/manager/VKswapchain_manager.hh"
+#include "drivers/vulkan/VKrender_target.hh"
 #include "drivers/vulkan/manager/VKdevice_manager.hh"
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
 #include "mochi/except.hh"
+#include "mochi/rhi/render_target.hh"
 
 
 
@@ -35,9 +37,9 @@ namespace mochi::rhi::vulkan
 
   void VK_SwapchainManager::destroy_resources() {
     auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
-    // Depth image is not managed by RAII, we need VMA for it, but for VMA we need the Allocator.
-    // However, AllocManager owns the allocator. We should really use AllocManager for depth buffer!
-    // Since we need to destroy it, for now we will assume the caller handles or we manage it carefully.
+    m_depth_view.clear();
+    m_depth_image_handle.clear();
+    m_depth_memory.clear();
   }
 
   void VK_SwapchainManager::create_resources() {
@@ -90,6 +92,7 @@ namespace mochi::rhi::vulkan
     m_swapchain = vk::raii::SwapchainKHR(vk_dmng.get(), swp_info);
     m_images = m_swapchain.getImages();
     m_image_views.clear();
+    m_render_finished_sems.clear();
 
     for (const auto &img: m_images) {
       vk::ImageViewCreateInfo view_info(
@@ -97,18 +100,48 @@ namespace mochi::rhi::vulkan
         {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
       );
       m_image_views.push_back(vk::raii::ImageView(vk_dmng.get(), view_info));
+      m_render_finished_sems.push_back(vk::raii::Semaphore(vk_dmng.get(), vk::SemaphoreCreateInfo()));
     }
 
-    // Creating depth buffer should ideally use rhi::AllocManager but keeping simple mapping here
-    // In strict RHI we'd ask AllocManager for a Depth Image!
+    // Depth buffer allocation
+    vk::ImageCreateInfo img_info(
+      {}, vk::ImageType::e2D, m_depth_format,
+      vk::Extent3D(m_extent.width, m_extent.height, 1),
+      1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+      vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled
+    );
+    m_depth_image_handle = vk::raii::Image(vk_dmng.get(), img_info);
     
+    auto mem_req = m_depth_image_handle.getMemoryRequirements();
+    auto mem_props = vk_dmng.phys_dev().getMemoryProperties();
+    u32 mem_type_idx = 0;
+    for (u32 i = 0; i < mem_props.memoryTypeCount; i++) {
+      if ((mem_req.memoryTypeBits & (1 << i)) &&
+          (mem_props.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal) == vk::MemoryPropertyFlagBits::eDeviceLocal) {
+        mem_type_idx = i;
+        break;
+      }
+    }
+    
+    vk::MemoryAllocateInfo alloc_info(mem_req.size, mem_type_idx);
+    m_depth_memory = vk::raii::DeviceMemory(vk_dmng.get(), alloc_info);
+    m_depth_image_handle.bindMemory(*m_depth_memory, 0);
+
+    vk::ImageViewCreateInfo view_info(
+      {}, *m_depth_image_handle, vk::ImageViewType::e2D, m_depth_format,
+      {}, {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
+    );
+    m_depth_view = vk::raii::ImageView(vk_dmng.get(), view_info);
+
     m_targets.clear();
     for (size_t i = 0; i < m_images.size(); i++) {
-      m_targets.push_back(rhi::render_target{
+      VK_RenderTarget rtg{
         m_images[i], *m_image_views[i], m_format,
-        m_depth_image, *m_depth_view, m_depth_format,
+        *m_depth_image_handle, *m_depth_view, m_depth_format,
         m_extent, vk::ImageLayout::ePresentSrcKHR
-      });
+      };
+
+      m_targets.push_back(std::move(rtg));
     }
   }
 
@@ -152,7 +185,17 @@ namespace mochi::rhi::vulkan
     vk::Semaphore sem = static_cast<VkSemaphore>(waitSemaphore);
     vk::SwapchainKHR swp = *m_swapchain;
     
-    vk::PresentInfoKHR present_info(1, &sem, 1, &swp, &imageIndex);
+    vk::PresentInfoKHR present_info;
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = &swp;
+    present_info.pImageIndices = &imageIndex;
+    if (waitSemaphore) {
+      present_info.waitSemaphoreCount = 1;
+      present_info.pWaitSemaphores = &sem;
+    } else {
+      present_info.waitSemaphoreCount = 0;
+      present_info.pWaitSemaphores = nullptr;
+    }
 
     try {
       auto family = vk_dmng.graphics_q().best().family();
@@ -166,11 +209,16 @@ namespace mochi::rhi::vulkan
     }
   }
 
-  fun VK_SwapchainManager::getRenderTarget(u32 index) -> render_target& {
+  fun VK_SwapchainManager::getRenderTarget(u32 index) -> RenderTarget& {
     return m_targets[index];
   }
 
   fun VK_SwapchainManager::getRenderTargetCount() const -> u32 {
     return m_targets.size();
+  }
+
+  fun VK_SwapchainManager::getRenderFinishedSemaphore(u32 image_index) -> void* {
+    if (m_render_finished_sems.empty()) return nullptr;
+    return (void*)(VkSemaphore)(*m_render_finished_sems[image_index]);
   }
 }

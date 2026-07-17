@@ -9,9 +9,9 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
+#include "mochi/basis.hh"
 #include "mochi/types.hh"
 #include <GLFW/glfw3.h>
 #include <string_view>
@@ -22,17 +22,16 @@
 
 
 
-namespace mochi::module
+namespace mochi::manager
 {
 
-  struct display
-  {
+  struct WindowManager: noncopy {
     public:
-      explicit display(rhi::DeviceManager &device, module::memory &memory, std::string_view title, int width, int height);
-      ~display();
+      explicit WindowManager(rhi::DeviceManager &dmng, manager::SceneManager &smng, std::string_view title, int width, int height);
+      ~WindowManager();
       
-      rhi::DeviceManager &m_device;
-      module::memory &m_memory;
+      rhi::DeviceManager &m_dmng;
+      manager::SceneManager &m_smng;
 
 
     // window
@@ -41,12 +40,12 @@ namespace mochi::module
       sptr<rhi::SwapchainManager> m_swapchain_mgr;
       
     public:
-      inline fun glfw() -> GLFWwindow* { return m_window; }
+      fun glfw() -> GLFWwindow* { return m_window; }
       
     public:
-      inline fun  width()  { return m_width; }
-      inline fun  height() { return m_height; }
-      inline fun extent() -> extent<2, u32> { return {(u32)m_width, (u32)m_height}; }
+      fun  width()  { return m_width; }
+      fun  height() { return m_height; }
+      fun extent() -> extent<2, u32> { return {(u32)m_width, (u32)m_height}; }
 
     private:
       int m_width{};
@@ -56,20 +55,16 @@ namespace mochi::module
       static void framebuffer_resize_callback(GLFWwindow* win, int width, int height);
     
     public:
-      static inline fun extensions() -> std::vector<const char*> {
+      static fun extensions() -> std::vector<const char*> {
         u32 glfwExtensionCount{};
         const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         return std::vector<const char*>(glfwExtensions, glfwExtensions + glfwExtensionCount);
       }
 
-      /**
-       * @brief Process window events.
-       * @return True if the window should stay open, false if it should close.
-       */
+      /// @brief Process window events.
       fun proc_events() -> bool;
 
-    inline fun resized() { return m_resized; }
-
+      fun resized() { return m_resized; }
 
 
     // swapchain
@@ -78,9 +73,10 @@ namespace mochi::module
       fun acquire_next_image(void* image_available_sem) -> u32;
       fun present(void* render_finished_sem, u32 image_index) -> void;
 
-      fun get_render_target(u32 image_index) -> rhi::render_target;
+      fun get_render_target(u32 image_index) -> rhi::RenderTarget&;
+      fun getRenderFinishedSemaphore(u32 image_index) -> void*;
       
-      inline fun swapchain_mgr() -> rhi::SwapchainManager& { return *m_swapchain_mgr; }
+      fun swapchain_mgr() -> rhi::SwapchainManager& { return *m_swapchain_mgr; }
   };
   
 }

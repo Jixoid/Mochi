@@ -80,7 +80,7 @@ namespace mochi::rhi
       virtual ~Image() = default;
   };
   
-  struct Image2: public Image {
+  struct Image2: Image {
     protected:
       explicit Image2() = default;
       

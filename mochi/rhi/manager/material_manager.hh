@@ -71,7 +71,7 @@ namespace mochi::rhi
       rhi::ShaderManager &m_smng;
 
     public:
-      virtual fun getMaterialDesc(rhi::render_target &target, MaterialProps props) -> sptr<MaterialDesc> = 0;
+      virtual fun getMaterialDesc(rhi::RenderTarget &target, MaterialProps props) -> sptr<MaterialDesc> = 0;
   };
   
 }

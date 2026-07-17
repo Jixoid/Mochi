@@ -12,6 +12,9 @@
 #pragma once
 
 #include "mochi/basis.hh"
+#include "mochi/rhi/image.hh"
+#include "mochi/rhi/sampler.hh"
+#include "mochi/rhi/buffer.hh"
 #include "mochi/types.hh"
 #include <functional>
 
@@ -80,6 +83,12 @@ namespace mochi::rhi
       fun& graphics_q() { return m_graphics_q; }
       fun& compute_q() { return m_compute_q; }
       fun& transfer_q() { return m_transfer_q; }
+      
+      // Descriptor Management
+      virtual fun initDescriptorHeap(rhi::AllocManager &alloc_mgr) -> void = 0;
+      virtual fun writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 = 0;
+      virtual fun descriptor_heap() -> sptr<rhi::Buffer> = 0;
+      virtual fun sampler_heap() -> sptr<rhi::Buffer> = 0;
   };
 
 }

@@ -23,11 +23,20 @@ namespace mochi::rhi::vulkan
   {
     auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
     
-    // Allocate semaphores and fences here (Stub for now)
+    for (u32 i = 0; i < m_max_frames_in_flight; i++) {
+      m_image_available_sems.push_back(vk::raii::Semaphore(vk_dmng.get(), vk::SemaphoreCreateInfo()));
+      m_in_flight_fences.push_back(vk::raii::Fence(vk_dmng.get(), vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled)));
+    }
   }
 
   fun VK_SyncManager::beginFrame() -> void {
-    // wait for fences etc
+    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    vk::Result res;
+    do {
+      res = vk_dmng.get().waitForFences({*m_in_flight_fences[m_current_frame]}, VK_TRUE, UINT64_MAX);
+    } while (res == vk::Result::eTimeout);
+    
+    vk_dmng.get().resetFences({*m_in_flight_fences[m_current_frame]});
   }
 
   fun VK_SyncManager::endFrame() -> void {
@@ -43,9 +52,5 @@ namespace mochi::rhi::vulkan
     if (m_image_available_sems.empty()) return nullptr;
     return (void*)(VkSemaphore)(*m_image_available_sems[m_current_frame]);
   }
-
-  fun VK_SyncManager::activeRenderFinishedSemaphore() -> void* {
-    if (m_render_finished_sems.empty()) return nullptr;
-    return (void*)(VkSemaphore)(*m_render_finished_sems[m_current_frame]);
-  }
+  
 }

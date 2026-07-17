@@ -11,12 +11,20 @@
 
 
 #include "drivers/vulkan/manager/VKdevice_manager.hh"
+#include "drivers/vulkan/manager/VKsync_manager.hh"
+#include "drivers/vulkan/VKimage.hh"
+#include "drivers/vulkan/VKsampler.hh"
+#include "mochi/rhi/manager/alloc_manager.hh"
+#include "mochi/rhi/image.hh"
+#include "mochi/rhi/sampler.hh"
+#include "drivers/vulkan/VKsampler.hh"
 #include "mochi/basis.hh"
 #include "mochi/except.hh"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include <string_view>
 #include <vulkan/vulkan_core.h>
+#include <GLFW/glfw3.h>
 
 #define ef else if
 
@@ -54,10 +62,9 @@ namespace mochi::rhi::vulkan
       //if (ext && !ext->instance_layers.empty())
       //  layers.append_range(ext->instance_layers);
       
-      std::vector<const char*> extensions {
-      };
-      //if (ext && !ext->instance_extensions.empty())
-      //  extensions.append_range(ext->instance_extensions);
+      u32 glfwExtensionCount = 0;
+      const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+      std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
       vk::InstanceCreateInfo createInfo({}, &appInfo, layers, extensions);
       vk_inst = vk::raii::Instance(ctx(), createInfo);
@@ -110,6 +117,7 @@ namespace mochi::rhi::vulkan
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
       VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME,
+      VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME,
     };
     //if (ext && !ext->device_extensions.empty())
     //  extensions.append_range(ext->device_extensions);
@@ -118,6 +126,7 @@ namespace mochi::rhi::vulkan
     vk::PhysicalDeviceFeatures features{};
     features.samplerAnisotropy = VK_TRUE;
     features.fillModeNonSolid = VK_TRUE;
+    features.shaderInt64 = VK_TRUE;
 
 
     vk::PhysicalDeviceVulkan12Features features12{};
@@ -206,6 +215,7 @@ namespace mochi::rhi::vulkan
     return
       features.features.samplerAnisotropy &&
       features.features.fillModeNonSolid &&
+      features.features.shaderInt64 &&
       features12.bufferDeviceAddress &&
       features13.dynamicRendering &&
       features13.synchronization2 &&
@@ -218,6 +228,75 @@ namespace mochi::rhi::vulkan
   {
     vk::CommandBufferAllocateInfo alloc_info(*m_mainPool, vk::CommandBufferLevel::ePrimary, count);
     return vk::raii::CommandBuffers(vk_device, alloc_info);
+  }
+
+  fun VK_DeviceManager::initDescriptorHeap(rhi::AllocManager &alloc_mgr) -> void {
+    // We assume Max 1024 textures for now
+    u32 max_textures = 1024;
+    
+    // Query descriptor size for images/samplers
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = {};
+    heap_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT;
+    
+    VkPhysicalDeviceProperties2 props2 = {};
+    props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    props2.pNext = &heap_props;
+    
+    // Call the C API function
+    vkGetPhysicalDeviceProperties2(*vk_phys_dev, &props2);
+    
+    m_descriptor_size = heap_props.imageDescriptorSize;
+    if (m_descriptor_size == 0) m_descriptor_size = 32; // Fallback estimate
+    m_sampler_descriptor_size = heap_props.samplerDescriptorSize;
+    if (m_sampler_descriptor_size == 0) m_sampler_descriptor_size = 32; // Fallback estimate
+
+    m_descriptor_heap = alloc_mgr.allocBuffer(
+      m_descriptor_size * max_textures,
+      rhi::BufferUsage::DeviceAddress | rhi::BufferUsage::DescriptorHeap,
+      rhi::AllocationCreateFlags(rhi::AllocationCreate::Mapped), // Host mapped
+      rhi::AllocationLocation::Auto
+    );
+    m_descriptor_heap->map();
+
+    m_sampler_heap = alloc_mgr.allocBuffer(
+      m_sampler_descriptor_size * max_textures,
+      rhi::BufferUsage::DeviceAddress | rhi::BufferUsage::DescriptorHeap,
+      rhi::AllocationCreateFlags(rhi::AllocationCreate::Mapped), // Host mapped
+      rhi::AllocationLocation::Auto
+    );
+    m_sampler_heap->map();
+  }
+
+  fun VK_DeviceManager::writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 {
+    u32 id = allocate_descriptor_id();
+    u64 offset = id * m_descriptor_size;
+    
+    VkDescriptorImageInfo image_info = {};
+    image_info.imageView = static_cast<vulkan::VK_ImageView2*>(view.get())->get();
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorGetInfoEXT get_info = {};
+    get_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT;
+    get_info.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    get_info.data.pSampledImage = &image_info;
+    
+    auto PFN_vkGetDescriptorEXT = reinterpret_cast<::PFN_vkGetDescriptorEXT>(vkGetDeviceProcAddr(*vk_device, "vkGetDescriptorEXT"));
+    if (PFN_vkGetDescriptorEXT) {
+      PFN_vkGetDescriptorEXT(*vk_device, &get_info, m_descriptor_size, (u8*)m_descriptor_heap->mapped() + offset);
+      
+      // Write sampler descriptor
+      VkSampler sampler_handle = static_cast<vulkan::VK_Sampler2*>(sampler.get())->get();
+      
+      VkDescriptorGetInfoEXT sampler_get_info = {};
+      sampler_get_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT;
+      sampler_get_info.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+      sampler_get_info.data.pSampler = &sampler_handle;
+      
+      u64 sampler_offset = id * m_sampler_descriptor_size;
+      PFN_vkGetDescriptorEXT(*vk_device, &sampler_get_info, m_sampler_descriptor_size, (u8*)m_sampler_heap->mapped() + sampler_offset);
+    }
+    
+    return id;
   }
 
 }

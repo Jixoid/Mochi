@@ -15,12 +15,14 @@
 #include "mochi/basis.hh"
 #include "mochi/math/extent.hh"
 #include "mochi/rhi/pipeline.hh"
+#include "mochi/rhi/render_target.hh"
+#include "mochi/rhi/buffer.hh"
 
 
 
 namespace mochi::rhi
 {
-
+  // Helpers
   struct Viewport{
     public:
       Viewport(extent<3,f32> min, extent<3,f32> max): m_min(min), m_max(max) {}
@@ -49,7 +51,7 @@ namespace mochi::rhi
   };
 
 
-
+  // Interface
   struct Command: noncopy {
     protected:
       explicit Command() = default;
@@ -59,7 +61,13 @@ namespace mochi::rhi
 
     
     public:
+      virtual fun begin() -> void = 0;
+      virtual fun end() -> void = 0;
+      virtual fun beginRendering(const RenderTarget &target, const std::array<float, 4> &clear_color) -> void = 0;
+      virtual fun endRendering(const RenderTarget &target) -> void = 0;
+
       virtual fun bindPipeline(Pipeline *pipe) -> void = 0;
+      virtual fun bindDescriptorHeap(sptr<Buffer> resource_heap, sptr<Buffer> sampler_heap, u64 resource_size, u64 sampler_size) -> void = 0;
       virtual fun pushConstant(ShaderStageFlags stage, u32 off, data dat) -> void = 0;
 
       virtual fun draw(offs vertex, offs inst) -> void = 0;

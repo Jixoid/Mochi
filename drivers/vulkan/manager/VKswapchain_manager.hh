@@ -11,15 +11,19 @@
 
 #pragma once
 
+#include "drivers/vulkan/VKrender_target.hh"
 #include "mochi/basis.hh"
 #include "mochi/rhi/manager/swapchain_manager.hh"
-#include "drivers/vulkan/manager/VKdevice_manager.hh"
 #include <vulkan/vulkan_raii.hpp>
+#include "mochi/rhi/render_target.hh"
 #include "vk_mem_alloc.h"
+
+
 
 namespace mochi::rhi::vulkan
 {
-  struct VK_SwapchainManager final : public rhi::SwapchainManager {
+
+  struct VK_SwapchainManager final: public rhi::SwapchainManager {
     public:
       explicit VK_SwapchainManager(rhi::DeviceManager &dmng);
       ~VK_SwapchainManager() override;
@@ -29,12 +33,13 @@ namespace mochi::rhi::vulkan
       vk::raii::SwapchainKHR m_swapchain{nil};
       std::vector<vk::Image> m_images;
       std::vector<vk::raii::ImageView> m_image_views;
+      std::vector<vk::raii::Semaphore> m_render_finished_sems;
       
-      vk::Image m_depth_image{nil};
-      VmaAllocation m_depth_allocation{nil};
+      vk::raii::Image m_depth_image_handle{nil};
+      vk::raii::DeviceMemory m_depth_memory{nil};
       vk::raii::ImageView m_depth_view{nil};
       
-      std::vector<render_target> m_targets;
+      std::vector<VK_RenderTarget> m_targets;
       u32 m_width{}, m_height{};
       vk::Format m_format{};
       vk::Format m_depth_format{vk::Format::eD32Sfloat};
@@ -50,7 +55,10 @@ namespace mochi::rhi::vulkan
       fun acquireNextImage(void* signalSemaphore) -> u32 override;
       fun present(u32 imageIndex, void* waitSemaphore) -> void override;
 
-      fun getRenderTarget(u32 index) -> render_target& override;
+      fun getRenderTarget(u32 index) -> RenderTarget& override;
       fun getRenderTargetCount() const -> u32 override;
+
+      fun getRenderFinishedSemaphore(u32 image_index) -> void* override;
   };
+  
 }

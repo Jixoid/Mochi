@@ -63,6 +63,10 @@ namespace mochi::rhi::vulkan
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VKConvert<AllocationLocation>(location);
     alloc_info.flags = VKConvert<AllocationCreateFlags>(create);
+    if ((alloc_info.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0 && 
+        (alloc_info.flags & VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT) == 0) {
+      alloc_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    }
 
     vk::BufferCreateInfo buffer_create_info{
       {},
@@ -105,12 +109,16 @@ namespace mochi::rhi::vulkan
     VmaAllocationCreateInfo alloc_info = {};
     alloc_info.usage = VKConvert<AllocationLocation>(location);
     alloc_info.flags = VKConvert<AllocationCreateFlags>(create);
+    if ((alloc_info.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0 && 
+        (alloc_info.flags & VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT) == 0) {
+      alloc_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    }
 
     vk::ImageCreateInfo image_info(
       {}, vk::ImageType::e2D, VKConvert<Format>(format),
       vk::Extent3D(ext.x(), ext.y(), 1),
       1, 1, vk::SampleCountFlagBits::e1, VKConvert<ImageTiling>(tiling),
-      VKConvert<ImageUsageFlags>(usage),
+      VKConvert<ImageUsageFlags>(usage) | vk::ImageUsageFlagBits::eHostTransfer,
       vk::SharingMode::eExclusive
     );
 

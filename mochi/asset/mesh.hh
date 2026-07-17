@@ -9,7 +9,6 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
 #include "mochi/asset/material.hh"
@@ -37,14 +36,14 @@ namespace mochi::asset
     public:
       explicit Mesh(sptr<rhi::Buffer> data, std::vector<offs> offs, std::vector<sptr<asset::Material>> material, std::vector<int> map);
       
-      explicit Mesh(core &core, std::span<char> file, std::string_view ext);
+      explicit Mesh(Core &core, std::span<char> file, std::string_view ext);
       
     public:
       static fun make(sptr<rhi::Buffer> data, std::vector<offs> offs, std::vector<sptr<asset::Material>> material, std::vector<int> map) {
         return make_sptr(new Mesh(data, offs, material, map));
       }
       
-      static  fun make(core &core, std::span<char> file, std::string_view ext) {
+      static fun make(Core &core, std::span<char> file, std::string_view ext) {
         return make_sptr(new Mesh(core, file, ext));
       }
       
@@ -56,12 +55,10 @@ namespace mochi::asset
       std::vector<int>  m_map;
 
     public:
-      /** @brief Access the underlying buffer holding the mesh vertex data. */
-      inline fun& data() { return m_data; }
-      inline fun& offs() { return m_offs; }
-      inline fun& material() { return m_material; }
-      inline fun& map() { return m_map; }
-
+      fun& data() { return m_data; }
+      fun& offs() { return m_offs; }
+      fun& material() { return m_material; }
+      fun& map() { return m_map; }
   };
 
 }

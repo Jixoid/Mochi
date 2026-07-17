@@ -15,17 +15,14 @@
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/except.hh"
-#include "mochi/module/memory.hh"
 #include "mochi/reader/reader.hh"
 #include "mochi/rhi/image.hh"
-#include "mochi/rhi/manager/device_manager.hh"
 #include "mochi/rhi/manager/alloc_manager.hh"
 #include "mochi/rhi/manager/transfer_manager.hh"
 #include "mochi/rhi/rhi.hh"
 #include "mochi/rhi/vtype.hh"
 #include "mochi/types.hh"
-#include "mochi/core.hh"
-#include <cstring>
+#include "mochi/core/core.hh"
 #include <string>
 #include <string_view>
 
@@ -88,7 +85,7 @@ namespace mochi::asset
     return vertexs;
   }
 
-  inline fun include_images(core &core, gltf_image &raw_image) -> sptr<rhi::Image2> {
+  inline fun include_images(Core &core, gltf_image &raw_image) -> sptr<rhi::Image2> {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load_from_memory(raw_image.data.data(), raw_image.data.size(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) throw mochi::asset_error("Failed to load texture!");
@@ -121,8 +118,7 @@ namespace mochi::asset
     , m_map(map)
   {}
 
-  Mesh::Mesh(core &core, std::span<char> file, std::string_view ext)
-  {
+  Mesh::Mesh(Core &core, std::span<char> file, std::string_view ext) {
     ::data mfile{file.data(), file.size_bytes()};
     
     std::vector<vertex_t> final_data;
@@ -156,7 +152,7 @@ namespace mochi::asset
         }
         else {
           auto img = include_images(core, X);
-          auto tex = make_sptr<asset::texture2>(core, img);
+          auto tex = make_sptr<asset::Texture2>(core, img);
 
           auto mat = make_sptr<asset::Material>(core);
           mat->setTexture(tex);
@@ -174,7 +170,8 @@ namespace mochi::asset
       for (int idx : raw.image_map) {
         if (idx == -1) {
           final_map.push_back(default_idx);
-        } else {
+        }
+        else {
           final_map.push_back(idx);
         }
       }

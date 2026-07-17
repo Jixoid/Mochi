@@ -45,7 +45,7 @@ namespace mochi::rhi
   };
 
 
-  struct Sampler2: public Sampler {
+  struct Sampler2: Sampler {
     protected:
       explicit Sampler2() = default;
   };

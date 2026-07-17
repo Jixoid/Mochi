@@ -40,7 +40,19 @@ namespace mochi::rhi::vulkan
       {}, vk_dst->get(), vk::ImageLayout::eGeneral, 1, &copyRegion
     );
 
+    vk::HostImageLayoutTransitionInfo transitionInfo(
+      vk_dst->get(), vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
+      vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
+    );
+    vk_dmng.get().transitionImageLayoutEXT(transitionInfo);
+
     vk_dmng.get().copyMemoryToImageEXT(copyInfo);
+
+    vk::HostImageLayoutTransitionInfo transitionInfo2(
+      vk_dst->get(), vk::ImageLayout::eGeneral, vk::ImageLayout::eShaderReadOnlyOptimal,
+      vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
+    );
+    vk_dmng.get().transitionImageLayoutEXT(transitionInfo2);
   }
 
   fun VK_TransferManager::copyMemoryToBuffer(TransferTime time, void* src, rhi::Buffer* dst) -> void {

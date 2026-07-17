@@ -480,6 +480,9 @@ struct noncopy {
   public:
     noncopy(const noncopy&) = delete;
     fun operator=(const noncopy&) -> noncopy& = delete;
+
+    noncopy(noncopy &&other) noexcept = default;
+    fun operator=(noncopy &&other) noexcept -> noncopy& = default;
 };
 
 

@@ -9,20 +9,19 @@
   Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-
 #pragma once
 
 
 namespace mochi
 {
 
-  struct core;
+  struct Core;
   
 
-  namespace module {
-    struct display;
-    struct renderer;
-    struct memory;
+  namespace manager {
+    struct WindowManager;
+    struct RenderManager;
+    struct SceneManager;
   }
 
 
@@ -46,13 +45,14 @@ namespace mochi
     struct Shader;
     struct Image;
     struct Image2;
+    struct ImageView2;
   }
 
 
   namespace asset {
     struct Mesh;
-    struct texture2;
-    struct matrial;
+    struct Texture2;
+    struct Material;
   }
 
 }

@@ -49,8 +49,11 @@ namespace mochi::rhi
       virtual fun present(u32 imageIndex, void* waitSemaphore) -> void = 0;
 
       // Çizim hedefi (Render Target) erişimi
-      virtual fun getRenderTarget(u32 index) -> render_target& = 0;
+      virtual fun getRenderTarget(u32 index) -> RenderTarget& = 0;
       virtual fun getRenderTargetCount() const -> u32 = 0;
+
+      // Senkronizasyon
+      virtual fun getRenderFinishedSemaphore(u32 image_index) -> void* = 0;
   };
 
 }

@@ -52,7 +52,6 @@ namespace mochi::rhi
       // Swapchain ve Queue Submit için ham senkronizasyon nesnelerini void* (veya vk::raii) olarak döner
       virtual fun activeInFlightFence() -> void* = 0;
       virtual fun activeImageAvailableSemaphore() -> void* = 0;
-      virtual fun activeRenderFinishedSemaphore() -> void* = 0;
   };
   
 }

@@ -30,7 +30,7 @@
 
 
 
-namespace vfs::__embed
+namespace mochi::vfs::__embed
 {
 
 	struct Mapped__embed: Mapped {
@@ -118,7 +118,7 @@ namespace vfs::__embed
 	};
 
 
-	fun __attribute__((constructor(65535))) __init() { vfs::provider_reg("file", new Provider__embed()); }
-	fun __attribute__((destructor(65535)))  __fini() { vfs::provider_del("file"); }
+	fun __attribute__((constructor(65535))) __init() { mochi::vfs::provider_reg("embed", new Provider__embed()); }
+	fun __attribute__((destructor(65535)))  __fini() { mochi::vfs::provider_del("embed"); }
 
 }

@@ -20,7 +20,7 @@
 
 
 
-namespace vfs
+namespace mochi::vfs
 {
 
 	struct Mapped {
@@ -83,13 +83,13 @@ namespace vfs
 
 
 inline fun operator""_vfs_ro (const char *fpath, std::size_t len) -> sptr<std::istream> {
-	return vfs::open_ro(std::string_view(fpath, len));
+	return mochi::vfs::open_ro(std::string_view(fpath, len));
 }
 
-inline fun operator""_vfs_map (const char *fpath, std::size_t len) -> sptr<vfs::Mapped> {
-	return vfs::open_map(std::string_view(fpath, len));
+inline fun operator""_vfs_map (const char *fpath, std::size_t len) -> sptr<mochi::vfs::Mapped> {
+	return mochi::vfs::open_map(std::string_view(fpath, len));
 }
 
 inline fun operator""_vfs_rw (const char *fpath, std::size_t len) -> sptr<std::iostream> {
-	return vfs::open_rw(std::string_view(fpath, len));
+	return mochi::vfs::open_rw(std::string_view(fpath, len));
 }
