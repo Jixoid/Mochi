@@ -42,7 +42,7 @@ namespace mochi::rhi::vulkan
   struct VK_Pipeline final: public rhi::Pipeline {
     public:
       explicit VK_Pipeline(
-        rhi::DeviceManager &device, rhi::PipelineManager &pmng, u64 sign,
+        rhi::mng::DeviceManager &device, rhi::mng::PipelineManager &pmng, u64 sign,
         PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format

@@ -18,24 +18,27 @@ namespace mochi
   struct Core;
   
 
-  namespace manager {
+  namespace mng {
     struct WindowManager;
     struct RenderManager;
     struct SceneManager;
     struct MaterialManager;
+    struct PluginManager;
   }
 
 
   namespace rhi {
-    struct DeviceManager;
-    struct AllocManager;
-    struct ShaderManager;
-    struct PipelineManager;
-    struct TransferManager;
-    struct SyncManager;
-    struct CommandManager;
-    struct SwapchainManager;
-    struct ResourceManager;
+    namespace mng {
+      struct DeviceManager;
+      struct AllocManager;
+      struct ShaderManager;
+      struct PipelineManager;
+      struct TransferManager;
+      struct SyncManager;
+      struct CommandManager;
+      struct SwapchainManager;
+      struct ResourceManager;
+    }
 
     struct PipelineMeta;
     struct Pipeline;

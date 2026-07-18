@@ -13,11 +13,12 @@
 #include "mochi/debug/debug.hh"
 
 
+namespace mochi::rhi::vulkan {debug::ModuleInfo debug_module("DRV.VK", debug::LogType::Verbose);}
+namespace mochi::rhi::vulkan::mng {debug::ModuleInfo debug_module("DRV.VK.MNG", debug::LogType::Verbose);}
+
+
 namespace mochi::rhi::vulkan
 {
-
-  debug::ModuleInfo debug_module("DRV.VK", debug::LogType::Verbose);
-
   extern "C" {
     const char* MochiRHI_DriverInfo = "Vulkan";
     const u32   MochiRHI_DriverVers[4] = {0,0,0,0};

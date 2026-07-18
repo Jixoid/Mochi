@@ -18,12 +18,12 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  struct VK_AllocManager final: public rhi::AllocManager {
+  struct VK_AllocManager final: public rhi::mng::AllocManager {
     public:
-      explicit VK_AllocManager(rhi::DeviceManager &device);
+      explicit VK_AllocManager(rhi::mng::DeviceManager &device);
       ~VK_AllocManager();
 
     private:
@@ -47,12 +47,12 @@ namespace mochi::rhi::vulkan
       
     public:
       fun allocBuffer(
-        u64 size, BufferUsageFlags usage, AllocationCreateFlags create, AllocationLocation location
+        u64 size, BufferUsageFlags usage, rhi::mng::AllocationCreateFlags create, rhi::mng::AllocationLocation location
       ) -> sptr<Buffer> override;
       
       fun allocImage2(
         extent<2,u32> ext, Format format, ImageUsageFlags usage, ImageTiling tiling,
-        AllocationCreateFlags create, AllocationLocation location
+        rhi::mng::AllocationCreateFlags create, rhi::mng::AllocationLocation location
       ) -> sptr<Image2> override;
 
       fun allocSampler2(

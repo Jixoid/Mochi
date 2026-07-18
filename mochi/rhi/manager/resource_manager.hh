@@ -20,27 +20,27 @@
 
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // External
-  extern "C" fun MochiRHI_MakeResourceManager(rhi::DeviceManager &dmng) -> ResourceManager*;
+  extern "C" fun MochiRHI_MakeResourceManager(rhi::mng::DeviceManager &dmng) -> ResourceManager*;
 
 
 
   // Interface
   struct ResourceManager: noncopy {
     protected:
-      ResourceManager(rhi::DeviceManager &dmng): m_dmng(dmng) {}
+      ResourceManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~ResourceManager() = default;
 
-      static fun make(rhi::DeviceManager &device) {
+      static fun make(rhi::mng::DeviceManager &device) {
         return make_sptr(MochiRHI_MakeResourceManager(device));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
 
     public:
       // Kaynakları silinmek üzere kuyruğa alır

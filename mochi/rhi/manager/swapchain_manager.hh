@@ -18,26 +18,26 @@
 
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // External
-  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::DeviceManager &dmng) -> SwapchainManager*;
+  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::mng::DeviceManager &dmng) -> SwapchainManager*;
 
 
   // Interface
   struct SwapchainManager: noncopy {
     protected:
-      SwapchainManager(rhi::DeviceManager &dmng): m_dmng(dmng) {}
+      SwapchainManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~SwapchainManager() = default;
 
-      static fun make(rhi::DeviceManager &device) {
+      static fun make(rhi::mng::DeviceManager &device) {
         return make_sptr(MochiRHI_MakeSwapchainManager(device));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
 
     public:
       // Platforma özel pencere handle'ı ile swapchain ilklendirme (GLFW/SDL pencere işaretçisi)

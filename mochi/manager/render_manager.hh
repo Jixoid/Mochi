@@ -21,7 +21,7 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
 
   struct RenderManager: noncopy {
@@ -29,14 +29,14 @@ namespace mochi::manager
       static constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
 
     public:
-      explicit RenderManager(rhi::DeviceManager &dmng);
+      explicit RenderManager(rhi::mng::DeviceManager &dmng);
 
 
     private:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
 
-      sptr<rhi::CommandManager> m_cmd_mgr;
-      sptr<rhi::SyncManager>    m_sync_mgr;
+      sptr<rhi::mng::CommandManager> m_cmd_mgr;
+      sptr<rhi::mng::SyncManager>    m_sync_mgr;
 
       std::vector<sptr<rhi::Command>> m_cmd_buffers;
 

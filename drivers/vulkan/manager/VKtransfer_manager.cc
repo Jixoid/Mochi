@@ -15,17 +15,19 @@
 #include <cstring>
 #include <vulkan/vulkan.hpp>
 
-namespace mochi::rhi::vulkan
+
+
+namespace mochi::rhi::vulkan::mng
 {
-  extern "C" fun MochiRHI_MakeTransferManager(rhi::DeviceManager &dmng) -> TransferManager* {
+  extern "C" fun MochiRHI_MakeTransferManager(rhi::mng::DeviceManager &dmng) -> rhi::mng::TransferManager* {
     return new VK_TransferManager(dmng);
   }
 
-  VK_TransferManager::VK_TransferManager(rhi::DeviceManager &dmng)
-    : rhi::TransferManager(dmng)
+  VK_TransferManager::VK_TransferManager(rhi::mng::DeviceManager &dmng)
+    : rhi::mng::TransferManager(dmng)
   {}
 
-  fun VK_TransferManager::copyMemoryToImage(TransferTime time, void* src, rhi::Image2* dst) -> void {
+  fun VK_TransferManager::copyMemoryToImage(rhi::mng::TransferTime time, void* src, rhi::Image2* dst) -> void {
     auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
     auto* vk_dst = static_cast<VK_Image2*>(dst);
 
@@ -55,7 +57,7 @@ namespace mochi::rhi::vulkan
     vk_dmng.get().transitionImageLayoutEXT(transitionInfo2);
   }
 
-  fun VK_TransferManager::copyMemoryToBuffer(TransferTime time, void* src, rhi::Buffer* dst) -> void {
+  fun VK_TransferManager::copyMemoryToBuffer(rhi::mng::TransferTime time, void* src, rhi::Buffer* dst) -> void {
     auto* vk_dst = static_cast<VK_Buffer*>(dst);
     
     // Direct mapping if mapped

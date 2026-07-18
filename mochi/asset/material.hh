@@ -32,7 +32,7 @@ namespace mochi::asset
       std::variant<vec3<f32>, sptr<asset::Texture2>> m_albedo;
       rhi::PolygonMode m_polymode{rhi::PolygonMode::Fill};
       rhi::PrimitiveTopology m_primitiveTopology{rhi::PrimitiveTopology::TriangleList};
-      manager::MaterialCount m_count{manager::MaterialCount::Single};
+      mng::MaterialCount m_count{mng::MaterialCount::Single};
 
     public:
       fun is_color() { return std::holds_alternative<vec3<f32>>(m_albedo); }
@@ -50,9 +50,9 @@ namespace mochi::asset
       fun setPrimitiveTopology(rhi::PrimitiveTopology val) { m_primitiveTopology = val; }
 
       fun count() { return m_count; }
-      fun setCount(manager::MaterialCount val) { m_count = val; }
+      fun setCount(mng::MaterialCount val) { m_count = val; }
 
-      fun desc(rhi::RenderTarget &target) -> sptr<manager::MaterialDesc>;
+      fun desc(rhi::RenderTarget &target) -> sptr<mng::MaterialDesc>;
   };
 
 }

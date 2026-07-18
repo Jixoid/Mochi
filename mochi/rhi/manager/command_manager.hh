@@ -18,26 +18,26 @@
 
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // External
-  extern "C" fun MochiRHI_MakeCommandManager(rhi::DeviceManager &dmng) -> CommandManager*;
+  extern "C" fun MochiRHI_MakeCommandManager(rhi::mng::DeviceManager &dmng) -> CommandManager*;
 
 
   // Interface
   struct CommandManager: noncopy {
     protected:
-      CommandManager(rhi::DeviceManager &dmng): m_dmng(dmng) {}
+      CommandManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~CommandManager() = default;
 
-      static fun make(rhi::DeviceManager &device) {
+      static fun make(rhi::mng::DeviceManager &device) {
         return make_sptr(MochiRHI_MakeCommandManager(device));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
 
     public:
       // Kareye ve iş parçacığına göre otomatik yönetilen komut tamponu tahsisi

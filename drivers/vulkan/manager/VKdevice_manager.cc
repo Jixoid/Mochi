@@ -32,16 +32,16 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  extern "C" fun MochiRHI_MakeDeviceManager(std::string_view appName, std::array<u16, 4> appVer) -> mochi::rhi::DeviceManager* {
-    return new mochi::rhi::vulkan::VK_DeviceManager(appName, appVer);
+  extern "C" fun MochiRHI_MakeDeviceManager(std::string_view appName, std::array<u16, 4> appVer) -> rhi::mng::DeviceManager* {
+    return new rhi::vulkan::mng::VK_DeviceManager(appName, appVer);
   }
 
 
   VK_DeviceManager::VK_DeviceManager(std::string_view appName, std::array<u16, 4> appVer)
-    : rhi::DeviceManager()
+    : rhi::mng::DeviceManager()
     , vk_ctx(), vk_inst(nil)
     , vk_phys_dev(nil), vk_device(nil)
     , m_mainPool(nil)
@@ -175,31 +175,31 @@ namespace mochi::rhi::vulkan
 
         // MAIN
         if (!main_q_set && flags & (vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute)) {
-          m_main_q = rhi::Queue(i);
+          m_main_q = rhi::mng::Queue(i);
           main_q_set = true;
         }
 
 
         // GRAPHIC
         if (flags & vk::QueueFlagBits::eGraphics)
-          graphics_q().add_primary(rhi::Queue(i));
+          graphics_q().add_primary(rhi::mng::Queue(i));
         
 
         // COMPUTE
         if (flags & vk::QueueFlagBits::eCompute) {
           if (!(flags & vk::QueueFlagBits::eGraphics))
-            compute_q().add_primary(rhi::Queue(i));
+            compute_q().add_primary(rhi::mng::Queue(i));
           else
-            compute_q().add_secondary(rhi::Queue(i));
+            compute_q().add_secondary(rhi::mng::Queue(i));
         }
 
 
         // TRANSFER
         if (flags & vk::QueueFlagBits::eTransfer) {
           if (!(flags & vk::QueueFlagBits::eGraphics) && !(flags & vk::QueueFlagBits::eCompute))
-            transfer_q().add_primary(rhi::Queue(i));
+            transfer_q().add_primary(rhi::mng::Queue(i));
           else
-            transfer_q().add_secondary(rhi::Queue(i));
+            transfer_q().add_secondary(rhi::mng::Queue(i));
         }
       }
     }
@@ -247,7 +247,7 @@ namespace mochi::rhi::vulkan
     return vk::raii::CommandBuffers(vk_device, alloc_info);
   }
 
-  fun VK_DeviceManager::initDescriptorHeap(rhi::AllocManager &alloc_mgr) -> void {
+  fun VK_DeviceManager::initDescriptorHeap(rhi::mng::AllocManager &alloc_mgr) -> void {
     // We assume Max 1024 textures for now
     u32 max_textures = 1024;
     
@@ -268,15 +268,15 @@ namespace mochi::rhi::vulkan
     m_descriptor_heap = alloc_mgr.allocBuffer(
       m_descriptor_size * max_textures,
       rhi::BufferUsage::DeviceAddress | rhi::BufferUsage::DescriptorHeap,
-      rhi::AllocationCreate::Mapped, // Host mapped
-      rhi::AllocationLocation::Auto
+      rhi::mng::AllocationCreate::Mapped, // Host mapped
+      rhi::mng::AllocationLocation::Auto
     );
 
     m_sampler_heap = alloc_mgr.allocBuffer(
       m_sampler_descriptor_size * max_textures,
       rhi::BufferUsage::DeviceAddress | rhi::BufferUsage::DescriptorHeap,
-      rhi::AllocationCreate::Mapped, // Host mapped
-      rhi::AllocationLocation::Auto
+      rhi::mng::AllocationCreate::Mapped, // Host mapped
+      rhi::mng::AllocationLocation::Auto
     );
 
     ME_LOG_VERB("descriptor heap initialized (capacity: {})", max_textures)

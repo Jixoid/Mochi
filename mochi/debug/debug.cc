@@ -34,7 +34,7 @@ namespace mochi::debug
 
     struct writeHelp {
       char Sym;
-      const char* Col;
+      const char *Col;
     }
     static WriteHelp[] = {
       {'V', "\033[1;30m"},
@@ -51,14 +51,28 @@ namespace mochi::debug
     auto now = std::chrono::steady_clock::now() - boot;
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
 
-    return std::format("{}{} [{}.{:03}] ""\033[4m""@{} {}""\033[24m""\n  file: {}:{}:{}""\033[0m",
-      Help.Col, Help.Sym,
-      ms/1000, ms%1000,
-      mod.name(),
-      str,
-      (std::string)fs::path(location.file_name()).filename(),
-      location.line(), location.column()
-    );
+    if (static_cast<u8>(typ) >= static_cast<u8>(LogType::Warning))
+      return std::format(
+      "{}{} [{}.{:03}] @{} {}\n"
+      "├─> ""\033[1;30m""func: {}\n{}"
+      "╰─> ""\033[1;30m""file: {}:{}:{}"
+      "\033[0m",
+        Help.Col, Help.Sym,
+        ms/1000, ms%1000,
+        mod.name(), str,
+
+        location.function_name(), Help.Col,
+
+        (std::string)fs::path(location.file_name()).filename(),
+        location.line(), location.column()
+      );
+    else
+      return std::format("{}{} [{}.{:03}] @{} {}""\033[0m",
+        Help.Col, Help.Sym,
+        ms/1000, ms%1000,
+        mod.name(),
+        str
+      );
   }
 
   fun log(ModuleInfo &mod, LogType typ, const std::source_location location, std::string_view str) -> void {
@@ -75,11 +89,14 @@ namespace mochi::debug
 
 }
 
+
 namespace mochi {
-  namespace rhi     {debug::ModuleInfo debug_module{"ME.RHI",   debug::LogType::Verbose};}
-  namespace math    {debug::ModuleInfo debug_module{"ME.MATH",  debug::LogType::Verbose};}
-  namespace manager {debug::ModuleInfo debug_module{"ME.MNG",   debug::LogType::Verbose};}
-  namespace reader  {debug::ModuleInfo debug_module{"ME.READ",  debug::LogType::Verbose};}
-  namespace asset   {debug::ModuleInfo debug_module{"ME.ASSET", debug::LogType::Verbose};}
-  namespace ecs     {debug::ModuleInfo debug_module{"ME.ECS",   debug::LogType::Verbose};}
+  namespace rhi      {debug::ModuleInfo debug_module{"ME.RHI",     debug::LogType::Verbose};}
+  namespace rhi::mng {debug::ModuleInfo debug_module{"ME.RHI.MNG", debug::LogType::Verbose};}
+
+  namespace mng      {debug::ModuleInfo debug_module{"ME.MNG",   debug::LogType::Verbose};}
+  namespace ecs      {debug::ModuleInfo debug_module{"ME.ECS",   debug::LogType::Verbose};}
+  namespace math     {debug::ModuleInfo debug_module{"ME.MATH",  debug::LogType::Verbose};}
+  namespace asset    {debug::ModuleInfo debug_module{"ME.ASSET", debug::LogType::Verbose};}
+  namespace reader   {debug::ModuleInfo debug_module{"ME.READ",  debug::LogType::Verbose};}
 }

@@ -21,7 +21,7 @@
 
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // Enums
   enum struct AllocationCreate: u32 {
@@ -42,23 +42,23 @@ namespace mochi::rhi
 
 
   // External
-  extern "C" fun MochiRHI_MakeAllocManager(rhi::DeviceManager &dmng) -> AllocManager*;
+  extern "C" fun MochiRHI_MakeAllocManager(rhi::mng::DeviceManager &dmng) -> AllocManager*;
 
 
   // Interface
   struct AllocManager: noncopy {
     protected:
-      AllocManager(rhi::DeviceManager &dmng): m_dmng(dmng) {}
+      AllocManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~AllocManager() = default;
       
-      static fun make(rhi::DeviceManager &device) {
+      static fun make(rhi::mng::DeviceManager &device) {
         return make_uptr(MochiRHI_MakeAllocManager(device));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
 
     public:
       virtual fun allocBuffer(
@@ -88,4 +88,4 @@ namespace mochi::rhi
 
 }
 
-FlagEnable(mochi::rhi::AllocationCreate)
+FlagEnable(mochi::rhi::mng::AllocationCreate)

@@ -15,11 +15,12 @@
 #include "mochi/rhi/manager/sync_manager.hh"
 #include <vulkan/vulkan_raii.hpp>
 
-namespace mochi::rhi::vulkan
+
+namespace mochi::rhi::vulkan::mng
 {
-  struct VK_SyncManager final : public rhi::SyncManager {
+  struct VK_SyncManager final : public rhi::mng::SyncManager {
     public:
-      explicit VK_SyncManager(rhi::DeviceManager &dmng, u32 max_frames_in_flight);
+      explicit VK_SyncManager(rhi::mng::DeviceManager &dmng, u32 max_frames_in_flight);
       ~VK_SyncManager() override = default;
 
     private:

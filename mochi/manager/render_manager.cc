@@ -21,12 +21,12 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
 
-  RenderManager::RenderManager(rhi::DeviceManager &dmng): m_dmng(dmng) {
-    m_cmd_mgr = rhi::CommandManager::make(m_dmng);
-    m_sync_mgr = rhi::SyncManager::make(m_dmng, MAX_FRAMES_IN_FLIGHT);
+  RenderManager::RenderManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {
+    m_cmd_mgr = rhi::mng::CommandManager::make(m_dmng);
+    m_sync_mgr = rhi::mng::SyncManager::make(m_dmng, MAX_FRAMES_IN_FLIGHT);
 
     for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       m_cmd_buffers.push_back(m_cmd_mgr->allocateGraphicsCommand());

@@ -22,16 +22,16 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
-  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::DeviceManager &dmng) -> SwapchainManager* {
+  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::mng::DeviceManager &dmng) -> rhi::mng::SwapchainManager* {
     return new VK_SwapchainManager(dmng);
   }
 
 
   
-  VK_SwapchainManager::VK_SwapchainManager(rhi::DeviceManager &dmng)
-    : rhi::SwapchainManager(dmng)
+  VK_SwapchainManager::VK_SwapchainManager(rhi::mng::DeviceManager &dmng)
+    : rhi::mng::SwapchainManager(dmng)
   {}
 
   VK_SwapchainManager::~VK_SwapchainManager() {

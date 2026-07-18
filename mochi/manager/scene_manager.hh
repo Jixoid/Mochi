@@ -20,18 +20,18 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
 
   struct SceneManager: noncopy {
     public:
-      explicit SceneManager(rhi::DeviceManager &dmng, rhi::AllocManager &amng);
+      explicit SceneManager(rhi::mng::DeviceManager &dmng, rhi::mng::AllocManager &amng);
       ~SceneManager();
 
 
     private:
-      rhi::DeviceManager &m_dmng;
-      rhi::AllocManager &m_amng;
+      rhi::mng::DeviceManager &m_dmng;
+      rhi::mng::AllocManager &m_amng;
 
     
     private:

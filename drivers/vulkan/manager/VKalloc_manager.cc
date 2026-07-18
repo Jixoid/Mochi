@@ -27,17 +27,17 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  extern "C" fun MochiRHI_MakeAllocManager(rhi::DeviceManager &device) -> AllocManager* {
+  extern "C" fun MochiRHI_MakeAllocManager(rhi::mng::DeviceManager &device) -> rhi::mng::AllocManager* {
     return new VK_AllocManager(device);
   }
 
 
 
-  VK_AllocManager::VK_AllocManager(rhi::DeviceManager &dmng)
-    : rhi::AllocManager(dmng)
+  VK_AllocManager::VK_AllocManager(rhi::mng::DeviceManager &dmng)
+    : rhi::mng::AllocManager(dmng)
   {
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
@@ -57,12 +57,12 @@ namespace mochi::rhi::vulkan
 
       
   fun VK_AllocManager::allocBuffer(
-    u64 size, BufferUsageFlags usage, AllocationCreateFlags create, AllocationLocation location
+    u64 size, BufferUsageFlags usage, rhi::mng::AllocationCreateFlags create, rhi::mng::AllocationLocation location
   ) -> sptr<Buffer>
   {
     VmaAllocationCreateInfo alloc_info{};
-    alloc_info.usage = VKConvert<AllocationLocation>(location);
-    alloc_info.flags = VKConvert<AllocationCreateFlags>(create);
+    alloc_info.usage = VKConvert<rhi::mng::AllocationLocation>(location);
+    alloc_info.flags = VKConvert<rhi::mng::AllocationCreateFlags>(create);
     if ((alloc_info.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0 && 
         (alloc_info.flags & VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT) == 0) {
       alloc_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
@@ -93,7 +93,7 @@ namespace mochi::rhi::vulkan
     if (res != VK_SUCCESS)
       throw mochi::rhi_error("Failed to create VMA Buffer! Error code: " + std::to_string(res));
     
-    if (create & AllocationCreate::Mapped)
+    if (create & rhi::mng::AllocationCreate::Mapped)
       e_addr = vma_alloc_info.pMappedData;
 
     
@@ -103,12 +103,12 @@ namespace mochi::rhi::vulkan
   
   fun VK_AllocManager::allocImage2(
     extent<2,u32> ext, Format format, ImageUsageFlags usage, ImageTiling tiling,
-    AllocationCreateFlags create, AllocationLocation location
+    rhi::mng::AllocationCreateFlags create, rhi::mng::AllocationLocation location
   ) -> sptr<Image2>
   {
     VmaAllocationCreateInfo alloc_info = {};
-    alloc_info.usage = VKConvert<AllocationLocation>(location);
-    alloc_info.flags = VKConvert<AllocationCreateFlags>(create);
+    alloc_info.usage = VKConvert<rhi::mng::AllocationLocation>(location);
+    alloc_info.flags = VKConvert<rhi::mng::AllocationCreateFlags>(create);
     if ((alloc_info.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0 && 
         (alloc_info.flags & VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT) == 0) {
       alloc_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;

@@ -20,12 +20,12 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  struct VK_SwapchainManager final: public rhi::SwapchainManager {
+  struct VK_SwapchainManager final: public rhi::mng::SwapchainManager {
     public:
-      explicit VK_SwapchainManager(rhi::DeviceManager &dmng);
+      explicit VK_SwapchainManager(rhi::mng::DeviceManager &dmng);
       ~VK_SwapchainManager() override;
 
     private:

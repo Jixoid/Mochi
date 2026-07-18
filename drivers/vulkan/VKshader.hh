@@ -26,7 +26,7 @@ namespace mochi::rhi::vulkan
 
   struct VK_Shader final: public rhi::Shader {
     public:
-      explicit VK_Shader(rhi::DeviceManager &device, ShaderStage stage, std::span<u32> span, std::string_view entry);
+      explicit VK_Shader(rhi::mng::DeviceManager &device, ShaderStage stage, std::span<u32> span, std::string_view entry);
       ~VK_Shader() = default;
 
     private:

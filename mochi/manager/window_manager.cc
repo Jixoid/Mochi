@@ -10,7 +10,6 @@
 */
 
 
-#include "mochi/manager/scene_manager.hh"
 #include "mochi/manager/window_manager.hh"
 #include "mochi/rhi/manager/device_manager.hh"
 #include "mochi/rhi/render_target.hh"
@@ -19,7 +18,7 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
 
   fun __attribute__((constructor())) glfw_init() { glfwInit(); }
@@ -27,7 +26,7 @@ namespace mochi::manager
 
 
 
-  WindowManager::WindowManager(rhi::DeviceManager &dmng, manager::SceneManager &smng, std::string_view title, int width, int height)
+  WindowManager::WindowManager(rhi::mng::DeviceManager &dmng, mng::SceneManager &smng, std::string_view title, int width, int height)
     : m_dmng(dmng)
     , m_smng(smng)
   {
@@ -45,7 +44,7 @@ namespace mochi::manager
 
     glfwSetFramebufferSizeCallback(m_window, framebuffer_resize_callback);
 
-    m_swapchain_mgr = rhi::SwapchainManager::make(m_dmng);
+    m_swapchain_mgr = rhi::mng::SwapchainManager::make(m_dmng);
     m_swapchain_mgr->init(m_window, m_width, m_height);
   }
 

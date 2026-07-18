@@ -22,22 +22,22 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
 
   struct WindowManager: noncopy {
     public:
-      explicit WindowManager(rhi::DeviceManager &dmng, manager::SceneManager &smng, std::string_view title, int width, int height);
+      explicit WindowManager(rhi::mng::DeviceManager &dmng, mng::SceneManager &smng, std::string_view title, int width, int height);
       ~WindowManager();
       
-      rhi::DeviceManager &m_dmng;
-      manager::SceneManager &m_smng;
+      rhi::mng::DeviceManager &m_dmng;
+      mng::SceneManager &m_smng;
 
 
     // window
     private:
       GLFWwindow *m_window{};
-      sptr<rhi::SwapchainManager> m_swapchain_mgr;
+      sptr<rhi::mng::SwapchainManager> m_swapchain_mgr;
       
     public:
       fun glfw() -> GLFWwindow* { return m_window; }
@@ -76,7 +76,7 @@ namespace mochi::manager
       fun get_render_target(u32 image_index) -> rhi::RenderTarget&;
       fun getRenderFinishedSemaphore(u32 image_index) -> void*;
       
-      fun swapchain_mgr() -> rhi::SwapchainManager& { return *m_swapchain_mgr; }
+      fun swapchain_mgr() -> rhi::mng::SwapchainManager& { return *m_swapchain_mgr; }
   };
   
 }

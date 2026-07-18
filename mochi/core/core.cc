@@ -17,6 +17,7 @@
 #include "mochi/ecs/multi_mesh.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/transform.hh"
+#include "mochi/manager/plugin_manager.hh"
 #include "mochi/manager/render_manager.hh"
 #include "mochi/manager/scene_manager.hh"
 #include "mochi/manager/window_manager.hh"
@@ -34,20 +35,21 @@ namespace mochi
 {
 
   Core::Core() {
-    auto device = rhi::DeviceManager::make("Mochi Test", {1,0,0,0}, [](){return 0;});
-    auto alloc   = rhi::AllocManager::make(*device);
+    auto device = rhi::mng::DeviceManager::make("Mochi Test", {1,0,0,0}, [](){return 0;});
+    auto alloc  = rhi::mng::AllocManager::make(*device);
     
     // Initialize descriptor heap for bindless
     device->initDescriptorHeap(*alloc);
     
-    auto transfer = rhi::TransferManager::make(*device);
+    auto transfer = rhi::mng::TransferManager::make(*device);
 
-    auto memory   = make_uptr(new manager::SceneManager(*device, *alloc));
-    auto shader   = rhi::ShaderManager::make(*device);
-    auto pipeline   = rhi::PipelineManager::make(*device);
-    auto material = make_uptr(new manager::MaterialManager(*device, *shader, *pipeline));
-    auto display  = make_uptr(new manager::WindowManager(*device, *memory, "Mochi Test", 800, 600));
-    auto renderer = make_uptr(new manager::RenderManager(*device));
+    auto memory   = make_uptr(new mng::SceneManager(*device, *alloc));
+    auto shader   = rhi::mng::ShaderManager::make(*device);
+    auto pipeline = rhi::mng::PipelineManager::make(*device);
+    auto material = make_uptr(new mng::MaterialManager(*device, *shader, *pipeline));
+    auto display  = make_uptr(new mng::WindowManager(*device, *memory, "Mochi Test", 800, 600));
+    auto render   = make_uptr(new mng::RenderManager(*device));
+    auto plugin   = make_uptr(new mng::PluginManger(*this));
 
     m_modules = decltype(m_modules)(
       std::move(device),
@@ -58,24 +60,30 @@ namespace mochi
       std::move(material),
       std::move(memory),
       std::move(display),
-      std::move(renderer)
+      std::move(render),
+      std::move(plugin)
     );
+
+
+    // Start plugins
+    sub<mng::PluginManger>().load_all_plugin();
   }
 
   Core::~Core() {
-    sub<rhi::DeviceManager>().waitIdle();
+    sub<rhi::mng::DeviceManager>().waitIdle();
     
     m_registry.clear();
 
-    std::get<uptr<manager::RenderManager>>(m_modules).reset();
-    std::get<uptr<manager::WindowManager>>(m_modules).reset();
-    std::get<uptr<manager::SceneManager>>(m_modules).reset();
-    std::get<uptr<manager::MaterialManager>>(m_modules).reset();
-    std::get<uptr<rhi::PipelineManager>>(m_modules).reset();
-    std::get<uptr<rhi::ShaderManager>>(m_modules).reset();
-    std::get<uptr<rhi::TransferManager>>(m_modules).reset();
-    std::get<uptr<rhi::AllocManager>>(m_modules).reset();
-    std::get<uptr<rhi::DeviceManager>>(m_modules).reset();
+    std::get<uptr<mng::PluginManger>>(m_modules).reset();
+    std::get<uptr<mng::RenderManager>>(m_modules).reset();
+    std::get<uptr<mng::WindowManager>>(m_modules).reset();
+    std::get<uptr<mng::SceneManager>>(m_modules).reset();
+    std::get<uptr<mng::MaterialManager>>(m_modules).reset();
+    std::get<uptr<rhi::mng::PipelineManager>>(m_modules).reset();
+    std::get<uptr<rhi::mng::ShaderManager>>(m_modules).reset();
+    std::get<uptr<rhi::mng::TransferManager>>(m_modules).reset();
+    std::get<uptr<rhi::mng::AllocManager>>(m_modules).reset();
+    std::get<uptr<rhi::mng::DeviceManager>>(m_modules).reset();
   }
 
 
@@ -84,12 +92,13 @@ namespace mochi
   fun Core::run() -> void {
     auto last_time = std::chrono::high_resolution_clock::now();
     
-    while (sub<manager::WindowManager>().proc_events()) {
+    while (sub<mng::WindowManager>().proc_events()) {
       auto current_time = std::chrono::high_resolution_clock::now();
-      float dt = std::chrono::duration<float, std::chrono::seconds::period>(current_time-last_time).count();
+      f32 dt = std::chrono::duration<f32, std::chrono::seconds::period>(current_time-last_time).count();
       last_time = current_time;
         
       m_idle(dt);
+      sub<mng::PluginManger>().dispatch(HookThing::Update);
 
       draw();
     }
@@ -97,7 +106,7 @@ namespace mochi
 
 
   fun Core::paint(rhi::Command &cmd, rhi::RenderTarget &target) -> void {
-    auto &mem = sub<manager::SceneManager>();
+    auto &mem = sub<mng::SceneManager>();
 
     // Update camera system
     auto cameras = m_registry.view<ecs::Transform, ecs::Camera>();
@@ -136,15 +145,15 @@ namespace mochi
     }
 
 
-    auto extent = sub<manager::WindowManager>().extent(); 
+    auto extent = sub<mng::WindowManager>().extent(); 
     cmd.setViewport(0, {rhi::Viewport(0, (f32)extent.x(), 0, (f32)extent.y(), 0, 1)});
     cmd.setScissor(0, {rhi::Rect2D(0, 0, extent.x(), extent.y())});
 
     
 
     // Render loop
-    auto heap = sub<rhi::DeviceManager>().descriptor_heap();
-    auto sampler_heap = sub<rhi::DeviceManager>().sampler_heap();
+    auto heap = sub<rhi::mng::DeviceManager>().descriptor_heap();
+    auto sampler_heap = sub<rhi::mng::DeviceManager>().sampler_heap();
     cmd.bindDescriptorHeap(heap, sampler_heap, heap->size(), sampler_heap->size());
 
     rhi::Pipeline *last_pipeline{};
@@ -237,9 +246,9 @@ namespace mochi
 
 
   fun Core::draw() -> void {
-    auto &dev  = sub<rhi::DeviceManager>();
-    auto &ren  = sub<manager::RenderManager>();
-    auto &disp = sub<manager::WindowManager>();
+    auto &dev  = sub<rhi::mng::DeviceManager>();
+    auto &ren  = sub<mng::RenderManager>();
+    auto &disp = sub<mng::WindowManager>();
 
     if (disp.resized())
       disp.recreate_swapchain();

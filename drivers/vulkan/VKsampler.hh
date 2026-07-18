@@ -23,10 +23,10 @@ namespace mochi::rhi::vulkan
 
   struct VK_Sampler2 final: public rhi::Sampler2 {
     public:
-      explicit VK_Sampler2(rhi::DeviceManager &device, vk::raii::Sampler sampler): m_device(device), m_sampler(std::move(sampler)) {}
+      explicit VK_Sampler2(rhi::mng::DeviceManager &device, vk::raii::Sampler sampler): m_device(device), m_sampler(std::move(sampler)) {}
 
     private:
-      rhi::DeviceManager &m_device;
+      rhi::mng::DeviceManager &m_device;
       vk::raii::Sampler m_sampler;
 
     public:

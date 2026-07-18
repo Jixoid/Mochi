@@ -16,16 +16,16 @@
 #include "mochi/types.hh"
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // External
-  extern "C" fun MochiRHI_MakeSyncManager(rhi::DeviceManager &dmng, u32 max_frames_in_flight) -> SyncManager*;
+  extern "C" fun MochiRHI_MakeSyncManager(rhi::mng::DeviceManager &dmng, u32 max_frames_in_flight) -> SyncManager*;
 
 
   // Interface
   struct SyncManager: noncopy {
     protected:
-      SyncManager(rhi::DeviceManager &dmng, u32 max_frames_in_flight)
+      SyncManager(rhi::mng::DeviceManager &dmng, u32 max_frames_in_flight)
         : m_dmng(dmng)
         , m_max_frames_in_flight(max_frames_in_flight)
       {}
@@ -33,12 +33,12 @@ namespace mochi::rhi
     public:
       virtual ~SyncManager() = default;
 
-      static fun make(rhi::DeviceManager &device, u32 max_frames_in_flight = 2) {
+      static fun make(rhi::mng::DeviceManager &device, u32 max_frames_in_flight = 2) {
         return make_sptr(MochiRHI_MakeSyncManager(device, max_frames_in_flight));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
       u32 m_max_frames_in_flight;
 
     public:

@@ -46,12 +46,14 @@ namespace mochi::debug
 }
 
 namespace mochi {
-  namespace rhi     {extern debug::ModuleInfo debug_module;}
-  namespace manager {extern debug::ModuleInfo debug_module;}
-  namespace math    {extern debug::ModuleInfo debug_module;}
-  namespace reader  {extern debug::ModuleInfo debug_module;}
-  namespace asset   {extern debug::ModuleInfo debug_module;}
-  namespace ecs     {extern debug::ModuleInfo debug_module;}
+  namespace rhi      {extern debug::ModuleInfo debug_module;}
+  namespace rhi::mng {extern debug::ModuleInfo debug_module;}
+
+  namespace mng      {extern debug::ModuleInfo debug_module;}
+  namespace ecs      {extern debug::ModuleInfo debug_module;}
+  namespace math     {extern debug::ModuleInfo debug_module;}
+  namespace asset    {extern debug::ModuleInfo debug_module;}
+  namespace reader   {extern debug::ModuleInfo debug_module;}
 }
 
 

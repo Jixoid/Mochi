@@ -12,14 +12,16 @@
 #include "drivers/vulkan/manager/VKsync_manager.hh"
 #include "drivers/vulkan/manager/VKdevice_manager.hh"
 
-namespace mochi::rhi::vulkan
+
+
+namespace mochi::rhi::vulkan::mng
 {
-  extern "C" fun MochiRHI_MakeSyncManager(rhi::DeviceManager &dmng, u32 max_frames_in_flight) -> SyncManager* {
+  extern "C" fun MochiRHI_MakeSyncManager(rhi::mng::DeviceManager &dmng, u32 max_frames_in_flight) -> rhi::mng::SyncManager* {
     return new VK_SyncManager(dmng, max_frames_in_flight);
   }
 
-  VK_SyncManager::VK_SyncManager(rhi::DeviceManager &dmng, u32 max_frames_in_flight)
-    : rhi::SyncManager(dmng, max_frames_in_flight)
+  VK_SyncManager::VK_SyncManager(rhi::mng::DeviceManager &dmng, u32 max_frames_in_flight)
+    : rhi::mng::SyncManager(dmng, max_frames_in_flight)
   {
     auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
     

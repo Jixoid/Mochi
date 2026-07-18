@@ -22,9 +22,8 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
-
   
   fun MaterialManager::getMaterialDesc(rhi::RenderTarget &target, MaterialProps props) -> sptr<MaterialDesc> {
     // Info Pipeline

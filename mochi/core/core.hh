@@ -12,6 +12,7 @@
 #pragma once
 
 #include "mochi/basis.hh"
+#include "mochi/manager/plugin_manager.hh"
 #include "mochi/manager/window_manager.hh"
 #include "mochi/manager/render_manager.hh"
 #include "mochi/manager/scene_manager.hh"
@@ -49,15 +50,16 @@ namespace mochi
     // Sub Module
     private:
       std::tuple<
-        uptr<rhi::DeviceManager>,
-        uptr<rhi::AllocManager>,
-        uptr<rhi::TransferManager>,
-        uptr<rhi::ShaderManager>,
-        uptr<rhi::PipelineManager>,
-        uptr<manager::MaterialManager>,
-        uptr<manager::SceneManager>,
-        uptr<manager::WindowManager>,
-        uptr<manager::RenderManager>
+        uptr<rhi::mng::DeviceManager>,
+        uptr<rhi::mng::AllocManager>,
+        uptr<rhi::mng::TransferManager>,
+        uptr<rhi::mng::ShaderManager>,
+        uptr<rhi::mng::PipelineManager>,
+        uptr<mng::MaterialManager>,
+        uptr<mng::SceneManager>,
+        uptr<mng::WindowManager>,
+        uptr<mng::RenderManager>,
+        uptr<mng::PluginManger>
       > m_modules;
 
     public:

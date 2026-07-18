@@ -18,12 +18,12 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  struct VK_PipelineManager final: rhi::PipelineManager {
+  struct VK_PipelineManager final: rhi::mng::PipelineManager {
     public:
-      explicit VK_PipelineManager(rhi::DeviceManager &device): rhi::PipelineManager(device) {}
+      explicit VK_PipelineManager(rhi::mng::DeviceManager &device): rhi::mng::PipelineManager(device) {}
 
     public:
       fun loadCache(u64 sign) -> std::vector<u8> override;

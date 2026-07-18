@@ -26,8 +26,8 @@ namespace mochi::asset
 {
 
   Texture2::Texture2(Core &core, sptr<rhi::Image2> data): m_data(data) {
-    auto& alloc_mgr = core.sub<rhi::AllocManager>();
-    auto& dev_mgr = core.sub<rhi::DeviceManager>();
+    auto& alloc_mgr = core.sub<rhi::mng::AllocManager>();
+    auto& dev_mgr = core.sub<rhi::mng::DeviceManager>();
     m_view = m_data->makeView();
     m_sampler = alloc_mgr.allocSampler2({rhi::SamplerAddressMode::Repeat, rhi::SamplerAddressMode::Repeat, rhi::SamplerAddressMode::Repeat}, rhi::SamplerFilter::Linear, rhi::SamplerFilter::Linear);
     m_id = dev_mgr.writeTextureDescriptor(m_view, m_sampler);
@@ -38,8 +38,8 @@ namespace mochi::asset
     stbi_uc* pixels = stbi_load(fpath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) throw mochi::asset_error("Failed to load texture!");
 
-    auto& alloc_mgr = core.sub<rhi::AllocManager>();
-    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+    auto& alloc_mgr = core.sub<rhi::mng::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::mng::TransferManager>();
 
     // Initialize texture and transfer to vram
     m_data = alloc_mgr.allocImage2(
@@ -47,34 +47,34 @@ namespace mochi::asset
       rhi::Format::v4norm8U,
       flags(rhi::ImageUsage::Sampled) | rhi::ImageUsage::TransferDst, 
       rhi::ImageTiling::Optimal, 
-      rhi::AllocationCreateFlags(), 
-      rhi::AllocationLocation::PreferDevice
+      {},
+      rhi::mng::AllocationLocation::PreferDevice
     );
 
-    transfer_mgr.copyMemoryToImage(rhi::TransferTime::Now, pixels, m_data.get());
+    transfer_mgr.copyMemoryToImage(rhi::mng::TransferTime::Now, pixels, m_data.get());
     stbi_image_free(pixels);
 
-    auto& dev_mgr = core.sub<rhi::DeviceManager>();
+    auto& dev_mgr = core.sub<rhi::mng::DeviceManager>();
     m_view = m_data->makeView();
     m_sampler = alloc_mgr.allocSampler2({rhi::SamplerAddressMode::Repeat, rhi::SamplerAddressMode::Repeat, rhi::SamplerAddressMode::Repeat}, rhi::SamplerFilter::Linear, rhi::SamplerFilter::Linear);
     m_id = dev_mgr.writeTextureDescriptor(m_view, m_sampler);
   }
 
   Texture2::Texture2(Core &core, u32 width, u32 height, const void *pixels) {
-    auto& alloc_mgr = core.sub<rhi::AllocManager>();
-    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+    auto& alloc_mgr = core.sub<rhi::mng::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::mng::TransferManager>();
 
     m_data = alloc_mgr.allocImage2(
       {width, height}, 
       rhi::Format::v4norm8U,
       flags(rhi::ImageUsage::Sampled) | rhi::ImageUsage::TransferDst, 
       rhi::ImageTiling::Optimal, 
-      rhi::AllocationCreateFlags(), 
-      rhi::AllocationLocation::PreferDevice
+      {},
+      rhi::mng::AllocationLocation::PreferDevice
     );
-    transfer_mgr.copyMemoryToImage(rhi::TransferTime::Now, const_cast<void*>(pixels), m_data.get());
+    transfer_mgr.copyMemoryToImage(rhi::mng::TransferTime::Now, const_cast<void*>(pixels), m_data.get());
 
-    auto& dev_mgr = core.sub<rhi::DeviceManager>();
+    auto& dev_mgr = core.sub<rhi::mng::DeviceManager>();
     m_view = m_data->makeView();
     m_sampler = alloc_mgr.allocSampler2({rhi::SamplerAddressMode::Repeat, rhi::SamplerAddressMode::Repeat, rhi::SamplerAddressMode::Repeat}, rhi::SamplerFilter::Linear, rhi::SamplerFilter::Linear);
     m_id = dev_mgr.writeTextureDescriptor(m_view, m_sampler);

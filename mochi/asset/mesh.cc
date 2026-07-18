@@ -90,19 +90,19 @@ namespace mochi::asset
     stbi_uc* pixels = stbi_load_from_memory(raw_image.data.data(), raw_image.data.size(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) throw mochi::asset_error("Failed to load texture!");
 
-    auto& alloc_mgr = core.sub<rhi::AllocManager>();
-    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+    auto& alloc_mgr = core.sub<rhi::mng::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::mng::TransferManager>();
 
     auto img = alloc_mgr.allocImage2(
       { (u32)texWidth, (u32)texHeight },
       rhi::Format::v4norm8U,
       flags(rhi::ImageUsage::TransferDst) | rhi::ImageUsage::Sampled,
       rhi::ImageTiling::Optimal,
-      rhi::AllocationCreateFlags(),
-      rhi::AllocationLocation::PreferDevice
+      {},
+      rhi::mng::AllocationLocation::PreferDevice
     );
     
-    transfer_mgr.copyMemoryToImage(rhi::TransferTime::Now, pixels, img.get());
+    transfer_mgr.copyMemoryToImage(rhi::mng::TransferTime::Now, pixels, img.get());
 
     stbi_image_free(pixels);
 
@@ -178,17 +178,17 @@ namespace mochi::asset
     }
 
 
-    auto& alloc_mgr = core.sub<rhi::AllocManager>();
-    auto& transfer_mgr = core.sub<rhi::TransferManager>();
+    auto& alloc_mgr = core.sub<rhi::mng::AllocManager>();
+    auto& transfer_mgr = core.sub<rhi::mng::TransferManager>();
 
     m_data = alloc_mgr.allocBuffer(
       sizeof(vertex_t) * final_data.size(),
       flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
-      rhi::AllocationCreate::Mapped,
-      rhi::AllocationLocation::PreferDevice
+      rhi::mng::AllocationCreate::Mapped,
+      rhi::mng::AllocationLocation::PreferDevice
     );
 
-    transfer_mgr.copyMemoryToBuffer(rhi::TransferTime::Now, final_data.data(), m_data.get());
+    transfer_mgr.copyMemoryToBuffer(rhi::mng::TransferTime::Now, final_data.data(), m_data.get());
     m_offs = std::move(final_offs);
     m_map = std::move(final_map);
     m_material = std::move(final_material);

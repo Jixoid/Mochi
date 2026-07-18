@@ -28,10 +28,10 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  extern "C" fun MochiRHI_MakeShaderManager(rhi::DeviceManager &device) -> ShaderManager* {
+  extern "C" fun MochiRHI_MakeShaderManager(rhi::mng::DeviceManager &device) -> rhi::mng::ShaderManager* {
     return new VK_ShaderManager(device);
   }
   

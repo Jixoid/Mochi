@@ -22,12 +22,12 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  struct VK_ShaderManager final: rhi::ShaderManager {
+  struct VK_ShaderManager final: rhi::mng::ShaderManager {
     public:
-      explicit VK_ShaderManager(rhi::DeviceManager &device): rhi::ShaderManager(device) {}
+      explicit VK_ShaderManager(rhi::mng::DeviceManager &device): rhi::mng::ShaderManager(device) {}
 
     private:
       shaderc::Compiler m_compiler;

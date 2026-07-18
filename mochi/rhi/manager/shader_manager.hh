@@ -16,7 +16,7 @@
 #include "mochi/types.hh"
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // Enums
   enum struct ShaderCompOptimization {
@@ -27,23 +27,23 @@ namespace mochi::rhi
 
   
   // External
-  extern "C" fun MochiRHI_MakeShaderManager(rhi::DeviceManager &dmng) -> ShaderManager*;
+  extern "C" fun MochiRHI_MakeShaderManager(rhi::mng::DeviceManager &dmng) -> ShaderManager*;
 
 
   // Interface
   struct ShaderManager: noncopy {
     protected:
-      ShaderManager(rhi::DeviceManager &dmng): m_dmng(dmng) {}
+      ShaderManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~ShaderManager() = default;
 
-      static fun make(rhi::DeviceManager &device) {
+      static fun make(rhi::mng::DeviceManager &device) {
         return make_uptr(MochiRHI_MakeShaderManager(device));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
       ShaderCompOptimization m_opt;
 
     public:

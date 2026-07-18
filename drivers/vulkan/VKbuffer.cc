@@ -24,7 +24,7 @@
 namespace mochi::rhi::vulkan
 {
 
-  VK_Buffer::VK_Buffer(rhi::DeviceManager &device, VmaAllocator vma_allocator, VkBuffer buffer, VmaAllocation allocation, void* mapped, u64 size)
+  VK_Buffer::VK_Buffer(rhi::mng::DeviceManager &device, VmaAllocator vma_allocator, VkBuffer buffer, VmaAllocation allocation, void* mapped, u64 size)
     : m_device(device)
     , m_vma_allocator(vma_allocator)
     , m_buffer(buffer)
@@ -79,7 +79,7 @@ namespace mochi::rhi::vulkan
     addr_info.sType = vk::StructureType::eBufferDeviceAddressInfo;
     addr_info.buffer = static_cast<VkBuffer>(m_buffer);
     
-    return static_cast<VK_DeviceManager&>(m_device).get().getBufferAddress(addr_info);
+    return static_cast<mng::VK_DeviceManager&>(m_device).get().getBufferAddress(addr_info);
   }
 
 }

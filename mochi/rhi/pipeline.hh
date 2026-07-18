@@ -117,7 +117,7 @@ namespace mochi::rhi
 
   extern "C" fun MochiRHI_MakePipelineMeta(PushConstantList push, VertexBindList vert) -> PipelineMeta*;
   extern "C" fun MochiRHI_MakePipeline(
-    rhi::DeviceManager &dmng, rhi::PipelineManager &pmng, u64 sign,
+    rhi::mng::DeviceManager &dmng, rhi::mng::PipelineManager &pmng, u64 sign,
     PipelineMeta *info, std::vector<sptr<Shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format color_format, Format depth_format
@@ -155,7 +155,7 @@ namespace mochi::rhi
       virtual ~Pipeline() = default;
 
       static fun make(
-        rhi::DeviceManager &dmng, rhi::PipelineManager &pmng, u64 sign,
+        rhi::mng::DeviceManager &dmng, rhi::mng::PipelineManager &pmng, u64 sign,
         PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format

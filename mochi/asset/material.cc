@@ -26,24 +26,24 @@ namespace mochi::asset
 
 
   
-  fun Material::desc(rhi::RenderTarget &target) -> sptr<manager::MaterialDesc> {
+  fun Material::desc(rhi::RenderTarget &target) -> sptr<mng::MaterialDesc> {
     auto Albedo = [&](){
-      if (std::holds_alternative<vec3<f32>>(m_albedo)) return manager::MaterialAlbedo::Color;
-      ef (std::holds_alternative<sptr<asset::Texture2>>(m_albedo)) return manager::MaterialAlbedo::Texture;
+      if (std::holds_alternative<vec3<f32>>(m_albedo)) return mng::MaterialAlbedo::Color;
+      ef (std::holds_alternative<sptr<asset::Texture2>>(m_albedo)) return mng::MaterialAlbedo::Texture;
       else
         throw except("unknown type");
     };
 
 
-    manager::MaterialProps props = {
-      .method = manager::MaterialMethod::PBR,
+    mng::MaterialProps props = {
+      .method = mng::MaterialMethod::PBR,
       .albedo = Albedo(),
       .count  = m_count,
       .polymode = m_polymode,
       .primitiveTopology = m_primitiveTopology,
     };
 
-    return std::move(m_core.sub<manager::MaterialManager>().getMaterialDesc(target, props));
+    return std::move(m_core.sub<mng::MaterialManager>().getMaterialDesc(target, props));
   }
 
 }

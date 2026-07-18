@@ -20,10 +20,10 @@
 #include <vector>
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  struct VK_Queue: rhi::Queue {
+  struct VK_Queue: rhi::mng::Queue {
     public:
       explicit VK_Queue() {}
 
@@ -36,13 +36,13 @@ namespace mochi::rhi::vulkan
 
 
 
-  struct VK_DeviceManager: rhi::DeviceManager {
+  struct VK_DeviceManager: rhi::mng::DeviceManager {
     public:
       explicit VK_DeviceManager(std::string_view appName, std::array<u16, 4> appVer);
 
       fun waitIdle() -> void override { vk_device.waitIdle(); }
       
-      fun initDescriptorHeap(rhi::AllocManager &alloc_mgr) -> void override;
+      fun initDescriptorHeap(rhi::mng::AllocManager &alloc_mgr) -> void override;
       fun writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 override;
 
 

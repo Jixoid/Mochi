@@ -22,7 +22,7 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
   // Enums
   enum struct MaterialMethod: u8 { Bare, PBR };
@@ -52,8 +52,8 @@ namespace mochi::manager
 }
 
 template<>
-struct std::hash<mochi::manager::MaterialProps> {
-  fun operator()(const mochi::manager::MaterialProps &d) const noexcept -> std::size_t {
+struct std::hash<mochi::mng::MaterialProps> {
+  fun operator()(const mochi::mng::MaterialProps &d) const noexcept -> std::size_t {
     std::size_t seed = 0;
 
     auto hash_combine = [&seed](auto &&v) {
@@ -82,21 +82,21 @@ struct std::hash<mochi::manager::MaterialProps> {
   }
 };
 
-namespace mochi::manager
+namespace mochi::mng
 {
   // Interface
   struct MaterialManager: noncopy {
     public:
-      MaterialManager(rhi::DeviceManager &device, rhi::ShaderManager &smng, rhi::PipelineManager &pmng)
+      MaterialManager(rhi::mng::DeviceManager &device, rhi::mng::ShaderManager &smng, rhi::mng::PipelineManager &pmng)
         : m_dmng(device)
         , m_smng(smng)
         , m_pmng(pmng)
       {}
       
     private:
-      rhi::DeviceManager &m_dmng;
-      rhi::ShaderManager &m_smng;
-      rhi::PipelineManager &m_pmng;
+      rhi::mng::DeviceManager &m_dmng;
+      rhi::mng::ShaderManager &m_smng;
+      rhi::mng::PipelineManager &m_pmng;
       
       std::unordered_map<MaterialProps, sptr<MaterialDesc>> m_materials;
     

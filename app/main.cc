@@ -83,7 +83,7 @@ fun Main() -> int {
   Mochi.idle() = [&](f32 dt){
     if (camera == entt::null) return;
 
-    auto win = Mochi.sub<mochi::manager::WindowManager>().glfw();
+    auto win = Mochi.sub<mochi::mng::WindowManager>().glfw();
 
 
     auto is_key_pressed = [win](int key) { return glfwGetKey(win, key) == GLFW_PRESS; };
@@ -163,7 +163,7 @@ fun Main() -> int {
 
     // Projection güncelleme — her frame (resize'da da güncel kalması için)
     {
-      auto ext = Mochi.sub<mochi::manager::WindowManager>().extent();
+      auto ext = Mochi.sub<mochi::mng::WindowManager>().extent();
       f32 aspect = (ext.y() > 0) ? (f32)ext.x() / (f32)ext.y() : 1.0f;
       Mochi.registry().get<mochi::ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, aspect, 0.1f, 100.0f);
     }

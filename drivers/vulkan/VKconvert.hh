@@ -106,24 +106,24 @@ namespace mochi::rhi
 
 
   template <typename T>
-    requires (std::is_same_v<T, AllocationCreate>)
-  inline fun VKConvert(AllocationCreate in) -> VmaAllocationCreateFlagBits
+    requires (std::is_same_v<T, rhi::mng::AllocationCreate>)
+  inline fun VKConvert(rhi::mng::AllocationCreate in) -> VmaAllocationCreateFlagBits
   {
     return static_cast<VmaAllocationCreateFlagBits>(in);
   }
 
 
   template <typename T>
-    requires (std::is_same_v<T, AllocationCreateFlags>)
-  inline fun VKConvert(AllocationCreateFlags in) -> VmaAllocationCreateFlags
+    requires (std::is_same_v<T, rhi::mng::AllocationCreateFlags>)
+  inline fun VKConvert(rhi::mng::AllocationCreateFlags in) -> VmaAllocationCreateFlags
   {
     return static_cast<VmaAllocationCreateFlags>(in.mask());
   }
 
 
   template <typename T>
-    requires (std::is_same_v<T, AllocationLocation>)
-  inline fun VKConvert(AllocationLocation in) -> VmaMemoryUsage
+    requires (std::is_same_v<T, rhi::mng::AllocationLocation>)
+  inline fun VKConvert(rhi::mng::AllocationLocation in) -> VmaMemoryUsage
   {
     return static_cast<VmaMemoryUsage>(in);
   }

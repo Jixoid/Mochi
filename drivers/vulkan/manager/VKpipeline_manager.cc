@@ -21,10 +21,10 @@
 
 
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
 
-  extern "C" fun MochiRHI_MakePipelineManager(rhi::DeviceManager &device) -> rhi::PipelineManager* {
+  extern "C" fun MochiRHI_MakePipelineManager(rhi::mng::DeviceManager &device) -> rhi::mng::PipelineManager* {
     return new VK_PipelineManager(device);
   }
 

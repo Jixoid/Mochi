@@ -18,26 +18,26 @@
 #include <vector>
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // External
-  extern "C" fun MochiRHI_MakePipelineManager(rhi::DeviceManager &dmng) -> PipelineManager*;
+  extern "C" fun MochiRHI_MakePipelineManager(rhi::mng::DeviceManager &dmng) -> PipelineManager*;
 
 
   // Interface
   struct PipelineManager: noncopy {
     protected:
-      PipelineManager(rhi::DeviceManager &dmng): m_dmng(dmng) {}
+      PipelineManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~PipelineManager() = default;
 
-      static fun make(rhi::DeviceManager &device) {
+      static fun make(rhi::mng::DeviceManager &device) {
         return make_uptr(MochiRHI_MakePipelineManager(device));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
 
     public:
       virtual fun loadCache(u64 sign) -> std::vector<u8> = 0;

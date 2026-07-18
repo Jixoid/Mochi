@@ -14,14 +14,14 @@
 #include "drivers/vulkan/VKcommand.hh"
 #include <vulkan/vulkan_raii.hpp>
 
-namespace mochi::rhi::vulkan
+namespace mochi::rhi::vulkan::mng
 {
-  extern "C" fun MochiRHI_MakeCommandManager(rhi::DeviceManager &dmng) -> CommandManager* {
+  extern "C" fun MochiRHI_MakeCommandManager(rhi::mng::DeviceManager &dmng) -> rhi::mng::CommandManager* {
     return new VK_CommandManager(dmng);
   }
 
-  VK_CommandManager::VK_CommandManager(rhi::DeviceManager &dmng)
-    : rhi::CommandManager(dmng)
+  VK_CommandManager::VK_CommandManager(rhi::mng::DeviceManager &dmng)
+    : rhi::mng::CommandManager(dmng)
   {}
 
   fun VK_CommandManager::allocateGraphicsCommand() -> sptr<Command> {

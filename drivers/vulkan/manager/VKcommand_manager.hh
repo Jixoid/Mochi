@@ -17,11 +17,12 @@
 #include "drivers/vulkan/VKcommand.hh"
 #include <vulkan/vulkan_raii.hpp>
 
-namespace mochi::rhi::vulkan
+
+namespace mochi::rhi::vulkan::mng
 {
-  struct VK_CommandManager final : public rhi::CommandManager {
+  struct VK_CommandManager final : public rhi::mng::CommandManager {
     public:
-      explicit VK_CommandManager(rhi::DeviceManager &dmng);
+      explicit VK_CommandManager(rhi::mng::DeviceManager &dmng);
       ~VK_CommandManager() override = default;
 
     public:

@@ -16,15 +16,16 @@
 #include "drivers/vulkan/manager/VKdevice_manager.hh"
 #include <vulkan/vulkan_raii.hpp>
 
-namespace mochi::rhi::vulkan
+
+namespace mochi::rhi::vulkan::mng
 {
-  struct VK_TransferManager final : public rhi::TransferManager {
+  struct VK_TransferManager final : public rhi::mng::TransferManager {
     public:
-      explicit VK_TransferManager(rhi::DeviceManager &dmng);
+      explicit VK_TransferManager(rhi::mng::DeviceManager &dmng);
       ~VK_TransferManager() override = default;
 
     public:
-      fun copyMemoryToImage(TransferTime time, void* src, rhi::Image2* dst) -> void override;
-      fun copyMemoryToBuffer(TransferTime time, void* src, rhi::Buffer* dst) -> void override;
+      fun copyMemoryToImage(rhi::mng::TransferTime time, void* src, rhi::Image2* dst) -> void override;
+      fun copyMemoryToBuffer(rhi::mng::TransferTime time, void* src, rhi::Buffer* dst) -> void override;
   };
 }

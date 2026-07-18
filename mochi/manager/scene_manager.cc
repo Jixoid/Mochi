@@ -20,10 +20,10 @@
 
 
 
-namespace mochi::manager
+namespace mochi::mng
 {
 
-  SceneManager::SceneManager(rhi::DeviceManager &dmng, rhi::AllocManager &amng)
+  SceneManager::SceneManager(rhi::mng::DeviceManager &dmng, rhi::mng::AllocManager &amng)
     : m_dmng(dmng), m_amng(amng)
   {}
 
@@ -39,8 +39,8 @@ namespace mochi::manager
       m_camera_ubo = m_amng.allocBuffer(
         sizeof(ecs::camera_t) * std::max<u64>(10, required_count),
         rhi::BufferUsage::UniformBuffer | rhi::BufferUsage::DeviceAddress, 
-        rhi::AllocationCreate::HostSequentialWrite | rhi::AllocationCreate::Mapped,
-        rhi::AllocationLocation::PreferHost
+        rhi::mng::AllocationCreate::HostSequentialWrite | rhi::mng::AllocationCreate::Mapped,
+        rhi::mng::AllocationLocation::PreferHost
       );
 
     return m_camera_ubo;
@@ -51,8 +51,8 @@ namespace mochi::manager
       m_light_ubo = m_amng.allocBuffer(
         sizeof(ecs::point_light_t) * std::max<u64>(100, required_count),
         rhi::BufferUsage::UniformBuffer | rhi::BufferUsage::DeviceAddress, 
-        rhi::AllocationCreate::HostSequentialWrite | rhi::AllocationCreate::Mapped,
-        rhi::AllocationLocation::PreferHost
+        rhi::mng::AllocationCreate::HostSequentialWrite | rhi::mng::AllocationCreate::Mapped,
+        rhi::mng::AllocationLocation::PreferHost
       );
 
     return m_light_ubo;

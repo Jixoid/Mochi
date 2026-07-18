@@ -15,7 +15,7 @@
 #include "mochi/types.hh"
 
 
-namespace mochi::rhi
+namespace mochi::rhi::mng
 {
   // Enums
   enum struct TransferTime {
@@ -25,23 +25,23 @@ namespace mochi::rhi
 
 
   // External
-  extern "C" fun MochiRHI_MakeTransferManager(rhi::DeviceManager &dmng) -> TransferManager*;
+  extern "C" fun MochiRHI_MakeTransferManager(rhi::mng::DeviceManager &dmng) -> TransferManager*;
 
 
   // Interface
   struct TransferManager: noncopy {
     protected:
-      TransferManager(rhi::DeviceManager &dmng): m_dmng(dmng) {}
+      TransferManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~TransferManager() = default;
 
-      static fun make(rhi::DeviceManager &device) {
+      static fun make(rhi::mng::DeviceManager &device) {
         return make_uptr(MochiRHI_MakeTransferManager(device));
       }
 
     protected:
-      rhi::DeviceManager &m_dmng;
+      rhi::mng::DeviceManager &m_dmng;
 
     public:
       virtual fun copyMemoryToImage(TransferTime time, void* src, rhi::Image2* dst) -> void = 0;

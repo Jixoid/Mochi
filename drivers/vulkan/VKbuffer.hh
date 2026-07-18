@@ -21,11 +21,11 @@ namespace mochi::rhi::vulkan
 
   struct VK_Buffer final: public rhi::Buffer {
     public:
-      explicit VK_Buffer(rhi::DeviceManager &device, VmaAllocator vma_allocator, VkBuffer buffer, VmaAllocation allocation, void* mapped, u64 size);
+      explicit VK_Buffer(rhi::mng::DeviceManager &device, VmaAllocator vma_allocator, VkBuffer buffer, VmaAllocation allocation, void* mapped, u64 size);
       ~VK_Buffer();
 
     private:
-      rhi::DeviceManager &m_device;
+      rhi::mng::DeviceManager &m_device;
       VmaAllocator m_vma_allocator{nil};
       VkBuffer m_buffer{nil};
       VmaAllocation m_allocation{nil};
