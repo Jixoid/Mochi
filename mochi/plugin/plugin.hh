@@ -41,7 +41,7 @@ namespace mochi
     public:
       virtual fun free() -> void = 0;
 
-      virtual fun on_load(Core &engine_core, HookFunc hook) -> void = 0;
+      virtual fun on_load(Engine &eng, HookFunc hook) -> void = 0;
       virtual fun on_unload() -> void = 0;
   };
 

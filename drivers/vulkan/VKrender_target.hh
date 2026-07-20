@@ -13,7 +13,7 @@
 
 #include "drivers/vulkan/VKconvert.hh"
 #include "mochi/rhi/render_target.hh"
-#include "mochi/rhi/rhi.hh"
+#include "mochi/rhi/types.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 

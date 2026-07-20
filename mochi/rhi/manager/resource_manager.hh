@@ -12,7 +12,7 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/device.hh"
 #include "mochi/rhi/buffer.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/sampler.hh"
@@ -20,27 +20,27 @@
 
 
 
-namespace mochi::rhi::mng
+namespace mochi::rhi
 {
   // External
-  extern "C" fun MochiRHI_MakeResourceManager(rhi::mng::DeviceManager &dmng) -> ResourceManager*;
+  extern "C" fun MochiRHI_MakeResourceManager(rhi::Device &dmng) -> ResourceManager*;
 
 
 
   // Interface
   struct ResourceManager: noncopy {
     protected:
-      ResourceManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
+      ResourceManager(rhi::Device &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~ResourceManager() = default;
 
-      static fun make(rhi::mng::DeviceManager &device) {
+      static fun make(rhi::Device &device) {
         return make_sptr(MochiRHI_MakeResourceManager(device));
       }
 
     protected:
-      rhi::mng::DeviceManager &m_dmng;
+      rhi::Device &m_dmng;
 
     public:
       // Kaynakları silinmek üzere kuyruğa alır

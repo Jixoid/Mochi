@@ -12,14 +12,14 @@
 #include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKconvert.hh"
 #include "drivers/vulkan/VKpipeline.hh"
-#include "drivers/vulkan/manager/VKdevice_manager.hh"
+#include "drivers/vulkan/manager/VKdevice.hh"
 #include "drivers/vulkan/VKshader.hh"
-#include <vulkan/vulkan_raii.hpp>
 #include "mochi/debug/debug.hh"
-#include "mochi/rhi/manager/device_manager.hh"
-#include "mochi/rhi/manager/pipeline_manager.hh"
+#include "mochi/rhi/manager/device.hh"
+#include "mochi/rhi/utility/pipeline_cache_utility.hh"
 #include "mochi/rhi/pipeline.hh"
 #include "mochi/rhi/shader.hh"
+#include <vulkan/vulkan_raii.hpp>
 #include "vk_mem_alloc.h"
 
 
@@ -32,7 +32,7 @@ namespace mochi::rhi::vulkan
   }
   
   extern "C" fun MochiRHI_MakePipeline(
-    rhi::mng::DeviceManager &device, rhi::mng::PipelineManager &pmng, u64 sign,
+    rhi::Device &device, rhi::PipelineCacheUtility &pmng, u64 sign,
     PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format color_format, Format depth_format
@@ -103,7 +103,7 @@ namespace mochi::rhi::vulkan
 
 
   VK_Pipeline::VK_Pipeline(
-    rhi::mng::DeviceManager &device, rhi::mng::PipelineManager &pmng, u64 sign,
+    rhi::Device &device, rhi::PipelineCacheUtility &pmng, u64 sign,
     PipelineMeta *_meta, std::vector<sptr<Shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format __color_format, Format __depth_format
@@ -132,13 +132,13 @@ namespace mochi::rhi::vulkan
       else
         ME_LOG_VERB("pipeline cache empty, building fresh")
 
-      vk_pipelineCache = vk::raii::PipelineCache(static_cast<vulkan::mng::VK_DeviceManager&>(device).get(), cache_info);
+      vk_pipelineCache = vk::raii::PipelineCache(static_cast<vulkan::VK_Device&>(device).get(), cache_info);
     }
 
 
 
     vk::PipelineLayoutCreateInfo layout_info({}, {}, meta->pushConstant());
-    vk_layout = vk::raii::PipelineLayout(static_cast<vulkan::mng::VK_DeviceManager&>(device).get(), layout_info);
+    vk_layout = vk::raii::PipelineLayout(static_cast<vulkan::VK_Device&>(device).get(), layout_info);
 
 
 
@@ -151,7 +151,7 @@ namespace mochi::rhi::vulkan
       vk::ComputePipelineCreateInfo compute_info({}, compute_stage, *vk_layout);
       
 
-      vk_pipeline = vk::raii::Pipeline(static_cast<vulkan::mng::VK_DeviceManager&>(device).get(), vk_pipelineCache, compute_info);
+      vk_pipeline = vk::raii::Pipeline(static_cast<vulkan::VK_Device&>(device).get(), vk_pipelineCache, compute_info);
     } 
     else {
       m_kind = PipelineKind::Graphic;
@@ -161,13 +161,13 @@ namespace mochi::rhi::vulkan
       vk::DescriptorMappingSourcePushIndexEXT push_index = {};
       push_index.heapOffset = 0;
       push_index.pushOffset = meta->push_data_end() > sizeof(uint32_t) ? (meta->push_data_end() - sizeof(uint32_t)) : 0;
-      push_index.heapIndexStride = static_cast<vulkan::mng::VK_DeviceManager&>(device).descriptor_size();
+      push_index.heapIndexStride = static_cast<vulkan::VK_Device&>(device).descriptor_size();
       push_index.heapArrayStride = 0;
       push_index.pEmbeddedSampler = nullptr;
       push_index.useCombinedImageSamplerIndex = VK_TRUE;
       push_index.samplerHeapOffset = 0;
       push_index.samplerPushOffset = push_index.pushOffset;
-      push_index.samplerHeapIndexStride = static_cast<vulkan::mng::VK_DeviceManager&>(device).sampler_descriptor_size();
+      push_index.samplerHeapIndexStride = static_cast<vulkan::VK_Device&>(device).sampler_descriptor_size();
       push_index.samplerHeapArrayStride = 0;
       
       VkDescriptorSetAndBindingMappingEXT mapping = {};
@@ -240,7 +240,7 @@ namespace mochi::rhi::vulkan
       pipeline_info.pNext = &create_flags2;
 
 
-      vk_pipeline = vk::raii::Pipeline(static_cast<vulkan::mng::VK_DeviceManager&>(device).get(), vk_pipelineCache, pipeline_info);
+      vk_pipeline = vk::raii::Pipeline(static_cast<vulkan::VK_Device&>(device).get(), vk_pipelineCache, pipeline_info);
     }
 
 

@@ -12,8 +12,9 @@
 
 #include "mochi/asset/material.hh"
 #include "mochi/asset/texture.hh"
+#include "mochi/core/engine.hh"
 #include "mochi/except.hh"
-#include "mochi/manager/material_manager.hh"
+#include "mochi/utility/material_utility.hh"
 #include "mochi/rhi/render_target.hh"
 #include <variant>
 
@@ -22,28 +23,27 @@
 namespace mochi::asset
 {
 
-  Material::Material(Core &core): m_core(core) {}
-
+  Material::Material(Engine &eng): m_eng(eng) {}
 
   
-  fun Material::desc(rhi::RenderTarget &target) -> sptr<mng::MaterialDesc> {
+  fun Material::desc(rhi::RenderTarget &target) -> sptr<utility::MaterialDesc> {
     auto Albedo = [&](){
-      if (std::holds_alternative<vec3<f32>>(m_albedo)) return mng::MaterialAlbedo::Color;
-      ef (std::holds_alternative<sptr<asset::Texture2>>(m_albedo)) return mng::MaterialAlbedo::Texture;
+      if (std::holds_alternative<vec3<f32>>(m_albedo)) return utility::MaterialAlbedo::Color;
+      ef (std::holds_alternative<sptr<asset::Texture2>>(m_albedo)) return utility::MaterialAlbedo::Texture;
       else
         throw except("unknown type");
     };
 
 
-    mng::MaterialProps props = {
-      .method = mng::MaterialMethod::PBR,
+    utility::MaterialProps props = {
+      .method = utility::MaterialMethod::PBR,
       .albedo = Albedo(),
       .count  = m_count,
       .polymode = m_polymode,
       .primitiveTopology = m_primitiveTopology,
     };
 
-    return std::move(m_core.sub<mng::MaterialManager>().getMaterialDesc(target, props));
+    return std::move(m_eng.sub<utility::MaterialUtility>().getMaterialDesc(target, props));
   }
 
 }

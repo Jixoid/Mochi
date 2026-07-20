@@ -54,8 +54,9 @@ layout(buffer_reference, std430, row_major) readonly buffer CameraBuffer {
   mat4 proj;
 };
 
-layout(push_constant) uniform PushConstant {
-  mat4 model;
+layout(push_constant, row_major) uniform PushConstant {
+  mat4x3 model;
+
   VertexBuffer vertexs;
   CameraBuffer camera;
   uint64_t light_addr;
@@ -85,7 +86,7 @@ void main() {
     frag_uv = vex.uv;
   #endif
 
-  mat4 trueModel = transpose(push.model);
+  mat4 trueModel = transpose(mat4(push.model));
 
 
   vec4 worldPos;

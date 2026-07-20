@@ -12,7 +12,7 @@
 #pragma once
 
 #include "mochi/rhi/shader.hh"
-#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/device.hh"
 #include <shaderc/shaderc.hpp>
 #include <vulkan/vulkan_raii.hpp>
 #include <string>
@@ -26,7 +26,7 @@ namespace mochi::rhi::vulkan
 
   struct VK_Shader final: public rhi::Shader {
     public:
-      explicit VK_Shader(rhi::mng::DeviceManager &device, ShaderStage stage, std::span<u32> span, std::string_view entry);
+      explicit VK_Shader(rhi::Device &device, ShaderStage stage, std::span<u8> span, std::string_view entry);
       ~VK_Shader() = default;
 
     private:

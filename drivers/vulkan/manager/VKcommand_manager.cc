@@ -10,22 +10,24 @@
 */
 
 #include "drivers/vulkan/manager/VKcommand_manager.hh"
-#include "drivers/vulkan/manager/VKdevice_manager.hh"
+#include "drivers/vulkan/manager/VKdevice.hh"
 #include "drivers/vulkan/VKcommand.hh"
 #include <vulkan/vulkan_raii.hpp>
 
-namespace mochi::rhi::vulkan::mng
+
+namespace mochi::rhi::vulkan
 {
-  extern "C" fun MochiRHI_MakeCommandManager(rhi::mng::DeviceManager &dmng) -> rhi::mng::CommandManager* {
+
+  extern "C" fun MochiRHI_MakeCommandManager(rhi::Device &dmng) -> rhi::CommandManager* {
     return new VK_CommandManager(dmng);
   }
 
-  VK_CommandManager::VK_CommandManager(rhi::mng::DeviceManager &dmng)
-    : rhi::mng::CommandManager(dmng)
+  VK_CommandManager::VK_CommandManager(rhi::Device &dmng)
+    : rhi::CommandManager(dmng)
   {}
 
   fun VK_CommandManager::allocateGraphicsCommand() -> sptr<Command> {
-    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    auto& vk_dmng = static_cast<VK_Device&>(m_device);
     // For now we use the main pool/buffer logic. In reality this should use proper command pools.
     auto cmd = vk_dmng.getMainBuffer(1);
     // VK_Command needs to take ownership of this command buffer
@@ -48,7 +50,7 @@ namespace mochi::rhi::vulkan::mng
     auto* vk_cmd = static_cast<VK_Command*>(cmd);
     vk::SubmitInfo submit_info({}, {}, *vk_cmd->get(), {});
     
-    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    auto& vk_dmng = static_cast<VK_Device&>(m_device);
     u32 family = vk_dmng.main_q().family();
     
     auto& queue = vk_dmng.active_queue(family);
@@ -69,10 +71,11 @@ namespace mochi::rhi::vulkan::mng
       sigSem ? 1 : 0, sigSem ? &signal_semaphore : nullptr
     );
 
-    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    auto& vk_dmng = static_cast<VK_Device&>(m_device);
     u32 family = vk_dmng.main_q().family();
     
     auto& queue = vk_dmng.active_queue(family);
     queue.submit(submit_info, submit_fence);
   }
+
 }

@@ -12,32 +12,30 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/manager/device_manager.hh"
-#include "mochi/rhi/command.hh"
 #include "mochi/types.hh"
 
 
 
-namespace mochi::rhi::mng
+namespace mochi::rhi
 {
   // External
-  extern "C" fun MochiRHI_MakeCommandManager(rhi::mng::DeviceManager &dmng) -> CommandManager*;
+  extern "C" fun MochiRHI_MakeCommandManager(rhi::Device &device) -> rhi::CommandManager*;
 
 
   // Interface
   struct CommandManager: noncopy {
     protected:
-      CommandManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
+      CommandManager(rhi::Device &device): m_device(device) {}
 
     public:
       virtual ~CommandManager() = default;
 
-      static fun make(rhi::mng::DeviceManager &device) {
-        return make_sptr(MochiRHI_MakeCommandManager(device));
+      static fun make(rhi::Device &device) {
+        return make_uptr(MochiRHI_MakeCommandManager(device));
       }
 
     protected:
-      rhi::mng::DeviceManager &m_dmng;
+      rhi::Device &m_device;
 
     public:
       // Kareye ve iş parçacığına göre otomatik yönetilen komut tamponu tahsisi

@@ -11,11 +11,11 @@
 
 #pragma once
 
-#include "mochi/asset/texture.hh"
 #include "mochi/basis.hh"
-#include "mochi/manager/material_manager.hh"
-#include "mochi/core/core.hh"
+#include "mochi/core/engine.hh"
+#include "mochi/asset/texture.hh"
 #include "mochi/rhi/render_target.hh"
+#include "mochi/utility/material_utility.hh"
 #include <variant>
 
 
@@ -25,14 +25,14 @@ namespace mochi::asset
 
   struct Material {
     public:
-      explicit Material(Core &core);
+      explicit Material(Engine &eng);
 
     private:
-      Core &m_core;
+      Engine &m_eng;
       std::variant<vec3<f32>, sptr<asset::Texture2>> m_albedo;
       rhi::PolygonMode m_polymode{rhi::PolygonMode::Fill};
       rhi::PrimitiveTopology m_primitiveTopology{rhi::PrimitiveTopology::TriangleList};
-      mng::MaterialCount m_count{mng::MaterialCount::Single};
+      utility::MaterialCount m_count{utility::MaterialCount::Single};
 
     public:
       fun is_color() { return std::holds_alternative<vec3<f32>>(m_albedo); }
@@ -50,9 +50,9 @@ namespace mochi::asset
       fun setPrimitiveTopology(rhi::PrimitiveTopology val) { m_primitiveTopology = val; }
 
       fun count() { return m_count; }
-      fun setCount(mng::MaterialCount val) { m_count = val; }
+      fun setCount(utility::MaterialCount val) { m_count = val; }
 
-      fun desc(rhi::RenderTarget &target) -> sptr<mng::MaterialDesc>;
+      fun desc(rhi::RenderTarget &target) -> sptr<utility::MaterialDesc>;
   };
 
 }

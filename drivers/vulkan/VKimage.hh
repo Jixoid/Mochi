@@ -12,7 +12,7 @@
 #pragma once
 
 #include "mochi/rhi/image.hh"
-#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/device.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "vk_mem_alloc.h"
 
@@ -23,11 +23,11 @@ namespace mochi::rhi::vulkan
 
   struct VK_Image2 final: public rhi::Image2 {
     public:
-      explicit VK_Image2(rhi::mng::DeviceManager &device, VmaAllocator vma_allocator, VkImage image, VmaAllocation allocation, extent<2,u32> ext);
+      explicit VK_Image2(rhi::Device &device, VmaAllocator vma_allocator, VkImage image, VmaAllocation allocation, extent<2,u32> ext);
       ~VK_Image2();
 
     private:
-      rhi::mng::DeviceManager &m_device;
+      rhi::Device &m_device;
       VmaAllocator m_vma_allocator{nil};
       VmaAllocation m_allocation{nil};
       VkImage m_image{nil};

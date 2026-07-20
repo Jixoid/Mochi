@@ -22,18 +22,24 @@ namespace mochi::asset
 
   struct Texture2 {
     public:
-      explicit Texture2(Core &core, sptr<rhi::Image2> data);
+      explicit Texture2(Engine &eng, sptr<rhi::Image2> data);
 
-      explicit Texture2(Core &core, const std::string &fpath);
+      explicit Texture2(Engine &eng, const std::string &fpath);
 
-      explicit Texture2(Core &core, u32 width, u32 height, const void *pixels);
+      explicit Texture2(Engine &eng, u32 width, u32 height, const void *pixels);
 
     public:
-      static fun make(Core &core, sptr<rhi::Image2> data) -> sptr<Texture2>;
+      static fun make(Engine &eng, sptr<rhi::Image2> data) {
+        return make_sptr<Texture2>(eng, data);
+      }
 
-      static fun make(Core &core, const std::string &fpath) -> sptr<Texture2>;
+      static fun make(Engine &eng, const std::string &fpath) {
+        return make_sptr<Texture2>(eng, fpath);
+      }
 
-      static fun make(Core &core, u32 width, u32 height, const void *pixels) -> sptr<Texture2>;
+      static fun make(Engine &eng, u32 width, u32 height, const void *pixels) {
+        return make_sptr<Texture2>(eng, width, height, pixels);
+      }
 
 
     private:

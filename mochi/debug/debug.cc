@@ -91,12 +91,12 @@ namespace mochi::debug
 
 
 namespace mochi {
-  namespace rhi      {debug::ModuleInfo debug_module{"ME.RHI",     debug::LogType::Verbose};}
-  namespace rhi::mng {debug::ModuleInfo debug_module{"ME.RHI.MNG", debug::LogType::Verbose};}
-
-  namespace mng      {debug::ModuleInfo debug_module{"ME.MNG",   debug::LogType::Verbose};}
-  namespace ecs      {debug::ModuleInfo debug_module{"ME.ECS",   debug::LogType::Verbose};}
-  namespace math     {debug::ModuleInfo debug_module{"ME.MATH",  debug::LogType::Verbose};}
-  namespace asset    {debug::ModuleInfo debug_module{"ME.ASSET", debug::LogType::Verbose};}
-  namespace reader   {debug::ModuleInfo debug_module{"ME.READ",  debug::LogType::Verbose};}
+  namespace rhi     {debug::ModuleInfo debug_module{"ME.RHI",     debug::LogType::Verbose};}
+  namespace ahi     {debug::ModuleInfo debug_module{"ME.AHI",     debug::LogType::Verbose};}
+  namespace sys     {debug::ModuleInfo debug_module{"ME.SYS",     debug::LogType::Verbose};}
+  namespace ecs     {debug::ModuleInfo debug_module{"ME.ECS",     debug::LogType::Verbose};}
+  namespace math    {debug::ModuleInfo debug_module{"ME.MATH",    debug::LogType::Verbose};}
+  namespace asset   {debug::ModuleInfo debug_module{"ME.ASSET",   debug::LogType::Verbose};}
+  namespace reader  {debug::ModuleInfo debug_module{"ME.READ",    debug::LogType::Verbose};}
+  namespace utility {debug::ModuleInfo debug_module{"ME.UTIL",    debug::LogType::Verbose};}
 }

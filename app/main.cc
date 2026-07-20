@@ -12,23 +12,28 @@
 
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include "mochi/core/core.hh"
+#include "mochi/core/engine.hh"
 #include "mochi/ecs/mesh.hh"
 #include "mochi/except.hh"
 #include "mochi/asset/mesh.hh"
 #include "mochi/ecs/camera.hh"
 #include "mochi/ecs/point_light.hh"
 #include "mochi/ecs/transform.hh"
-#include "mochi/manager/window_manager.hh"
 #include "mochi/math/quaternion.hh"
 #include "mochi/math/vec3.hh"
+#include "mochi/systems/display_system.hh"
+#include "mochi/systems/scene_system.hh"
 #include "mochi/vfs/vfs.hh"
 
+using namespace mochi;
 
 
 fun Main() -> int {
-  mochi::Core Mochi;
-  auto &Reg = Mochi.registry();
+  Engine Mochi;
+
+  Mochi.sub<sys::SceneSystem>().switchScene(asset::Scene::make());
+  
+  auto &Reg = Mochi.sub<sys::SceneSystem>().getActiveScene()->regs();
 
 
   mochi::vec3<f32> cam_pos{0,0,4};
@@ -83,7 +88,7 @@ fun Main() -> int {
   Mochi.idle() = [&](f32 dt){
     if (camera == entt::null) return;
 
-    auto win = Mochi.sub<mochi::mng::WindowManager>().glfw();
+    auto win = Mochi.sub<sys::DisplaySystem>().glfw();
 
 
     auto is_key_pressed = [win](int key) { return glfwGetKey(win, key) == GLFW_PRESS; };
@@ -158,14 +163,14 @@ fun Main() -> int {
     if (is_key_pressed(GLFW_KEY_LEFT_SHIFT)) { cam_pos -= cam_up * (cam_speed * dt); moved = true; }
 
     if (moved || cursor_locked) {
-      Mochi.registry().get<mochi::ecs::Camera>(camera).view = mochi::mat4x4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
+      Reg.get<mochi::ecs::Camera>(camera).view = mochi::mat4x4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
     }
 
     // Projection güncelleme — her frame (resize'da da güncel kalması için)
     {
-      auto ext = Mochi.sub<mochi::mng::WindowManager>().extent();
+      auto ext = Mochi.sub<sys::DisplaySystem>().extent();
       f32 aspect = (ext.y() > 0) ? (f32)ext.x() / (f32)ext.y() : 1.0f;
-      Mochi.registry().get<mochi::ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, aspect, 0.1f, 100.0f);
+      Reg.get<mochi::ecs::Camera>(camera).proj = mochi::mat4x4<f32>::perspective(90, aspect, 0.1f, 100.0f);
     }
   };
 

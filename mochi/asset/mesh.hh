@@ -36,15 +36,15 @@ namespace mochi::asset
     public:
       explicit Mesh(sptr<rhi::Buffer> data, std::vector<offs> offs, std::vector<sptr<asset::Material>> material, std::vector<int> map);
       
-      explicit Mesh(Core &core, std::span<char> file, std::string_view ext);
+      explicit Mesh(Engine &eng, std::span<char> file, std::string_view ext);
       
     public:
       static fun make(sptr<rhi::Buffer> data, std::vector<offs> offs, std::vector<sptr<asset::Material>> material, std::vector<int> map) {
         return make_sptr(new Mesh(data, offs, material, map));
       }
       
-      static fun make(Core &core, std::span<char> file, std::string_view ext) {
-        return make_sptr(new Mesh(core, file, ext));
+      static fun make(Engine &eng, std::span<char> file, std::string_view ext) {
+        return make_sptr(new Mesh(eng, file, ext));
       }
       
 

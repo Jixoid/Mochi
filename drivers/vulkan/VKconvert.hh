@@ -13,14 +13,14 @@
 
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/manager/alloc_manager.hh"
+#include "mochi/rhi/manager/allocator.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/pipeline.hh"
-#include "mochi/rhi/rhi.hh"
-#include <type_traits>
-#include <vulkan/vulkan.hpp>
+#include "mochi/rhi/types.hh"
 #include "mochi/rhi/shader.hh"
 #include "mochi/rhi/buffer.hh"
+#include <type_traits>
+#include <vulkan/vulkan.hpp>
 #include "vk_mem_alloc.h"
 
 
@@ -106,24 +106,24 @@ namespace mochi::rhi
 
 
   template <typename T>
-    requires (std::is_same_v<T, rhi::mng::AllocationCreate>)
-  inline fun VKConvert(rhi::mng::AllocationCreate in) -> VmaAllocationCreateFlagBits
+    requires (std::is_same_v<T, rhi::AllocationCreate>)
+  inline fun VKConvert(rhi::AllocationCreate in) -> VmaAllocationCreateFlagBits
   {
     return static_cast<VmaAllocationCreateFlagBits>(in);
   }
 
 
   template <typename T>
-    requires (std::is_same_v<T, rhi::mng::AllocationCreateFlags>)
-  inline fun VKConvert(rhi::mng::AllocationCreateFlags in) -> VmaAllocationCreateFlags
+    requires (std::is_same_v<T, rhi::AllocationCreateFlags>)
+  inline fun VKConvert(rhi::AllocationCreateFlags in) -> VmaAllocationCreateFlags
   {
     return static_cast<VmaAllocationCreateFlags>(in.mask());
   }
 
 
   template <typename T>
-    requires (std::is_same_v<T, rhi::mng::AllocationLocation>)
-  inline fun VKConvert(rhi::mng::AllocationLocation in) -> VmaMemoryUsage
+    requires (std::is_same_v<T, rhi::AllocationLocation>)
+  inline fun VKConvert(rhi::AllocationLocation in) -> VmaMemoryUsage
   {
     return static_cast<VmaMemoryUsage>(in);
   }

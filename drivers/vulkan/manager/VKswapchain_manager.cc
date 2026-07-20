@@ -12,7 +12,7 @@
 #include "drivers/vulkan/manager/VKswapchain_manager.hh"
 #include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKrender_target.hh"
-#include "drivers/vulkan/manager/VKdevice_manager.hh"
+#include "drivers/vulkan/manager/VKdevice.hh"
 #include <format>
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
@@ -22,16 +22,16 @@
 
 
 
-namespace mochi::rhi::vulkan::mng
+namespace mochi::rhi::vulkan
 {
-  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::mng::DeviceManager &dmng) -> rhi::mng::SwapchainManager* {
+  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::Device &dmng) -> rhi::SwapchainManager* {
     return new VK_SwapchainManager(dmng);
   }
 
 
   
-  VK_SwapchainManager::VK_SwapchainManager(rhi::mng::DeviceManager &dmng)
-    : rhi::mng::SwapchainManager(dmng)
+  VK_SwapchainManager::VK_SwapchainManager(rhi::Device &dmng)
+    : rhi::SwapchainManager(dmng)
   {}
 
   VK_SwapchainManager::~VK_SwapchainManager() {
@@ -39,14 +39,14 @@ namespace mochi::rhi::vulkan::mng
   }
 
   void VK_SwapchainManager::destroy_resources() {
-    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
     m_depth_view.clear();
     m_depth_image_handle.clear();
     m_depth_memory.clear();
   }
 
   void VK_SwapchainManager::create_resources() {
-    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
     vk_dmng.get().waitIdle();
     
     destroy_resources();
@@ -151,7 +151,7 @@ namespace mochi::rhi::vulkan::mng
   }
 
   fun VK_SwapchainManager::init(void* windowHandle, u32 width, u32 height) -> void {
-    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
     m_width = width;
     m_height = height;
 
@@ -189,7 +189,7 @@ namespace mochi::rhi::vulkan::mng
   }
 
   fun VK_SwapchainManager::present(u32 imageIndex, void* waitSemaphore) -> void {
-    auto& vk_dmng = static_cast<VK_DeviceManager&>(m_dmng);
+    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
     
     vk::Semaphore sem = static_cast<VkSemaphore>(waitSemaphore);
     vk::SwapchainKHR swp = *m_swapchain;

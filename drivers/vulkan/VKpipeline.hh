@@ -13,7 +13,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 #include "mochi/rhi/pipeline.hh"
-#include "mochi/rhi/manager/pipeline_manager.hh"
+#include "mochi/rhi/utility/pipeline_cache_utility.hh"
 #include "mochi/rhi/shader.hh"
 #include "vk_mem_alloc.h"
 
@@ -42,7 +42,7 @@ namespace mochi::rhi::vulkan
   struct VK_Pipeline final: public rhi::Pipeline {
     public:
       explicit VK_Pipeline(
-        rhi::mng::DeviceManager &device, rhi::mng::PipelineManager &pmng, u64 sign,
+        rhi::Device &device, rhi::PipelineCacheUtility &pmng, u64 sign,
         PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format

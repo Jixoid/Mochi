@@ -38,7 +38,7 @@ namespace mochi::rhi
 
 
   // External
-  extern "C" fun MochiRHI_MakeShader(rhi::mng::DeviceManager &dmng, ShaderStage stage, std::span<u32> span, std::string_view entry) -> Shader*;
+  extern "C" fun MochiRHI_MakeShader(rhi::Device &device, ShaderStage stage, std::span<u8> span, std::string_view entry) -> Shader*;
   
 
   // Interface
@@ -49,8 +49,8 @@ namespace mochi::rhi
     public:
       virtual ~Shader() = default;
       
-      static fun make(rhi::mng::DeviceManager &dmng, ShaderStage stage, std::span<u32> span, std::string_view entry = "main"){
-        return make_sptr(MochiRHI_MakeShader(dmng, stage, span, entry));
+      static fun make(rhi::Device &device, ShaderStage stage, std::span<u8> span, std::string_view entry = "main"){
+        return make_sptr(MochiRHI_MakeShader(device, stage, span, entry));
       }
 
     public:

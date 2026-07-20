@@ -15,4 +15,3 @@
 
 
 namespace mochi::rhi::vulkan {extern debug::ModuleInfo debug_module;}
-namespace mochi::rhi::vulkan::mng {extern debug::ModuleInfo debug_module;}

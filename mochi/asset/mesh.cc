@@ -17,12 +17,11 @@
 #include "mochi/except.hh"
 #include "mochi/reader/reader.hh"
 #include "mochi/rhi/image.hh"
-#include "mochi/rhi/manager/alloc_manager.hh"
-#include "mochi/rhi/manager/transfer_manager.hh"
-#include "mochi/rhi/rhi.hh"
-#include "mochi/rhi/vtype.hh"
+#include "mochi/rhi/manager/allocator.hh"
+#include "mochi/rhi/manager/uploader.hh"
+#include "mochi/rhi/types.hh"
 #include "mochi/types.hh"
-#include "mochi/core/core.hh"
+#include "mochi/core/engine.hh"
 #include <string>
 #include <string_view>
 
@@ -85,13 +84,13 @@ namespace mochi::asset
     return vertexs;
   }
 
-  inline fun include_images(Core &core, gltf_image &raw_image) -> sptr<rhi::Image2> {
+  inline fun include_images(Engine &eng, gltf_image &raw_image) -> sptr<rhi::Image2> {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load_from_memory(raw_image.data.data(), raw_image.data.size(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     if (!pixels) throw mochi::asset_error("Failed to load texture!");
 
-    auto& alloc_mgr = core.sub<rhi::mng::AllocManager>();
-    auto& transfer_mgr = core.sub<rhi::mng::TransferManager>();
+    auto& alloc_mgr = eng.sub<rhi::Allocator>();
+    auto& transfer_mgr = eng.sub<rhi::Uploader>();
 
     auto img = alloc_mgr.allocImage2(
       { (u32)texWidth, (u32)texHeight },
@@ -99,10 +98,10 @@ namespace mochi::asset
       flags(rhi::ImageUsage::TransferDst) | rhi::ImageUsage::Sampled,
       rhi::ImageTiling::Optimal,
       {},
-      rhi::mng::AllocationLocation::PreferDevice
+      rhi::AllocationLocation::PreferDevice
     );
     
-    transfer_mgr.copyMemoryToImage(rhi::mng::TransferTime::Now, pixels, img.get());
+    transfer_mgr.copyMemoryToImage(rhi::TransferTime::Now, pixels, img.get());
 
     stbi_image_free(pixels);
 
@@ -118,7 +117,7 @@ namespace mochi::asset
     , m_map(map)
   {}
 
-  Mesh::Mesh(Core &core, std::span<char> file, std::string_view ext) {
+  Mesh::Mesh(Engine &core, std::span<char> file, std::string_view ext) {
     ::data mfile{file.data(), file.size_bytes()};
     
     std::vector<vertex_t> final_data;
@@ -178,17 +177,17 @@ namespace mochi::asset
     }
 
 
-    auto& alloc_mgr = core.sub<rhi::mng::AllocManager>();
-    auto& transfer_mgr = core.sub<rhi::mng::TransferManager>();
+    auto& alloc_mgr = core.sub<rhi::Allocator>();
+    auto& transfer_mgr = core.sub<rhi::Uploader>();
 
     m_data = alloc_mgr.allocBuffer(
       sizeof(vertex_t) * final_data.size(),
       flags(rhi::BufferUsage::DeviceAddress) | rhi::BufferUsage::TransferDst,
-      rhi::mng::AllocationCreate::Mapped,
-      rhi::mng::AllocationLocation::PreferDevice
+      rhi::AllocationCreate::Mapped,
+      rhi::AllocationLocation::PreferDevice
     );
 
-    transfer_mgr.copyMemoryToBuffer(rhi::mng::TransferTime::Now, final_data.data(), m_data.get());
+    transfer_mgr.copyMemoryToBuffer(rhi::TransferTime::Now, final_data.data(), m_data.get());
     m_offs = std::move(final_offs);
     m_map = std::move(final_map);
     m_material = std::move(final_material);

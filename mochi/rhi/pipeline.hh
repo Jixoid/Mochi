@@ -13,11 +13,10 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/rhi.hh"
-#include "mochi/rhi/vtype.hh"
+#include "mochi/rhi/types.hh"
 #include "mochi/types.hh"
 #include "mochi/rhi/shader.hh"
-#include "mochi/rhi/manager/pipeline_manager.hh"
+#include "mochi/rhi/utility/pipeline_cache_utility.hh"
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
@@ -112,12 +111,9 @@ namespace mochi::rhi
 
 
   // External
-  struct PipelineMeta;
-  struct Pipeline;
-
   extern "C" fun MochiRHI_MakePipelineMeta(PushConstantList push, VertexBindList vert) -> PipelineMeta*;
   extern "C" fun MochiRHI_MakePipeline(
-    rhi::mng::DeviceManager &dmng, rhi::mng::PipelineManager &pmng, u64 sign,
+    rhi::Device &device, rhi::PipelineCacheUtility &pipeCache, u64 sign,
     PipelineMeta *info, std::vector<sptr<Shader>> shaders,
     PolygonMode polymode, PrimitiveTopology primitiveTopology,
     Format color_format, Format depth_format
@@ -155,12 +151,12 @@ namespace mochi::rhi
       virtual ~Pipeline() = default;
 
       static fun make(
-        rhi::mng::DeviceManager &dmng, rhi::mng::PipelineManager &pmng, u64 sign,
+        rhi::Device &device, rhi::PipelineCacheUtility &pipeCache, u64 sign,
         PipelineMeta *meta, std::vector<sptr<Shader>> shaders,
         PolygonMode polymode, PrimitiveTopology primitiveTopology,
         Format color_format, Format depth_format
       ) {
-        return make_sptr(MochiRHI_MakePipeline(dmng, pmng, sign, meta, std::move(shaders), polymode, primitiveTopology, color_format, depth_format));
+        return make_sptr(MochiRHI_MakePipeline(device, pipeCache, sign, meta, std::move(shaders), polymode, primitiveTopology, color_format, depth_format));
       }
     
 

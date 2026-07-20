@@ -12,45 +12,77 @@
 #pragma once
 
 
-namespace mochi
-{
+namespace mochi {
 
-  struct Core;
+  // Engine
+  struct Engine;
   
 
-  namespace mng {
-    struct WindowManager;
-    struct RenderManager;
-    struct SceneManager;
-    struct MaterialManager;
-    struct PluginManager;
+  // SubSystems
+  namespace sys {
+    struct RenderingSystem;
+    struct DisplaySystem;
+    struct SceneSystem;
+    struct PhysicSystem;
+    struct AudioSystem;
+    struct PluginSystem;
   }
 
+  // Audio Hardware Interface
+  namespace ahi {
 
+  }
+
+  // Render Hardware Interface
   namespace rhi {
-    namespace mng {
-      struct DeviceManager;
-      struct AllocManager;
-      struct ShaderManager;
-      struct PipelineManager;
-      struct TransferManager;
-      struct SyncManager;
-      struct CommandManager;
-      struct SwapchainManager;
-      struct ResourceManager;
-    }
+    // Manager
+    struct Device;
+    struct Allocator;
+    struct Uploader;
 
+    // Utility
+    struct PipelineCacheUtility;
+    struct ShaderCacheUtility;
+    struct ShaderCompileUtility;
+    
+    // Comp
+    struct Shader;
     struct PipelineMeta;
     struct Pipeline;
-    
     struct Buffer;
-    struct Shader;
     struct Image;
     struct Image2;
+    struct ImageView;
     struct ImageView2;
+    struct Sampler;
+    struct Sampler2;
+    struct RenderTarget;
+    struct Command;
+    struct Synchronizer;
+    
+    
+    struct CommandManager;
+    struct SwapchainManager;
+    struct ResourceManager;
   }
 
+  // Utility
+  namespace utility {
+    struct MaterialUtility;
+  }
 
+  // Entity Component System
+  namespace ecs {
+    struct Camera;
+    struct Hierarchy;
+    struct Mesh;
+    struct MultiMesh;
+    struct PointLight;
+    struct Skeleton;
+    struct Transform;
+  }
+
+  // Asset
   namespace asset {
     struct Mesh;
     struct Texture2;

@@ -13,6 +13,7 @@
 #version 450
 
 #extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 
 layout(location = 0) out vec4 out_color;
@@ -27,10 +28,40 @@ layout(location = 1) in vec3 normal_world;
 #endif
 
 
-#if defined(WITH_TEXTURE)
-	layout(binding = 2) uniform sampler2D texSampler;
-#endif
+layout(buffer_reference, std430, row_major) readonly buffer CameraBuffer {
+	mat4 view;
+	mat4 proj;
+};
 
+
+struct light_t {
+	vec4 pos;
+	vec4 color;
+};
+
+layout(buffer_reference, std430) readonly buffer LightBuffer {
+	uvec4 a;
+	uvec4 b;
+	light_t s[32];
+};
+
+layout(push_constant, row_major) uniform PushConstant {
+  mat4x3 model;
+	
+  uint64_t vertex_addr;
+  CameraBuffer camera;
+  LightBuffer  light;
+  
+  #if defined(WITH_MULTI_INST)
+    uint64_t inst_addr;
+  #endif
+
+  uint texture_id;
+} push;
+
+#if defined(WITH_TEXTURE)
+	layout(set = 1, binding = 0) uniform sampler2D texSampler;
+#endif
 
 
 void main()

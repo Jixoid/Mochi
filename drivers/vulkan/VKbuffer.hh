@@ -10,7 +10,7 @@
 */
 
 #include "drivers/vulkan/VKconvert.hh"
-#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/device.hh"
 #include <vulkan/vulkan.hpp>
 #include "vk_mem_alloc.h"
 
@@ -21,11 +21,11 @@ namespace mochi::rhi::vulkan
 
   struct VK_Buffer final: public rhi::Buffer {
     public:
-      explicit VK_Buffer(rhi::mng::DeviceManager &device, VmaAllocator vma_allocator, VkBuffer buffer, VmaAllocation allocation, void* mapped, u64 size);
+      explicit VK_Buffer(rhi::Device &device, VmaAllocator vma_allocator, VkBuffer buffer, VmaAllocation allocation, void* mapped, u64 size);
       ~VK_Buffer();
 
     private:
-      rhi::mng::DeviceManager &m_device;
+      rhi::Device &m_device;
       VmaAllocator m_vma_allocator{nil};
       VkBuffer m_buffer{nil};
       VmaAllocation m_allocation{nil};

@@ -12,7 +12,7 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/rhi.hh"
+#include "mochi/rhi/types.hh"
 
 
 

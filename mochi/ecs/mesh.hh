@@ -13,6 +13,7 @@
 
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
+#include "entt/entity/entity.hpp"
 
 
 

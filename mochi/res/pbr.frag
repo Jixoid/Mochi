@@ -45,8 +45,9 @@ layout(buffer_reference, std430) readonly buffer LightBuffer {
 	light_t s[32];
 };
 
-layout(push_constant) uniform PushConstant {
-  mat4 model;
+layout(push_constant, row_major) uniform PushConstant {
+  mat4x3 model;
+	
   uint64_t vertex_addr;
   CameraBuffer camera;
   LightBuffer  light;

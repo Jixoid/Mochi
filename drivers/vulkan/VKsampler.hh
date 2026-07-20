@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/device.hh"
 #include <vulkan/vulkan_raii.hpp>
 #include "mochi/rhi/sampler.hh"
 #include "vk_mem_alloc.h"
@@ -23,10 +23,10 @@ namespace mochi::rhi::vulkan
 
   struct VK_Sampler2 final: public rhi::Sampler2 {
     public:
-      explicit VK_Sampler2(rhi::mng::DeviceManager &device, vk::raii::Sampler sampler): m_device(device), m_sampler(std::move(sampler)) {}
+      explicit VK_Sampler2(rhi::Device &device, vk::raii::Sampler sampler): m_device(device), m_sampler(std::move(sampler)) {}
 
     private:
-      rhi::mng::DeviceManager &m_device;
+      rhi::Device &m_device;
       vk::raii::Sampler m_sampler;
 
     public:

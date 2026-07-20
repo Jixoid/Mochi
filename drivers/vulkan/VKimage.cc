@@ -10,12 +10,12 @@
 */
 
 
-#include "drivers/vulkan/manager/VKalloc_manager.hh"
+#include "drivers/vulkan/manager/VKallocator.hh"
 #include "mochi/basis.hh"
 #include "mochi/types.hh"
 #include "vk_mem_alloc.h"
-#include "mochi/rhi/manager/device_manager.hh"
-#include "drivers/vulkan/manager/VKdevice_manager.hh"
+#include "mochi/rhi/manager/device.hh"
+#include "drivers/vulkan/manager/VKdevice.hh"
 #include "drivers/vulkan/VKbuffer.hh"
 #include "drivers/vulkan/VKimage.hh"
 #include <vulkan/vulkan_raii.hpp>
@@ -24,7 +24,7 @@
 namespace mochi::rhi::vulkan
 {
 
-  VK_Image2::VK_Image2(rhi::mng::DeviceManager &device, VmaAllocator vma_allocator, VkImage image, VmaAllocation allocation, extent<2,u32> ext)
+  VK_Image2::VK_Image2(rhi::Device &device, VmaAllocator vma_allocator, VkImage image, VmaAllocation allocation, extent<2,u32> ext)
     : m_device(device)
     , m_vma_allocator(vma_allocator)
     , m_allocation(allocation)
@@ -45,7 +45,7 @@ namespace mochi::rhi::vulkan
       {}, m_image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Unorm,
       {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
     );
-    auto e_view = vk::raii::ImageView(static_cast<vulkan::mng::VK_DeviceManager&>(m_device).get(), view_info);
+    auto e_view = vk::raii::ImageView(static_cast<vulkan::VK_Device&>(m_device).get(), view_info);
 
     return make_sptr(new VK_ImageView2(std::move(e_view)));
   }

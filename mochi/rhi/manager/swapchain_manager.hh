@@ -12,32 +12,32 @@
 #pragma once
 
 #include "mochi/basis.hh"
-#include "mochi/rhi/manager/device_manager.hh"
+#include "mochi/rhi/manager/device.hh"
 #include "mochi/rhi/render_target.hh"
 #include "mochi/types.hh"
 
 
 
-namespace mochi::rhi::mng
+namespace mochi::rhi
 {
   // External
-  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::mng::DeviceManager &dmng) -> SwapchainManager*;
+  extern "C" fun MochiRHI_MakeSwapchainManager(rhi::Device &dmng) -> SwapchainManager*;
 
 
   // Interface
   struct SwapchainManager: noncopy {
     protected:
-      SwapchainManager(rhi::mng::DeviceManager &dmng): m_dmng(dmng) {}
+      SwapchainManager(rhi::Device &dmng): m_dmng(dmng) {}
 
     public:
       virtual ~SwapchainManager() = default;
 
-      static fun make(rhi::mng::DeviceManager &device) {
+      static fun make(rhi::Device &device) {
         return make_sptr(MochiRHI_MakeSwapchainManager(device));
       }
 
     protected:
-      rhi::mng::DeviceManager &m_dmng;
+      rhi::Device &m_dmng;
 
     public:
       // Platforma özel pencere handle'ı ile swapchain ilklendirme (GLFW/SDL pencere işaretçisi)
