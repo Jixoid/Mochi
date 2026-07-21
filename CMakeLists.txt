@@ -44,6 +44,11 @@ endif()
 
 
 # Thirdparty
+set(KTX_FEATURE_TOOLS OFF CACHE INTERNAL "Do not build KTX command line tools")
+set(KTX_FEATURE_DOC OFF CACHE INTERNAL "Do not build KTX documentation")
+set(KTX_FEATURE_TESTS OFF CACHE INTERNAL "Do not build KTX tests")
+set(KTX_FEATURE_VULKAN OFF CACHE INTERNAL "Enable Vulkan features in KTX")
+
 file(GLOB childs RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty" "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/*")
 foreach(child ${childs})
   if(
@@ -92,8 +97,6 @@ endif()
 # Depency
 find_package(PkgConfig REQUIRED)
 
-find_package(Vulkan REQUIRED)
-
 find_package(glfw3 CONFIG QUIET)
 if(glfw3_FOUND)
   set(GLFW_TARGET glfw)
@@ -108,37 +111,35 @@ endif()
 add_library(glfw_ INTERFACE)
 target_link_libraries(glfw_ INTERFACE ${GLFW_TARGET})
 
-pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
 
+# Drivers
+add_subdirectory(drivers)
 
 
 # Engine
 file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mochi/*.cc")
-file(GLOB_RECURSE DRIVER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/drivers/vulkan/*.cc")
 
 
-add_library(qaos_mochi_shared SHARED ${SOURCES} ${RES_OBJECTS} ${DRIVER_SOURCES})
+add_library(qaos_mochi_shared SHARED ${SOURCES} ${RES_OBJECTS})
 target_include_directories(qaos_mochi_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qaos_mochi_shared PUBLIC
+  qaos_mochi_graphic_driver
   glfw_
-  Vulkan::Vulkan
-  PkgConfig::SHADERC
   ext_cgltf
   ext_stb
-  VulkanMemoryAllocator
+  ktx
   EnTT
 )
 
 
-add_library(qaos_mochi_static STATIC ${SOURCES} ${RES_OBJECTS} ${DRIVER_SOURCES})
+add_library(qaos_mochi_static STATIC ${SOURCES} ${RES_OBJECTS})
 target_include_directories(qaos_mochi_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qaos_mochi_static PUBLIC
+  qaos_mochi_graphic_driver
   glfw_
-  Vulkan::Vulkan
-  PkgConfig::SHADERC
   ext_cgltf
   ext_stb
-  VulkanMemoryAllocator
+  ktx
   EnTT
 )
 
@@ -149,4 +150,3 @@ add_subdirectory(app)
 
 # Editor
 add_subdirectory(editor)
-

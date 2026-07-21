@@ -7,3 +7,9 @@
 [submodule "thirdparty/nimbus"]
 	path = thirdparty/nimbus
 	url = https://github.com/Jixoid/Nimbus.git
+[submodule "thirdparty/ktx"]
+	path = thirdparty/ktx
+	url = https://github.com/KhronosGroup/KTX-Software.git
+[submodule "thirdparty/miniaudio"]
+	path = thirdparty/miniaudio
+	url = https://github.com/mackron/miniaudio.git

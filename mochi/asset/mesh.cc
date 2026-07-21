@@ -16,6 +16,7 @@
 #include "mochi/asset/mesh.hh"
 #include "mochi/except.hh"
 #include "mochi/reader/reader.hh"
+#include "mochi/reader/types.hh"
 #include "mochi/rhi/image.hh"
 #include "mochi/rhi/manager/allocator.hh"
 #include "mochi/rhi/manager/uploader.hh"
@@ -127,7 +128,7 @@ namespace mochi::asset
 
 
     if (ext == ".obj") {
-      auto raw = read<ft_wavefront>(mfile);
+      auto raw = read<ftype::wavefront>(mfile);
 
       auto asset = make_sptr<asset::Material>(core);
       asset->setColor({0,0,0});
@@ -138,7 +139,7 @@ namespace mochi::asset
       final_map = {0};
     } 
     ef (ext == ".glb" || ext == ".gltf") {
-      auto raw = read<ft_gltf>(mfile);
+      auto raw = read<ftype::gltf>(mfile);
 
       final_data = std::move(raw.vertices);
       final_offs = std::move(raw.offsets);

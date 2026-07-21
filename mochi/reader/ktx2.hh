@@ -1,0 +1,27 @@
+/*
+  This file is part of QAOS
+
+  This file is licensed under the GNU General Public License version 3 (GPL3).
+
+  You should have received a copy of the GNU General Public License
+  along with QAOS. If not, see <https://www.gnu.org/licenses/>.
+
+  Copyright (c) 2025-2026 by Kadir Aydın.
+*/
+
+#pragma once
+
+#include "mochi/basis.hh"
+#include "mochi/reader/types.hh"
+#include "mochi/rhi/types.hh"
+
+
+
+namespace mochi::reader
+{
+
+  template <ftype T>
+    requires (T == ftype::ktx)
+  fun read(data src, rhi::Format format) -> std::vector<u8>;
+
+}

@@ -23,7 +23,7 @@ namespace mochi
 {
 
   template<>
-  fun read<ft_wavefront>(data src) -> wf_obj
+  fun read<ftype::wavefront>(data src) -> wf_obj
   {
     wf_obj data;
     std::spanstream file(std::span<char>((char*)src.ptr(), src.size()));

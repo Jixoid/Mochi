@@ -14,31 +14,12 @@
 
 #include "mochi/basis.hh"
 #include "mochi/asset/mesh.hh"
+#include "mochi/reader/types.hh"
 
 
 
 namespace mochi
 {
-
-  /** @brief Supported file types for reading. */
-  enum ftype
-  {
-    /** @brief Wavefront OBJ format. */
-    ft_wavefront,
-    /** @brief glTF format. */
-    ft_gltf,
-  };
-
-  /** 
-   * @brief Generic read function template. 
-   * @tparam T The file type to read.
-   */
-  template <ftype T>
-  fun read();
-
-
-
-
   /// Wavefront
 
   /** @brief Wavefront OBJ indices for a single vertex. */
@@ -77,7 +58,7 @@ namespace mochi
    * @return A parsed Wavefront OBJ model.
    */
   template <ftype T>
-    requires (T == ftype::ft_wavefront)
+    requires (T == ftype::wavefront)
   fun read(data input) -> wf_obj;
 
 
@@ -113,7 +94,7 @@ namespace mochi
    * @return A parsed glTF model.
    */
   template <ftype T>
-    requires (T == ftype::ft_gltf)
+    requires (T == ftype::gltf)
   fun read(data input) -> gltf_obj;
 
 }

@@ -23,7 +23,7 @@ namespace mochi
 {
 
   template<>
-  fun read<ft_gltf>(data src) -> gltf_obj
+  fun read<ftype::gltf>(data src) -> gltf_obj
   {
     gltf_obj result;
     
