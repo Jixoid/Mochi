@@ -23,6 +23,9 @@
 #include "mochi/math/vec3.hh"
 #include "mochi/systems/display_system.hh"
 #include "mochi/systems/scene_system.hh"
+#include "mochi/systems/audio_system.hh"
+#include "mochi/ecs/audio_source.hh"
+#include "mochi/audio/pcm_asset.hh"
 #include "mochi/vfs/vfs.hh"
 
 using namespace mochi;
@@ -83,6 +86,17 @@ fun Main() -> int {
   auto &transform = Reg.emplace<mochi::ecs::Transform>(mesh_instance);
   transform.model = mochi::mat4x3<f32>::model({0}, mochi::quaternion<f32>(), {1});
   scene_nodes.push_back(mesh_instance);
+
+
+  auto my_audio_asset = make_sptr<mochi::audio::PcmAsset>(Mochi.sub<mochi::sys::AudioSystem>().device(), "/home/alforce/Müzik/test.wav");
+  
+  auto &audio_comp = Reg.emplace<mochi::ecs::AudioSource>(mesh_instance);
+  audio_comp.source->bind_asset(my_audio_asset);
+  audio_comp.source->volume = 1.0f;
+  audio_comp.source->position = {0.0f, 0.0f, 0.0f};
+  audio_comp.source->loop(true);
+  audio_comp.attach_to_mixer(Mochi.sub<mochi::sys::AudioSystem>().mixer());
+  audio_comp.source->play();
 
 
   Mochi.idle() = [&](f32 dt){
@@ -164,6 +178,12 @@ fun Main() -> int {
 
     if (moved || cursor_locked) {
       Reg.get<mochi::ecs::Camera>(camera).view = mochi::mat4x4<f32>::lookAt(cam_pos, cam_pos + cam_front, cam_up);
+      
+      mochi::audio::Listener listener;
+      listener.position = cam_pos;
+      listener.forward = cam_front;
+      listener.up = cam_up;
+      Mochi.sub<mochi::sys::AudioSystem>().mixer().set_listener(listener);
     }
 
     // Projection güncelleme — her frame (resize'da da güncel kalması için)
@@ -175,10 +195,7 @@ fun Main() -> int {
   };
 
   Mochi.run();
-
-  scene_nodes.clear();
-  m3d.reset();
-
+  
   return 0;
 }
 

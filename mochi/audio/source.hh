@@ -28,13 +28,12 @@ namespace mochi::audio
       virtual ~Source() = default;
 
     private:
-      const PcmAsset* m_asset{nullptr};
+      sptr<PcmAsset> m_asset{nullptr};
       std::atomic<u64> m_cursor{0};
       std::atomic<SourceState> m_state{SourceState::Stopped};
       std::atomic<bool> m_looping{false};
 
     public:
-      // 3D Spatial Properties
       vec3<f32> position{0.0f, 0.0f, 0.0f};
       float volume{1.0f};
       float pitch{1.0f};
@@ -42,7 +41,7 @@ namespace mochi::audio
       float max_distance{100.0f};
 
     public:
-      fun bind_asset(const PcmAsset* asset) -> void { 
+      fun bind_asset(sptr<PcmAsset> asset) -> void { 
         m_asset = asset; 
         m_cursor.store(0); 
       }

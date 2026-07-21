@@ -17,11 +17,22 @@ set(FETCHCONTENT_QUIET OFF)
 
 # Debug
 add_compile_options(-Wno-gnu-alignof-expression)
-add_compile_definitions($<$<CONFIG:Debug>:_DBG> $<$<CONFIG:RelWithDebInfo>:_DBG>)
-add_compile_definitions(_mochi_debug_khronos_validator)
-add_compile_definitions(_mochi_debug_validator)
-add_compile_definitions(_mochi_debug_level=0)
-add_compile_definitions(_mochi_driver_debug_statistics)
+
+add_compile_definitions($<$<CONFIG:Release>:_REL>)
+add_compile_definitions($<$<CONFIG:Debug>:_DBG>)
+add_compile_definitions($<$<CONFIG:RelWithDebInfo>:_RWDI>)
+
+add_compile_definitions($<$<CONFIG:Debug>:_mochi_debug_khronos_validator>)
+add_compile_definitions($<$<CONFIG:Debug>:_mochi_debug_validator>)
+add_compile_definitions($<$<CONFIG:Debug>:_mochi_driver_debug_statistics>)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_definitions(_mochi_debug_level=0)
+elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  add_compile_definitions(_mochi_debug_level=2)
+else()
+  add_compile_definitions(_mochi_debug_level=2)
+endif()
 
 
 # Sanitizer
