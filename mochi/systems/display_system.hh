@@ -17,7 +17,6 @@
 #include <string_view>
 #include "mochi/math/extent.hh"
 #include "mochi/rhi/manager/swapchain_manager.hh"
-#include "vk_mem_alloc.h"
 #include "mochi/rhi/render_target.hh"
 
 

@@ -20,6 +20,7 @@
 #include "mochi/systems/display_system.hh"
 #include "mochi/systems/rendering_system.hh"
 #include "mochi/systems/scene_system.hh"
+#include "mochi/systems/audio_system.hh"
 #include <cassert>
 #include <functional>
 #include "entt/entt.hpp"
@@ -56,6 +57,7 @@ namespace mochi
         uptr<sys::DisplaySystem>,
         uptr<sys::SceneSystem>,
         uptr<sys::PluginSystem>,
+        uptr<sys::AudioSystem>,
         
         uptr<rhi::PipelineCacheUtility>,
         uptr<rhi::ShaderCacheUtility>,

@@ -22,6 +22,7 @@
 #include "mochi/systems/plugin_system.hh"
 #include "mochi/systems/rendering_system.hh"
 #include "mochi/systems/scene_system.hh"
+#include "mochi/systems/audio_system.hh"
 #include "mochi/types.hh"
 #include <chrono>
 
@@ -47,6 +48,7 @@ namespace mochi
     auto smng = make_uptr(new sys::SceneSystem());
     auto display = make_uptr(new sys::DisplaySystem(*device, *smng, "Mochi Engine", 800,600));
     auto plugin = make_uptr(new sys::PluginSystem(*this));
+    auto audio = make_uptr(new sys::AudioSystem());
 
     // Utility
     auto picu = rhi::PipelineCacheUtility::make(*device);
@@ -68,6 +70,7 @@ namespace mochi
       std::move(display),
       std::move(smng),
       std::move(plugin),
+      std::move(audio),
       
       std::move(picu),
       std::move(sacu),
@@ -77,6 +80,7 @@ namespace mochi
   }
 
   Engine::~Engine() {
+    std::get<uptr<sys::AudioSystem>>(m_modules).reset();
     std::get<uptr<sys::PluginSystem>>(m_modules).reset();
     std::get<uptr<sys::SceneSystem>>(m_modules).reset();
     std::get<uptr<sys::DisplaySystem>>(m_modules).reset();

@@ -10,6 +10,7 @@
 */
 
 
+#define VMA_IMPLEMENTATION
 #include "drivers/vulkan/manager/VKdevice.hh"
 #include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKimage.hh"
@@ -21,6 +22,7 @@
 #include "drivers/vulkan/VKsampler.hh"
 #include "mochi/basis.hh"
 #include "mochi/except.hh"
+#include "vk_mem_alloc.h"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include <format>

@@ -124,6 +124,7 @@ add_library(qaos_mochi_shared SHARED ${SOURCES} ${RES_OBJECTS})
 target_include_directories(qaos_mochi_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qaos_mochi_shared PUBLIC
   qaos_mochi_graphic_driver
+  qaos_mochi_audio_driver
   glfw_
   ext_cgltf
   ext_stb
@@ -136,6 +137,7 @@ add_library(qaos_mochi_static STATIC ${SOURCES} ${RES_OBJECTS})
 target_include_directories(qaos_mochi_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qaos_mochi_static PUBLIC
   qaos_mochi_graphic_driver
+  qaos_mochi_audio_driver
   glfw_
   ext_cgltf
   ext_stb
