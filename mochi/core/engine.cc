@@ -80,12 +80,28 @@ namespace mochi
   }
 
   Engine::~Engine() {
+    auto& device = std::get<uptr<rhi::Device>>(m_modules);
+    if (device) {
+      device->waitIdle();
+      device->finiDescriptorHeap();
+    }
+
+    std::get<uptr<utility::MaterialUtility>>(m_modules).reset();
+    std::get<uptr<rhi::ShaderCompileUtility>>(m_modules).reset();
+    std::get<uptr<rhi::ShaderCacheUtility>>(m_modules).reset();
+    std::get<uptr<rhi::PipelineCacheUtility>>(m_modules).reset();
+    
     std::get<uptr<sys::AudioSystem>>(m_modules).reset();
     std::get<uptr<sys::PluginSystem>>(m_modules).reset();
     std::get<uptr<sys::SceneSystem>>(m_modules).reset();
     std::get<uptr<sys::DisplaySystem>>(m_modules).reset();
     std::get<uptr<sys::RenderingSystem>>(m_modules).reset();
 
+    std::get<uptr<rhi::Synchronizer>>(m_modules).reset();
+    std::get<uptr<rhi::CommandManager>>(m_modules).reset();
+    std::get<uptr<rhi::Uploader>>(m_modules).reset();
+    std::get<uptr<rhi::Allocator>>(m_modules).reset();
+    
     std::get<uptr<rhi::Device>>(m_modules).reset();
   }
 

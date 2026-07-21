@@ -43,6 +43,7 @@ namespace mochi::rhi::vulkan
       fun waitIdle() -> void override { vk_device.waitIdle(); }
       
       fun initDescriptorHeap(rhi::Allocator &alloc) -> void override;
+      fun finiDescriptorHeap() -> void override;
       fun writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 override;
 
 

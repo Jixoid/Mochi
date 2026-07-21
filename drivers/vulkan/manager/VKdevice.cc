@@ -12,7 +12,6 @@
 
 #define VMA_IMPLEMENTATION
 #include "drivers/vulkan/manager/VKdevice.hh"
-#include "drivers/vulkan/VKdriver.hh"
 #include "drivers/vulkan/VKimage.hh"
 #include "drivers/vulkan/VKsampler.hh"
 #include "mochi/debug/debug.hh"
@@ -282,6 +281,11 @@ namespace mochi::rhi::vulkan
     );
 
     ME_LOG_VERB("descriptor heap initialized (capacity: {})", max_textures)
+  }
+
+  fun VK_Device::finiDescriptorHeap() -> void {
+    m_descriptor_heap.reset();
+    m_sampler_heap.reset();
   }
 
   fun VK_Device::writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 {

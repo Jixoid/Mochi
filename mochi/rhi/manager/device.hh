@@ -84,6 +84,7 @@ namespace mochi::rhi
       
       // Descriptor Management
       virtual fun initDescriptorHeap(rhi::Allocator &alloc) -> void = 0;
+      virtual fun finiDescriptorHeap() -> void = 0;
       virtual fun writeTextureDescriptor(sptr<rhi::ImageView2> view, sptr<rhi::Sampler2> sampler) -> u32 = 0;
       virtual fun descriptor_heap() -> sptr<rhi::Buffer> = 0;
       virtual fun sampler_heap() -> sptr<rhi::Buffer> = 0;
