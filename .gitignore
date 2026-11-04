@@ -1,15 +1,9 @@
 # Helpers
-.vscode
-.remote
-/build
-.cache
-.qcache
-html
-latex
-xml
-
-
-# Compiled
-**/@*
 **/!*
-**.spv
+/.vscode
+/build
+/.cache
+/html
+/latex
+/xml
+/perf.data*

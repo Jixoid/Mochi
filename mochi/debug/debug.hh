@@ -54,6 +54,7 @@ namespace mochi {
   namespace asset   {extern debug::ModuleInfo debug_module;}
   namespace reader  {extern debug::ModuleInfo debug_module;}
   namespace utility {extern debug::ModuleInfo debug_module;}
+  namespace audio   {extern debug::ModuleInfo debug_module;}
 }
 
 

@@ -99,4 +99,5 @@ namespace mochi {
   namespace asset   {debug::ModuleInfo debug_module{"ME.ASSET",   debug::LogType::Verbose};}
   namespace reader  {debug::ModuleInfo debug_module{"ME.READ",    debug::LogType::Verbose};}
   namespace utility {debug::ModuleInfo debug_module{"ME.UTIL",    debug::LogType::Verbose};}
+  namespace audio   {debug::ModuleInfo debug_module{"ME.AUDIO",   debug::LogType::Verbose};}
 }
