@@ -28,21 +28,16 @@ impl<T: Number> Vec4<T> {
 	pub const ONE: Self = Self{x: T::ONE, y: T::ONE, z: T::ONE, w: T::ONE};
 
 
-	pub const fn new_with(x: T, y: T, z: T, w: T) -> Self {
+	pub const fn new(x: T, y: T, z: T, w: T) -> Self {
 		Self { x, y, z, w }
+	}
+
+	pub const fn new_with(x: T, y: T, z: T, w: T) -> Self {
+		Self::new(x, y, z, w)
 	}
 
 	pub const fn new_cast(v: T) -> Self {
 		Self { x: v, y: v, z: v, w: v }
-	}
-
-
-	pub fn zero() -> Self {
-		Self::new_cast(T::zero())
-	}
-
-	pub fn one() -> Self {
-		Self::new_cast(T::one())
 	}
 
 
@@ -76,7 +71,7 @@ impl<T: Number> Vec4<T> {
 				w: self.w / len,
 			}
 		} else {
-			Self::zero()
+			Self::ZERO
 		}
 	}
 
@@ -119,11 +114,11 @@ impl<T: Number> Vec4<T> {
 
 
 	pub fn xyz(&self) -> Vec3<T> {
-		Vec3::new_with(self.x, self.y, self.z)
+		Vec3::new(self.x, self.y, self.z)
 	}
 
 	pub fn xy(&self) -> Vec2<T> {
-		Vec2::new_with(self.x, self.y)
+		Vec2::new(self.x, self.y)
 	}
 
 
@@ -146,13 +141,13 @@ impl<T: Number> Default for Vec4<T> {
 
 impl<T: Number> From<[T; 4]> for Vec4<T> {
 	fn from(arr: [T; 4]) -> Self {
-		Self::new_with(arr[0], arr[1], arr[2], arr[3])
+		Self::new(arr[0], arr[1], arr[2], arr[3])
 	}
 }
 
 impl<T: Number> From<(T, T, T, T)> for Vec4<T> {
 	fn from(tup: (T, T, T, T)) -> Self {
-		Self::new_with(tup.0, tup.1, tup.2, tup.3)
+		Self::new(tup.0, tup.1, tup.2, tup.3)
 	}
 }
 

@@ -25,8 +25,12 @@ impl<T: Number> Vec2<T> {
 	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO};
 	pub const ONE: Self = Self{x: T::ONE, y: T::ONE};
 
-	pub const fn new_with(x: T, y: T) -> Self {
+	pub const fn new(x: T, y: T) -> Self {
 		Self { x, y }
+	}
+
+	pub const fn new_with(x: T, y: T) -> Self {
+		Self::new(x, y)
 	}
 
 	pub const fn new_cast(v: T) -> Self {
@@ -117,13 +121,13 @@ impl<T: Number> Default for Vec2<T> {
 
 impl<T: Number> From<[T; 2]> for Vec2<T> {
 	fn from(arr: [T; 2]) -> Self {
-		Self::new_with(arr[0], arr[1])
+		Self::new(arr[0], arr[1])
 	}
 }
 
 impl<T: Number> From<(T, T)> for Vec2<T> {
 	fn from(tup: (T, T)) -> Self {
-		Self::new_with(tup.0, tup.1)
+		Self::new(tup.0, tup.1)
 	}
 }
 

@@ -59,6 +59,8 @@ pub const trait Float:
 
   fn from_f32(val: f32) -> Self;
   fn from_f64(val: f64) -> Self;
+  fn to_f32(self) -> f32;
+  fn to_f64(self) -> f64;
 }
 
 const impl Float for f16  {
@@ -69,6 +71,8 @@ const impl Float for f16  {
 
   fn from_f32(val: f32) -> Self { val as f16 }
   fn from_f64(val: f64) -> Self { val as f16 }
+  fn to_f32(self) -> f32 { self as f32 }
+  fn to_f64(self) -> f64 { self as f64 }
 }
 
 const impl Float for f32  {
@@ -79,6 +83,8 @@ const impl Float for f32  {
 
   fn from_f32(val: f32) -> Self { val }
   fn from_f64(val: f64) -> Self { val as f32 }
+  fn to_f32(self) -> f32 { self }
+  fn to_f64(self) -> f64 { self as f64 }
 }
 
 const impl Float for f64  {
@@ -89,6 +95,8 @@ const impl Float for f64  {
 
   fn from_f32(val: f32) -> Self { val as f64 }
   fn from_f64(val: f64) -> Self { val }
+  fn to_f32(self) -> f32 { self as f32 }
+  fn to_f64(self) -> f64 { self }
 }
 
 const impl Float for f128 {
@@ -99,6 +107,8 @@ const impl Float for f128 {
 
   fn from_f32(val: f32) -> Self { val as f128 }
   fn from_f64(val: f64) -> Self { val as f128 }
+  fn to_f32(self) -> f32 { self as f32 }
+  fn to_f64(self) -> f64 { self as f64 }
 }
 
 

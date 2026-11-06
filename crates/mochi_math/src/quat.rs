@@ -12,7 +12,7 @@
 
 use std::ops::{Mul, Neg};
 
-use crate::{Float, Rad, Vec3};
+use crate::{Euler, Float, Rad, Vec3};
 
 
 #[repr(C)]
@@ -53,11 +53,6 @@ impl<T: Float> Quat<T> {
     Self::new(T::ZERO, T::ZERO, s, c)
   }
 
-  pub fn from_euler_yxz(yaw: Rad<T>, pitch: Rad<T>, roll: Rad<T>) -> Self {
-    Self::from_rotation_y(yaw)
-      * Self::from_rotation_x(pitch)
-      * Self::from_rotation_z(roll)
-  }
 
   pub fn from_two_vectors(u: Vec3<T>, v: Vec3<T>) -> Self {
     let u = u.normalize();
@@ -136,7 +131,7 @@ impl<T: Float> Quat<T> {
     let tx = two * (uy * v.z - uz * v.y);
     let ty = two * (uz * v.x - ux * v.z);
     let tz = two * (ux * v.y - uy * v.x);
-    Vec3::new_with(
+    Vec3::new(
       v.x + self.w * tx + (uy * tz - uz * ty),
       v.y + self.w * ty + (uz * tx - ux * tz),
       v.z + self.w * tz + (ux * ty - uy * tx),
@@ -182,13 +177,23 @@ impl<T: Float> Quat<T> {
     let w = q.w.clamp(-T::ONE, T::ONE);
     let s = (T::ONE - w * w).sqrt();
     if s < T::from_f32(1e-6) {
-      (Vec3::new_with(T::ONE, T::ZERO, T::ZERO), T::ZERO)
+      (Vec3::new(T::ONE, T::ZERO, T::ZERO), T::ZERO)
     } else {
-      (Vec3::new_with(q.x / s, q.y / s, q.z / s), T::TWO * w.acos())
+      (Vec3::new(q.x / s, q.y / s, q.z / s), T::TWO * w.acos())
     }
   }
 
 }
+
+
+impl<T: Float> From<Euler<T>> for Quat<T> {
+	fn from(value: Euler<T>) -> Self {
+		Self::from_rotation_y(value.yaw)
+      * Self::from_rotation_x(value.pitch)
+      * Self::from_rotation_z(value.roll)
+	}
+}
+
 
 
 impl<T: Float> Default for Quat<T> {
@@ -225,5 +230,30 @@ impl<T: Float> Mul<Vec3<T>> for Quat<T> {
 
   fn mul(self, v: Vec3<T>) -> Vec3<T> {
     self.rotate(v)
+  }
+}
+
+
+impl<T: Float> From<[T; 4]> for Quat<T> {
+  fn from(arr: [T; 4]) -> Self {
+    Self::new(arr[0], arr[1], arr[2], arr[3])
+  }
+}
+
+impl<T: Float> From<(T, T, T, T)> for Quat<T> {
+  fn from((x, y, z, w): (T, T, T, T)) -> Self {
+    Self::new(x, y, z, w)
+  }
+}
+
+impl<T: Float> From<Quat<T>> for [T; 4] {
+  fn from(q: Quat<T>) -> Self {
+    [q.x, q.y, q.z, q.w]
+  }
+}
+
+impl<T: Float> From<Quat<T>> for (T, T, T, T) {
+  fn from(q: Quat<T>) -> Self {
+    (q.x, q.y, q.z, q.w)
   }
 }

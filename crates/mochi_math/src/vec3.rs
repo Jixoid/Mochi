@@ -22,10 +22,6 @@ pub struct Vec3<T: Number = f32> {
 	pub z: T,
 }
 
-impl<T: Number> Vec3<T> {
-	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ZERO};
-	pub const ONE: Self = Self{x: T::ONE, y: T::ONE, z: T::ONE};
-}
 
 impl<T: Number + const Neg<Output = T>> Vec3<T> {
 	pub const UP: Self = Self{x: T::ZERO, y: T::ONE, z: T::ZERO};
@@ -39,8 +35,16 @@ impl<T: Number + const Neg<Output = T>> Vec3<T> {
 }
 
 impl<T: Number> Vec3<T> {
-	pub const fn new_with(x: T, y: T, z: T) -> Self {
+	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ZERO};
+	pub const ONE: Self = Self{x: T::ONE, y: T::ONE, z: T::ONE};
+
+
+	pub const fn new(x: T, y: T, z: T) -> Self {
 		Self { x, y, z }
+	}
+
+	pub const fn new_with(x: T, y: T, z: T) -> Self {
+		Self::new(x, y, z)
 	}
 
 	pub const fn new_cast(v: T) -> Self {
@@ -123,15 +127,15 @@ impl<T: Number> Vec3<T> {
 
 
 	pub fn xy(&self) -> Vec2<T> {
-		Vec2::new_with(self.x, self.y)
+		Vec2::new(self.x, self.y)
 	}
 
 	pub fn xz(&self) -> Vec2<T> {
-		Vec2::new_with(self.x, self.z)
+		Vec2::new(self.x, self.z)
 	}
 
 	pub fn yz(&self) -> Vec2<T> {
-		Vec2::new_with(self.y, self.z)
+		Vec2::new(self.y, self.z)
 	}
 
 
@@ -154,13 +158,13 @@ impl<T: Number> Default for Vec3<T> {
 
 impl<T: Number> From<[T; 3]> for Vec3<T> {
 	fn from(arr: [T; 3]) -> Self {
-		Self::new_with(arr[0], arr[1], arr[2])
+		Self::new(arr[0], arr[1], arr[2])
 	}
 }
 
 impl<T: Number> From<(T, T, T)> for Vec3<T> {
 	fn from(tup: (T, T, T)) -> Self {
-		Self::new_with(tup.0, tup.1, tup.2)
+		Self::new(tup.0, tup.1, tup.2)
 	}
 }
 
