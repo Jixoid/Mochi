@@ -14,30 +14,25 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign,
 use crate::{Number, Vec2, Vec3};
 
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Vec4<T>
-where
-	T: Number,
-{
+pub struct Vec4<T: Number = f32> {
 	pub x: T,
 	pub y: T,
 	pub z: T,
 	pub w: T,
 }
 
-impl<T> Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Vec4<T> {
 	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ZERO, w: T::ZERO};
 	pub const ONE: Self = Self{x: T::ONE, y: T::ONE, z: T::ONE, w: T::ONE};
 
 
-	pub fn new_with(x: T, y: T, z: T, w: T) -> Self {
+	pub const fn new_with(x: T, y: T, z: T, w: T) -> Self {
 		Self { x, y, z, w }
 	}
 
-	pub fn new_cast(v: T) -> Self {
+	pub const fn new_cast(v: T) -> Self {
 		Self { x: v, y: v, z: v, w: v }
 	}
 
@@ -142,48 +137,33 @@ where
 }
 
 
-impl<T> Default for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Default for Vec4<T> {
 	fn default() -> Self {
 		Self::ZERO
 	}
 }
 
 
-impl<T> From<[T; 4]> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> From<[T; 4]> for Vec4<T> {
 	fn from(arr: [T; 4]) -> Self {
 		Self::new_with(arr[0], arr[1], arr[2], arr[3])
 	}
 }
 
-impl<T> From<(T, T, T, T)> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> From<(T, T, T, T)> for Vec4<T> {
 	fn from(tup: (T, T, T, T)) -> Self {
 		Self::new_with(tup.0, tup.1, tup.2, tup.3)
 	}
 }
 
-impl<T> From<Vec4<T>> for [T; 4]
-where
-	T: Number,
-{
+impl<T: Number> From<Vec4<T>> for [T; 4] {
 	fn from(v: Vec4<T>) -> Self {
 		[v.x, v.y, v.z, v.w]
 	}
 }
 
 
-impl<T> Index<usize> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Index<usize> for Vec4<T> {
 	type Output = T;
 	fn index(&self, index: usize) -> &Self::Output {
 		match index {
@@ -196,10 +176,7 @@ where
 	}
 }
 
-impl<T> IndexMut<usize> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> IndexMut<usize> for Vec4<T> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
 		match index {
 			0 => &mut self.x,
@@ -212,10 +189,7 @@ where
 }
 
 
-impl<T> Neg for Vec4<T>
-where
-	T: Number + Neg<Output = T>,
-{
+impl<T: Number + Neg<Output = T>> Neg for Vec4<T> {
 	type Output = Self;
 	fn neg(self) -> Self::Output {
 		Self {
@@ -228,10 +202,7 @@ where
 }
 
 
-impl<T> Add<Self> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Add<Self> for Vec4<T> {
 	type Output = Self;
 	fn add(self, rhs: Self) -> Self::Output {
 		Self {
@@ -243,10 +214,7 @@ where
 	}
 }
 
-impl<T> Sub<Self> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Sub<Self> for Vec4<T> {
 	type Output = Self;
 	fn sub(self, rhs: Self) -> Self::Output {
 		Self {
@@ -259,10 +227,7 @@ where
 }
 
 
-impl<T> Mul<Self> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Mul<Self> for Vec4<T> {
 	type Output = Self;
 	fn mul(self, rhs: Self) -> Self::Output {
 		Self {
@@ -274,10 +239,7 @@ where
 	}
 }
 
-impl<T> Div<Self> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Div<Self> for Vec4<T> {
 	type Output = Self;
 	fn div(self, rhs: Self) -> Self::Output {
 		Self {
@@ -290,10 +252,7 @@ where
 }
 
 
-impl<T> Mul<T> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Mul<T> for Vec4<T> {
 	type Output = Self;
 	fn mul(self, rhs: T) -> Self::Output {
 		Self {
@@ -305,10 +264,7 @@ where
 	}
 }
 
-impl<T> Div<T> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> Div<T> for Vec4<T> {
 	type Output = Self;
 	fn div(self, rhs: T) -> Self::Output {
 		Self {
@@ -321,10 +277,7 @@ where
 }
 
 
-impl<T> AddAssign for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> AddAssign for Vec4<T> {
 	fn add_assign(&mut self, rhs: Self) {
 		self.x = self.x + rhs.x;
 		self.y = self.y + rhs.y;
@@ -333,10 +286,7 @@ where
 	}
 }
 
-impl<T> SubAssign for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> SubAssign for Vec4<T> {
 	fn sub_assign(&mut self, rhs: Self) {
 		self.x = self.x - rhs.x;
 		self.y = self.y - rhs.y;
@@ -346,10 +296,7 @@ where
 }
 
 
-impl<T> MulAssign<T> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> MulAssign<T> for Vec4<T> {
 	fn mul_assign(&mut self, rhs: T) {
 		self.x = self.x * rhs;
 		self.y = self.y * rhs;
@@ -358,10 +305,7 @@ where
 	}
 }
 
-impl<T> DivAssign<T> for Vec4<T>
-where
-	T: Number,
-{
+impl<T: Number> DivAssign<T> for Vec4<T> {
 	fn div_assign(&mut self, rhs: T) {
 		self.x = self.x / rhs;
 		self.y = self.y / rhs;

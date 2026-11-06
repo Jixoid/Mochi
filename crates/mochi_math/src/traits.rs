@@ -10,7 +10,7 @@
 */
 
 
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 
 pub const trait Number:
@@ -18,6 +18,7 @@ pub const trait Number:
   Zero + Sqrt + One +
   ConstZero + ConstOne +
   Min + Max + Clamp +
+  Abs +
   Add<Self, Output = Self> + Sub<Self, Output = Self> + Mul<Self, Output = Self> + Div<Self, Output = Self> +
   PartialEq + PartialOrd +
 {}
@@ -38,6 +39,146 @@ const impl Number for u16  {}
 const impl Number for u32  {}
 const impl Number for u64  {}
 const impl Number for u128 {}
+
+
+pub const trait Float:
+  Number +
+  Copy + Clone +
+  Zero + Sqrt + One +
+  ConstZero + ConstOne +
+  Pi +
+  Min + Max + Clamp +
+  const Neg<Output = Self> +
+  Add<Self, Output = Self> + Sub<Self, Output = Self> + Mul<Self, Output = Self> + Div<Self, Output = Self> +
+  PartialEq + PartialOrd +
+{
+  const EPSILON: Self;
+  const MIN_POSITIVE: Self;
+  const HALF: Self;
+  const TWO: Self;
+
+  fn from_f32(val: f32) -> Self;
+  fn from_f64(val: f64) -> Self;
+}
+
+const impl Float for f16  {
+  const EPSILON: Self = f16::EPSILON;
+  const MIN_POSITIVE: Self = f16::MIN_POSITIVE;
+  const HALF: Self = 0.5_f16;
+  const TWO: Self = 2.0_f16;
+
+  fn from_f32(val: f32) -> Self { val as f16 }
+  fn from_f64(val: f64) -> Self { val as f16 }
+}
+
+const impl Float for f32  {
+  const EPSILON: Self = f32::EPSILON;
+  const MIN_POSITIVE: Self = f32::MIN_POSITIVE;
+  const HALF: Self = 0.5_f32;
+  const TWO: Self = 2.0_f32;
+
+  fn from_f32(val: f32) -> Self { val }
+  fn from_f64(val: f64) -> Self { val as f32 }
+}
+
+const impl Float for f64  {
+  const EPSILON: Self = f64::EPSILON;
+  const MIN_POSITIVE: Self = f64::MIN_POSITIVE;
+  const HALF: Self = 0.5_f64;
+  const TWO: Self = 2.0_f64;
+
+  fn from_f32(val: f32) -> Self { val as f64 }
+  fn from_f64(val: f64) -> Self { val }
+}
+
+const impl Float for f128 {
+  const EPSILON: Self = f128::EPSILON;
+  const MIN_POSITIVE: Self = f128::MIN_POSITIVE;
+  const HALF: Self = 0.5_f128;
+  const TWO: Self = 2.0_f128;
+
+  fn from_f32(val: f32) -> Self { val as f128 }
+  fn from_f64(val: f64) -> Self { val as f128 }
+}
+
+
+pub trait Pi
+where
+  Self: Sized
+{
+  const PI: Self;
+  const PI2: Self;
+  
+  fn to_degrees(self) -> Self;
+  fn to_radians(self) -> Self;
+  fn sin(self) -> Self;
+  fn cos(self) -> Self;
+  fn tan(self) -> Self;
+  fn sin_cos(self) -> (Self, Self);
+  fn asin(self) -> Self;
+  fn acos(self) -> Self;
+  fn atan2(self, other: Self) -> Self;
+}
+
+impl Pi for f16  {
+  const PI: Self = core::f16::consts::PI;
+  const PI2: Self = core::f16::consts::TAU;
+
+  fn to_degrees(self) -> Self { self.to_degrees() }
+  fn to_radians(self) -> Self { self.to_radians() }
+  fn sin(self) -> Self { self.sin() }
+  fn cos(self) -> Self { self.cos() }
+  fn tan(self) -> Self { self.tan() }
+  fn sin_cos(self) -> (Self, Self) { self.sin_cos() }
+  fn asin(self) -> Self { self.asin() }
+  fn acos(self) -> Self { self.acos() }
+  fn atan2(self, other: Self) -> Self { self.atan2(other) }
+}
+
+impl Pi for f32  {
+  const PI: Self = core::f32::consts::PI;
+  const PI2: Self = core::f32::consts::TAU;
+  
+  fn to_degrees(self) -> Self { self.to_degrees() }
+  fn to_radians(self) -> Self { self.to_radians() }
+  fn sin(self) -> Self { self.sin() }
+  fn cos(self) -> Self { self.cos() }
+  fn tan(self) -> Self { self.tan() }
+  fn sin_cos(self) -> (Self, Self) { self.sin_cos() }
+  fn asin(self) -> Self { self.asin() }
+  fn acos(self) -> Self { self.acos() }
+  fn atan2(self, other: Self) -> Self { self.atan2(other) }
+}
+
+impl Pi for f64  {
+  const PI: Self = core::f64::consts::PI;
+  const PI2: Self = core::f64::consts::TAU;
+  
+  fn to_degrees(self) -> Self { self.to_degrees() }
+  fn to_radians(self) -> Self { self.to_radians() }
+  fn sin(self) -> Self { self.sin() }
+  fn cos(self) -> Self { self.cos() }
+  fn tan(self) -> Self { self.tan() }
+  fn sin_cos(self) -> (Self, Self) { self.sin_cos() }
+  fn asin(self) -> Self { self.asin() }
+  fn acos(self) -> Self { self.acos() }
+  fn atan2(self, other: Self) -> Self { self.atan2(other) }
+}
+
+impl Pi for f128 {
+  const PI: Self = core::f128::consts::PI;
+  const PI2: Self = core::f128::consts::TAU;
+  
+  fn to_degrees(self) -> Self { self.to_degrees() }
+  fn to_radians(self) -> Self { self.to_radians() }
+  fn sin(self) -> Self { self.sin() }
+  fn cos(self) -> Self { self.cos() }
+  fn tan(self) -> Self { self.tan() }
+  fn sin_cos(self) -> (Self, Self) { self.sin_cos() }
+  fn asin(self) -> Self { self.asin() }
+  fn acos(self) -> Self { self.acos() }
+  fn atan2(self, other: Self) -> Self { self.atan2(other) }
+}
 
 
 pub trait ConstZero {
@@ -214,3 +355,25 @@ const impl Clamp for u16  { fn clamp(self, min: Self, max: Self) -> Self { if se
 const impl Clamp for u32  { fn clamp(self, min: Self, max: Self) -> Self { if self > max {max} else if self < min {min} else {self} } }
 const impl Clamp for u64  { fn clamp(self, min: Self, max: Self) -> Self { if self > max {max} else if self < min {min} else {self} } }
 const impl Clamp for u128 { fn clamp(self, min: Self, max: Self) -> Self { if self > max {max} else if self < min {min} else {self} } }
+
+
+pub const trait Abs {
+  fn abs(self) -> Self;
+}
+
+const impl Abs for f16  { fn abs(self) -> Self { self.abs() } }
+const impl Abs for f32  { fn abs(self) -> Self { self.abs() } }
+const impl Abs for f64  { fn abs(self) -> Self { self.abs() } }
+const impl Abs for f128 { fn abs(self) -> Self { self.abs() } }
+
+const impl Abs for i8   { fn abs(self) -> Self { self.abs() } }
+const impl Abs for i16  { fn abs(self) -> Self { self.abs() } }
+const impl Abs for i32  { fn abs(self) -> Self { self.abs() } }
+const impl Abs for i64  { fn abs(self) -> Self { self.abs() } }
+const impl Abs for i128 { fn abs(self) -> Self { self.abs() } }
+
+const impl Abs for u8   { fn abs(self) -> Self { self } }
+const impl Abs for u16  { fn abs(self) -> Self { self } }
+const impl Abs for u32  { fn abs(self) -> Self { self } }
+const impl Abs for u64  { fn abs(self) -> Self { self } }
+const impl Abs for u128 { fn abs(self) -> Self { self } }

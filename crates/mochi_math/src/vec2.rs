@@ -14,27 +14,22 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign,
 use crate::Number;
 
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Vec2<T>
-where
-	T: Number,
-{
+pub struct Vec2<T: Number = f32> {
 	pub x: T,
 	pub y: T,
 }
 
-impl<T> Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Vec2<T> {
 	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO};
 	pub const ONE: Self = Self{x: T::ONE, y: T::ONE};
 
-	pub fn new_with(x: T, y: T) -> Self {
+	pub const fn new_with(x: T, y: T) -> Self {
 		Self { x, y }
 	}
 
-	pub fn new_cast(v: T) -> Self {
+	pub const fn new_cast(v: T) -> Self {
 		Self { x: v, y: v }
 	}
 
@@ -113,48 +108,33 @@ where
 }
 
 
-impl<T> Default for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Default for Vec2<T> {
 	fn default() -> Self {
 		Self::ZERO
 	}
 }
 
 
-impl<T> From<[T; 2]> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> From<[T; 2]> for Vec2<T> {
 	fn from(arr: [T; 2]) -> Self {
 		Self::new_with(arr[0], arr[1])
 	}
 }
 
-impl<T> From<(T, T)> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> From<(T, T)> for Vec2<T> {
 	fn from(tup: (T, T)) -> Self {
 		Self::new_with(tup.0, tup.1)
 	}
 }
 
-impl<T> From<Vec2<T>> for [T; 2]
-where
-	T: Number,
-{
+impl<T: Number> From<Vec2<T>> for [T; 2] {
 	fn from(v: Vec2<T>) -> Self {
 		[v.x, v.y]
 	}
 }
 
 
-impl<T> Index<usize> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Index<usize> for Vec2<T> {
 	type Output = T;
 	fn index(&self, index: usize) -> &Self::Output {
 		match index {
@@ -165,10 +145,7 @@ where
 	}
 }
 
-impl<T> IndexMut<usize> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> IndexMut<usize> for Vec2<T> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
 		match index {
 			0 => &mut self.x,
@@ -179,10 +156,7 @@ where
 }
 
 
-impl<T> Neg for Vec2<T>
-where
-	T: Number + Neg<Output = T>,
-{
+impl<T: Number + Neg<Output = T>> Neg for Vec2<T> {
 	type Output = Self;
 
 	fn neg(self) -> Self::Output {
@@ -194,10 +168,7 @@ where
 }
 
 
-impl<T> Add<Self> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Add<Self> for Vec2<T> {
 	type Output = Vec2<T>;
 
 	fn add(self, rhs: Self) -> Self::Output {
@@ -208,10 +179,7 @@ where
 	}
 }
 
-impl<T> Sub<Self> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Sub<Self> for Vec2<T> {
 	type Output = Vec2<T>;
 
 	fn sub(self, rhs: Self) -> Self::Output {
@@ -223,10 +191,7 @@ where
 }
 
 
-impl<T> Mul<Self> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Mul<Self> for Vec2<T> {
 	type Output = Vec2<T>;
 
 	fn mul(self, rhs: Self) -> Self::Output {
@@ -237,10 +202,7 @@ where
 	}
 }
 
-impl<T> Div<Self> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Div<Self> for Vec2<T> {
 	type Output = Vec2<T>;
 
 	fn div(self, rhs: Self) -> Self::Output {
@@ -252,10 +214,7 @@ where
 }
 
 
-impl<T> Mul<T> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Mul<T> for Vec2<T> {
 	type Output = Vec2<T>;
 
 	fn mul(self, rhs: T) -> Self::Output {
@@ -266,10 +225,7 @@ where
 	}
 }
 
-impl<T> Div<T> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> Div<T> for Vec2<T> {
 	type Output = Vec2<T>;
 
 	fn div(self, rhs: T) -> Self::Output {
@@ -281,20 +237,14 @@ where
 }
 
 
-impl<T> AddAssign for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> AddAssign for Vec2<T> {
 	fn add_assign(&mut self, rhs: Self) {
 		self.x = self.x + rhs.x;
 		self.y = self.y + rhs.y;
 	}
 }
 
-impl<T> SubAssign for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> SubAssign for Vec2<T> {
 	fn sub_assign(&mut self, rhs: Self) {
 		self.x = self.x - rhs.x;
 		self.y = self.y - rhs.y;
@@ -302,20 +252,14 @@ where
 }
 
 
-impl<T> MulAssign<T> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> MulAssign<T> for Vec2<T> {
 	fn mul_assign(&mut self, rhs: T) {
 		self.x = self.x * rhs;
 		self.y = self.y * rhs;
 	}
 }
 
-impl<T> DivAssign<T> for Vec2<T>
-where
-	T: Number,
-{
+impl<T: Number> DivAssign<T> for Vec2<T> {
 	fn div_assign(&mut self, rhs: T) {
 		self.x = self.x / rhs;
 		self.y = self.y / rhs;

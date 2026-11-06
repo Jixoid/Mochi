@@ -14,28 +14,20 @@ use core::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign,
 use crate::{Number, Vec2};
 
 
+#[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Vec3<T>
-where
-	T: Number,
-{
+pub struct Vec3<T: Number = f32> {
 	pub x: T,
 	pub y: T,
 	pub z: T,
 }
 
-impl<T> Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Vec3<T> {
 	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ZERO};
 	pub const ONE: Self = Self{x: T::ONE, y: T::ONE, z: T::ONE};
 }
 
-impl<T> Vec3<T>
-where
-	T: Number + const Neg<Output = T>,
-{
+impl<T: Number + const Neg<Output = T>> Vec3<T> {
 	pub const UP: Self = Self{x: T::ZERO, y: T::ONE, z: T::ZERO};
 	pub const DOWN: Self = Self{x: T::ZERO, y: -T::ONE, z: T::ZERO};
 	
@@ -46,15 +38,12 @@ where
 	pub const BACK: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ONE};
 }
 
-impl<T> Vec3<T>
-where
-	T: Number,
-{
-	pub fn new_with(x: T, y: T, z: T) -> Self {
+impl<T: Number> Vec3<T> {
+	pub const fn new_with(x: T, y: T, z: T) -> Self {
 		Self { x, y, z }
 	}
 
-	pub fn new_cast(v: T) -> Self {
+	pub const fn new_cast(v: T) -> Self {
 		Self { x: v, y: v, z: v }
 	}
 
@@ -88,7 +77,7 @@ where
 
 	pub fn normalize(&self) -> Self {
 		let len = self.length();
-		if len > T::zero() {
+		if len > T::ZERO {
 			Self {
 				x: self.x / len,
 				y: self.y / len,
@@ -156,48 +145,33 @@ where
 }
 
 
-impl<T> Default for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Default for Vec3<T> {
 	fn default() -> Self {
 		Self::ZERO
 	}
 }
 
 
-impl<T> From<[T; 3]> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> From<[T; 3]> for Vec3<T> {
 	fn from(arr: [T; 3]) -> Self {
 		Self::new_with(arr[0], arr[1], arr[2])
 	}
 }
 
-impl<T> From<(T, T, T)> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> From<(T, T, T)> for Vec3<T> {
 	fn from(tup: (T, T, T)) -> Self {
 		Self::new_with(tup.0, tup.1, tup.2)
 	}
 }
 
-impl<T> From<Vec3<T>> for [T; 3]
-where
-	T: Number,
-{
+impl<T: Number> From<Vec3<T>> for [T; 3] {
 	fn from(v: Vec3<T>) -> Self {
 		[v.x, v.y, v.z]
 	}
 }
 
 
-impl<T> Index<usize> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Index<usize> for Vec3<T> {
 	type Output = T;
 	fn index(&self, index: usize) -> &Self::Output {
 		match index {
@@ -209,10 +183,7 @@ where
 	}
 }
 
-impl<T> IndexMut<usize> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> IndexMut<usize> for Vec3<T> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
 		match index {
 			0 => &mut self.x,
@@ -224,10 +195,7 @@ where
 }
 
 
-impl<T> Neg for Vec3<T>
-where
-	T: Number + Neg<Output = T>,
-{
+impl<T: Number + Neg<Output = T>> Neg for Vec3<T> {
 	type Output = Self;
 	fn neg(self) -> Self::Output {
 		Self {
@@ -239,10 +207,7 @@ where
 }
 
 
-impl<T> Add<Self> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Add<Self> for Vec3<T> {
 	type Output = Self;
 	fn add(self, rhs: Self) -> Self::Output {
 		Self {
@@ -253,10 +218,7 @@ where
 	}
 }
 
-impl<T> Sub<Self> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Sub<Self> for Vec3<T> {
 	type Output = Self;
 	fn sub(self, rhs: Self) -> Self::Output {
 		Self {
@@ -268,10 +230,7 @@ where
 }
 
 
-impl<T> Mul<Self> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Mul<Self> for Vec3<T> {
 	type Output = Self;
 	fn mul(self, rhs: Self) -> Self::Output {
 		Self {
@@ -282,10 +241,7 @@ where
 	}
 }
 
-impl<T> Div<Self> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Div<Self> for Vec3<T> {
 	type Output = Self;
 	fn div(self, rhs: Self) -> Self::Output {
 		Self {
@@ -297,10 +253,7 @@ where
 }
 
 
-impl<T> Mul<T> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Mul<T> for Vec3<T> {
 	type Output = Self;
 	fn mul(self, rhs: T) -> Self::Output {
 		Self {
@@ -311,10 +264,7 @@ where
 	}
 }
 
-impl<T> Div<T> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> Div<T> for Vec3<T> {
 	type Output = Self;
 	fn div(self, rhs: T) -> Self::Output {
 		Self {
@@ -326,10 +276,7 @@ where
 }
 
 
-impl<T> AddAssign for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> AddAssign for Vec3<T> {
 	fn add_assign(&mut self, rhs: Self) {
 		self.x = self.x + rhs.x;
 		self.y = self.y + rhs.y;
@@ -337,10 +284,7 @@ where
 	}
 }
 
-impl<T> SubAssign for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> SubAssign for Vec3<T> {
 	fn sub_assign(&mut self, rhs: Self) {
 		self.x = self.x - rhs.x;
 		self.y = self.y - rhs.y;
@@ -349,10 +293,7 @@ where
 }
 
 
-impl<T> MulAssign<T> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> MulAssign<T> for Vec3<T> {
 	fn mul_assign(&mut self, rhs: T) {
 		self.x = self.x * rhs;
 		self.y = self.y * rhs;
@@ -360,10 +301,7 @@ where
 	}
 }
 
-impl<T> DivAssign<T> for Vec3<T>
-where
-	T: Number,
-{
+impl<T: Number> DivAssign<T> for Vec3<T> {
 	fn div_assign(&mut self, rhs: T) {
 		self.x = self.x / rhs;
 		self.y = self.y / rhs;

@@ -16,13 +16,17 @@
 
 
 mod extent;
+mod degree;
 mod traits;
 mod vec2;
 mod vec3;
 mod vec4;
+mod quat;
 
 pub use extent::*;
+pub use degree::*;
 pub use traits::*;
 pub use vec2::*;
 pub use vec3::*;
 pub use vec4::*;
+pub use quat::*;
