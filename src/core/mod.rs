@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS / Mochi
+	This file is part of QAOS
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -17,6 +17,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
 use mochi_rhi::{self as rhi, Synchronizer};
+use crate::audio::AudioSystem;
 use crate::display::Display;
 use crate::rendering::RenderingSystem;
 
@@ -37,6 +38,7 @@ pub struct EngineApp {
 	syncer: Option<rhi::Synchronizer>,
 
 	rendering_system: Option<RenderingSystem>,
+	audio_system: Option<AudioSystem>,
 	display: Option<Display>,
 }
 
@@ -47,6 +49,9 @@ impl EngineApp {
 		let alloca = rhi::Allocator::new(&device);
 		let cmdmng = rhi::CommandManager::new(&device);
 		let syncer = Synchronizer::new(&device, RenderingSystem::MAX_FRAMES_IN_FLIGHT);
+
+		// Audio
+		let audio_system = AudioSystem::new("Mochi Audio", 0, 1, 0, 0);
 
 		// SYS
 		let rendering_system = RenderingSystem::new(&cmdmng).expect("failed to create RenderingSystem");
@@ -62,6 +67,7 @@ impl EngineApp {
 			syncer: Some(syncer),
 
 			rendering_system: Some(rendering_system),
+			audio_system: Some(audio_system),
 			display: None,
 			last_frame_time: None,
 			fps_timer: Instant::now(),
@@ -83,6 +89,10 @@ impl EngineApp {
 
 	pub fn alloca(&self) -> &rhi::Allocator {
 		self.alloca.as_ref().unwrap()
+	}
+
+	pub fn audio_system(&self) -> Option<&AudioSystem> {
+		self.audio_system.as_ref()
 	}
 
 
@@ -163,6 +173,10 @@ impl ApplicationHandler for EngineApp {
 					}
 				}
 
+				if let Some(audio) = &self.audio_system {
+					audio.update();
+				}
+
 				if let (Some(display), Some(rendering), Some(sync), Some(cmdmng)) = (
 					&self.display,
 					&self.rendering_system,
@@ -205,6 +219,8 @@ impl ApplicationHandler for EngineApp {
 
 	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
 		println!("[Engine] Cleaning up Engine resources...");
+		self.audio_system = None;
+
 		self.device.as_ref().unwrap().wait_idle();
 		
 		self.rendering_system = None;
@@ -233,6 +249,10 @@ impl Engine {
 
 	pub fn set_idle<F: FnMut(f32) + 'static>(&mut self, cb: F) {
 		self.app.set_idle(cb);
+	}
+
+	pub fn audio_system(&self) -> Option<&AudioSystem> {
+		self.app.audio_system()
 	}
 
 	pub fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
