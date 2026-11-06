@@ -162,4 +162,7 @@ target_link_libraries(qaos_mochi_static PUBLIC
 add_subdirectory(app)
 
 # Editor
-add_subdirectory(editor)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/editor")
+  add_subdirectory(editor)
+endif()
+

@@ -25,6 +25,7 @@ namespace mochi::rhi::vulkan
   struct VK_PipelineMeta final: public rhi::PipelineMeta {
     public:
       explicit VK_PipelineMeta(PushConstantList push, VertexBindList vert);
+      explicit VK_PipelineMeta(vk::ShaderStageFlags push_stages, uint32_t push_size);
 
     private:
       std::vector<vk::PushConstantRange> vk_PushConstant;

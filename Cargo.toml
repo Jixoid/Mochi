@@ -1,0 +1,18 @@
+[package]
+name = "Mochi"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = [
+  "crates/*"
+]
+
+[dependencies]
+bitflags = "2.13.2"
+num-traits = "0.2.19"
+raw-window-handle = "0.6"
+winit = "0.30"
+mochi_rhi = { path = "crates/mochi_rhi" }
+mochi_ahi = { path = "crates/mochi_ahi" }
+mochi_math = { path = "crates/mochi_math" }

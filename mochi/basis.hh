@@ -396,9 +396,7 @@ struct flags
     
     constexpr flags(BitType bit) noexcept : m_mask(static_cast<MaskType>(bit)) {}
 
-  private:
     constexpr explicit flags(MaskType flags) noexcept : m_mask(flags) {}
-
 
   private:
     MaskType m_mask;

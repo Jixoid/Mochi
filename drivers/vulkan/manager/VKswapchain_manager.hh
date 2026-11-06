@@ -28,12 +28,15 @@ namespace mochi::rhi::vulkan
       explicit VK_SwapchainManager(rhi::Device &dmng);
       ~VK_SwapchainManager() override;
 
-    private:
-      vk::raii::SurfaceKHR m_surface{nil};
+      VkSurfaceKHR m_surface{VK_NULL_HANDLE};
+      bool m_owns_surface{false};
       vk::raii::SwapchainKHR m_swapchain{nil};
       std::vector<vk::Image> m_images;
       std::vector<vk::raii::ImageView> m_image_views;
       std::vector<vk::raii::Semaphore> m_render_finished_sems;
+      vk::raii::Fence m_acquire_fence{nil};
+      vk::raii::CommandPool m_cmd_pool{nil};
+      vk::raii::CommandBuffer m_cmd_buffer{nil};
       
       vk::raii::Image m_depth_image_handle{nil};
       vk::raii::DeviceMemory m_depth_memory{nil};
@@ -50,6 +53,7 @@ namespace mochi::rhi::vulkan
 
     public:
       fun init(void* windowHandle, u32 width, u32 height) -> void override;
+      fun initWithSurface(VkSurfaceKHR surface, u32 width, u32 height) -> void;
       fun resize(u32 width, u32 height) -> void override;
 
       fun acquireNextImage(void* signalSemaphore) -> u32 override;

@@ -102,6 +102,20 @@ namespace mochi::rhi::vulkan
   }
 
 
+  VK_PipelineMeta::VK_PipelineMeta(vk::ShaderStageFlags push_stages, uint32_t push_size)
+    : m_push_data_end(push_size)
+  {
+    if (push_size > 0) {
+      vk_PushConstant.push_back(vk::PushConstantRange(
+        push_stages,
+        0,
+        push_size
+      ));
+    }
+  }
+
+
+
   VK_Pipeline::VK_Pipeline(
     rhi::Device &device, rhi::PipelineCacheUtility &pmng, u64 sign,
     PipelineMeta *_meta, std::vector<sptr<Shader>> shaders,

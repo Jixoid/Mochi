@@ -13,7 +13,8 @@
 #include "drivers/vulkan/utility/VKpipeline_cache_utility.hh"
 #include "mochi/debug/debug.hh"
 #include "mochi/rhi/utility/pipeline_cache_utility.hh"
-#include "mochi/vfs/vfs.hh"
+#include <filesystem>
+#include <fstream>
 #include <format>
 #include <span>
 #include <vector>
@@ -34,14 +35,23 @@ namespace mochi::rhi::vulkan
 
     auto path = std::format(".cache/mochi/vulkan/pipelines/{:x}.bin", sign);
 
-    if (!vfs::exists(path))
+    if (!std::filesystem::exists(path))
       return {};
 
     ME_LOG_VERB("pipeline cache reading")
 
-    auto file = vfs::open_map(path);
-    auto *ptr = reinterpret_cast<const u8*>(file->data());
-    return std::vector<u8>(ptr, ptr + file->size());
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open())
+      return {};
+
+    auto size = file.tellg();
+    if (size <= 0)
+      return {};
+
+    std::vector<u8> buffer(static_cast<size_t>(size));
+    file.seekg(0, std::ios::beg);
+    file.read(reinterpret_cast<char*>(buffer.data()), size);
+    return buffer;
   }
 
 
@@ -52,7 +62,14 @@ namespace mochi::rhi::vulkan
     ME_LOG_VERB("pipeline cache writing")
 
     auto path = std::format(".cache/mochi/vulkan/pipelines/{:x}.bin", sign);
-    vfs::open_rw(path)->write(reinterpret_cast<const char*>(data.data()), data.size()).flush();
+    auto parent = std::filesystem::path(path).parent_path();
+    if (!parent.empty())
+      std::filesystem::create_directories(parent);
+
+    std::ofstream file(path, std::ios::binary);
+    if (file.is_open()) {
+      file.write(reinterpret_cast<const char*>(data.data()), data.size());
+    }
   }
 
 }
