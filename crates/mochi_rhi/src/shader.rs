@@ -11,10 +11,12 @@
 
 
 use std::ffi::CString;
+use std::sync::Arc;
 use bitflags::bitflags;
 
 use crate::Device;
 use crate::ffi::*;
+use crate::manager::DeviceInner;
 
 
 bitflags! {
@@ -34,12 +36,52 @@ bitflags! {
 	}
 }
 
-
-pub struct Shader {
+pub struct ShaderInner {
+	device: Arc<DeviceInner>,
 	handle: MochiShaderHandle,
 	stage: ShaderStage,
 	entry: String,
 }
+
+unsafe impl Send for ShaderInner {}
+unsafe impl Sync for ShaderInner {}
+
+impl ShaderInner {
+	pub fn handle(&self) -> MochiShaderHandle {
+		self.handle
+	}
+
+	pub fn device(&self) -> &Arc<DeviceInner> {
+		&self.device
+	}
+
+	pub fn stage(&self) -> ShaderStage {
+		self.stage
+	}
+
+	pub fn entry(&self) -> &str {
+		&self.entry
+	}
+}
+
+impl Drop for ShaderInner {
+	fn drop(&mut self) {
+		if !self.handle.is_null() {
+			unsafe {
+				mochi_rhi_shader_dis(self.handle);
+			}
+			self.handle = std::ptr::null_mut();
+		}
+	}
+}
+
+#[derive(Clone)]
+pub struct Shader {
+	inner: Arc<ShaderInner>,
+}
+
+unsafe impl Send for Shader {}
+unsafe impl Sync for Shader {}
 
 impl Shader {
 	pub fn new(device: &Device, stage: ShaderStage, code: &[u8], entry: &str) -> Self {
@@ -56,32 +98,28 @@ impl Shader {
 		assert!(!handle.is_null(), "RHI driver failed to create Shader");
 
 		Self {
-			handle,
-			stage,
-			entry: entry.to_string(),
+			inner: Arc::new(ShaderInner {
+				device: device.inner().clone(),
+				handle,
+				stage,
+				entry: entry.to_string(),
+			}),
 		}
+	}
+
+	pub fn inner(&self) -> &Arc<ShaderInner> {
+		&self.inner
 	}
 
 	pub fn handle(&self) -> MochiShaderHandle {
-		self.handle
+		self.inner.handle
 	}
 
 	pub fn stage(&self) -> ShaderStage {
-		self.stage
+		self.inner.stage
 	}
 
 	pub fn entry(&self) -> &str {
-		&self.entry
-	}
-}
-
-impl Drop for Shader {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_shader_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
+		&self.inner.entry
 	}
 }

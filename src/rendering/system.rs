@@ -126,7 +126,7 @@ impl RenderingSystem {
 
 		let uploader = rhi::Uploader::new(device);
 
-		let vertex_buffer = rhi::Buffer::new(
+		let mut vertex_buffer = rhi::Buffer::new(
 			alloc,
 			(std::mem::size_of::<Vertex>() * vertices.len()) as u64,
 			rhi::BufferUsage::DeviceAddress | rhi::BufferUsage::StorageBuffer,
@@ -140,7 +140,7 @@ impl RenderingSystem {
 				std::mem::size_of_val(&vertices),
 			)
 		};
-		uploader.copy_memory_to_buffer(rhi::TransferTime::Now, vertex_bytes, &vertex_buffer);
+		uploader.copy_memory_to_buffer(rhi::TransferTime::Now, vertex_bytes, &mut vertex_buffer);
 
 		let camera_data = CameraData {
 			view: [
@@ -157,7 +157,7 @@ impl RenderingSystem {
 			],
 		};
 
-		let camera_ubo = rhi::Buffer::new(
+		let mut camera_ubo = rhi::Buffer::new(
 			alloc,
 			std::mem::size_of::<CameraData>() as u64,
 			rhi::BufferUsage::DeviceAddress | rhi::BufferUsage::StorageBuffer | rhi::BufferUsage::UniformBuffer,
@@ -171,7 +171,7 @@ impl RenderingSystem {
 				std::mem::size_of::<CameraData>(),
 			)
 		};
-		uploader.copy_memory_to_buffer(rhi::TransferTime::Now, camera_bytes, &camera_ubo);
+		uploader.copy_memory_to_buffer(rhi::TransferTime::Now, camera_bytes, &mut camera_ubo);
 
 		println!(
 			"[RenderingSystem] Pipeline ready. Vertex buffer address: 0x{:x}, Camera UBO address: 0x{:x}",
@@ -187,65 +187,67 @@ impl RenderingSystem {
 		self.camera_ubo = Some(camera_ubo);
 	}
 
-	pub fn begin_frame(&self, sync: &rhi::Synchronizer) -> &rhi::Command {
+	pub fn render(
+		&mut self,
+		sync: &mut rhi::Synchronizer,
+		cmdmng: &rhi::CommandManager,
+		display: &mut crate::display::Display,
+		clear_color: impl Into<Vec4<f32>>,
+	) {
 		sync.begin_frame();
 		let frame = sync.current_frame() as usize;
-		let cmd = &self.cmd_buffers[frame];
+		let wait_sem = sync.image_available_semaphore();
+		let img_idx = display.acquire_next_image_with_semaphore(&wait_sem);
+
+		let width = display.width();
+		let height = display.height();
+		let target = display.render_target(img_idx);
+
+		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
-		cmd
-	}
 
-	pub fn begin_pass(&self, cmd: &rhi::Command, target: &rhi::RenderTarget, clear_color: impl Into<Vec4<f32>>) {
-		cmd.begin_rendering(target, clear_color.into());
-	}
+		if let Some(target) = target {
+			cmd.render_pass(&target, clear_color, |pass| {
+				if let (Some(pipeline), Some(vbuf), Some(cambuf)) = (
+					&self.pipeline,
+					&self.vertex_buffer,
+					&self.camera_ubo,
+				) {
+					pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+					pass.set_scissor(0, 0, width, height);
+					pass.bind_pipeline(pipeline);
 
-	pub fn draw_triangle(&self, cmd: &rhi::Command, width: u32, height: u32) {
-		if let (Some(pipeline), Some(vbuf), Some(cambuf)) = (
-			&self.pipeline,
-			&self.vertex_buffer,
-			&self.camera_ubo,
-		) {
-			cmd.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-			cmd.set_scissor(0, 0, width, height);
-			cmd.bind_pipeline(pipeline);
+					let pc = PushConstantData {
+						model: [
+							1.0, 0.0, 0.0, 0.0,
+							0.0, 1.0, 0.0, 0.0,
+							0.0, 0.0, 1.0, 0.0,
+						],
+						vertex_addr: vbuf.address(),
+						camera_addr: cambuf.address(),
+						light_addr: 0,
+						texture_id: 0,
+						_pad: 0,
+					};
 
-			let pc = PushConstantData {
-				model: [
-					1.0, 0.0, 0.0, 0.0,
-					0.0, 1.0, 0.0, 0.0,
-					0.0, 0.0, 1.0, 0.0,
-				],
-				vertex_addr: vbuf.address(),
-				camera_addr: cambuf.address(),
-				light_addr: 0,
-				texture_id: 0,
-				_pad: 0,
-			};
+					pass.push_constant(
+						rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
+						0,
+						&pc,
+					);
 
-			cmd.push_constant(
-				rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-				0,
-				&pc,
-			);
-
-			cmd.draw(3, 1, 0, 0);
+					pass.draw(3, 1, 0, 0);
+				}
+			});
 		}
-	}
 
-	pub fn end_pass(&self, cmd: &rhi::Command, target: &rhi::RenderTarget) {
-		cmd.end_rendering(target);
-	}
-
-	pub fn end_frame(
-		&self,
-		cmd: &rhi::Command,
-		cmdmng: &rhi::CommandManager,
-		syncer: &rhi::Synchronizer,
-		wait_sem: *mut std::ffi::c_void,
-		signal_sem: *mut std::ffi::c_void,
-	) {
 		cmd.end();
-		cmdmng.submit_with_sync(cmd, wait_sem, signal_sem, syncer.in_flight_fence());
-		syncer.end_frame();
+
+		let sig_sem = display.render_finished_semaphore(img_idx);
+		let fence = sync.in_flight_fence();
+		cmdmng.submit_with_sync(cmd, Some(&wait_sem), Some(&sig_sem), Some(&fence));
+		sync.end_frame();
+
+		display.present_with_semaphore(img_idx, &sig_sem);
 	}
 }

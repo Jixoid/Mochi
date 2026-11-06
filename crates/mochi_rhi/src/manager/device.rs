@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -11,9 +11,11 @@
 
 
 use std::ffi::CString;
+use std::sync::{Arc, Mutex};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
 
 use crate::ffi::*;
+use crate::manager::allocator::AllocatorInner;
 use crate::{Allocator, Buffer, ImageView2, Sampler2, Surface};
 
 
@@ -32,11 +34,10 @@ impl Queue {
 	}
 }
 
-
 #[derive(Clone, Debug, Default)]
 pub struct QueueGroup {
-	primary: Vec<Queue>,   // Dedicated (specialized) queues
-	secondary: Vec<Queue>, // Shared queues
+	primary: Vec<Queue>,
+	secondary: Vec<Queue>,
 }
 
 impl QueueGroup {
@@ -54,7 +55,6 @@ impl QueueGroup {
 	pub fn add_secondary(&mut self, q: Queue) {
 		self.secondary.push(q);
 	}
-
 
 	pub fn available(&self) -> bool {
 		!self.primary.is_empty() || !self.secondary.is_empty()
@@ -78,8 +78,36 @@ impl QueueGroup {
 }
 
 
-pub struct Device {
+pub struct DeviceInner {
 	handle: MochiDeviceHandle,
+	descriptor_allocator: Mutex<Option<Arc<AllocatorInner>>>,
+}
+
+unsafe impl Send for DeviceInner {}
+unsafe impl Sync for DeviceInner {}
+
+impl DeviceInner {
+	pub fn handle(&self) -> MochiDeviceHandle {
+		self.handle
+	}
+}
+
+impl Drop for DeviceInner {
+	fn drop(&mut self) {
+		if !self.handle.is_null() {
+			unsafe {
+				mochi_rhi_device_wait_idle(self.handle);
+				mochi_rhi_device_dis(self.handle);
+			}
+			self.handle = std::ptr::null_mut();
+		}
+	}
+}
+
+
+#[derive(Clone)]
+pub struct Device {
+	inner: Arc<DeviceInner>,
 	main_q: Queue,
 	graphics_q: QueueGroup,
 	compute_q: QueueGroup,
@@ -99,7 +127,10 @@ impl Device {
 		graphics_q.add_primary(Queue::new(q_family));
 
 		Self {
-			handle,
+			inner: Arc::new(DeviceInner {
+				handle,
+				descriptor_allocator: Mutex::new(None),
+			}),
 			main_q,
 			graphics_q,
 			compute_q: QueueGroup::new(),
@@ -107,15 +138,17 @@ impl Device {
 		}
 	}
 
-	pub fn handle(&self) -> MochiDeviceHandle {
-		self.handle
+	pub fn inner(&self) -> &Arc<DeviceInner> {
+		&self.inner
 	}
 
+	pub fn handle(&self) -> MochiDeviceHandle {
+		self.inner.handle
+	}
 
 	pub fn wait_idle(&self) {
-		unsafe { mochi_rhi_device_wait_idle(self.handle); }
+		unsafe { mochi_rhi_device_wait_idle(self.inner.handle); }
 	}
-
 
 	pub fn main_q(&self) -> &Queue {
 		&self.main_q
@@ -133,38 +166,39 @@ impl Device {
 		&self.transfer_q
 	}
 
-
-	pub fn init_descriptor_heap(&self, alloc: &Allocator) {
-		unsafe { mochi_rhi_device_init_descriptor_heap(self.handle, alloc.handle()); }
+	pub fn init_descriptor_heap(&mut self, alloc: &Allocator) {
+		*self.inner.descriptor_allocator.lock().unwrap() = Some(alloc.inner().clone());
+		unsafe { mochi_rhi_device_init_descriptor_heap(self.inner.handle, alloc.handle()); }
 	}
 
-	pub fn fini_descriptor_heap(&self) {
-		unsafe { mochi_rhi_device_fini_descriptor_heap(self.handle); }
+	pub fn fini_descriptor_heap(&mut self) {
+		*self.inner.descriptor_allocator.lock().unwrap() = None;
+		unsafe { mochi_rhi_device_fini_descriptor_heap(self.inner.handle); }
 	}
 
-
-	pub fn write_texture_descriptor(&self, view: &ImageView2, sampler: &Sampler2) -> u32 {
-		unsafe { mochi_rhi_device_write_texture_descriptor(self.handle, view.handle(), sampler.handle()) }
+	pub fn write_texture_descriptor(&mut self, view: &ImageView2<'_>, sampler: &Sampler2) -> u32 {
+		unsafe { mochi_rhi_device_write_texture_descriptor(self.inner.handle, view.handle(), sampler.handle()) }
 	}
 
 	pub fn descriptor_heap(&self) -> Option<Buffer> {
-		let h = unsafe { mochi_rhi_device_get_descriptor_heap(self.handle) };
+		let h = unsafe { mochi_rhi_device_get_descriptor_heap(self.inner.handle) };
 		if h.is_null() {
 			None
 		} else {
-			Some(Buffer::from_handle(h))
+			let alloc_opt = self.inner.descriptor_allocator.lock().unwrap().clone();
+			alloc_opt.map(|alloc| Buffer::from_handle_unowned(alloc, h))
 		}
 	}
 
 	pub fn sampler_heap(&self) -> Option<Buffer> {
-		let h = unsafe { mochi_rhi_device_get_sampler_heap(self.handle) };
+		let h = unsafe { mochi_rhi_device_get_sampler_heap(self.inner.handle) };
 		if h.is_null() {
 			None
 		} else {
-			Some(Buffer::from_handle(h))
+			let alloc_opt = self.inner.descriptor_allocator.lock().unwrap().clone();
+			alloc_opt.map(|alloc| Buffer::from_handle_unowned(alloc, h))
 		}
 	}
-
 
 	pub fn create_surface<W: HasWindowHandle + HasDisplayHandle>(&self, window: &W) -> Result<Surface, String> {
 		let display_handle = window
@@ -175,21 +209,22 @@ impl Device {
 			.window_handle()
 			.map_err(|e| format!("failed to get window handle: {e}"))?;
 
+		let dev_handle = self.inner.handle;
 		let surface_handle = match (display_handle.as_raw(), window_handle.as_raw()) {
 			(RawDisplayHandle::Wayland(d), RawWindowHandle::Wayland(w)) => unsafe {
 				mochi_rhi_create_surface_wayland(
-					self.handle,
+					dev_handle,
 					d.display.as_ptr(),
 					w.surface.as_ptr(),
 				)
 			},
 			(RawDisplayHandle::Xlib(d), RawWindowHandle::Xlib(w)) => {
 				let dpy = d.display.map(|p| p.as_ptr()).unwrap_or(std::ptr::null_mut());
-				unsafe { mochi_rhi_create_surface_xlib(self.handle, dpy, w.window) }
+				unsafe { mochi_rhi_create_surface_xlib(dev_handle, dpy, w.window) }
 			}
 			(RawDisplayHandle::Xcb(d), RawWindowHandle::Xcb(w)) => {
 				let conn = d.connection.map(|p| p.as_ptr()).unwrap_or(std::ptr::null_mut());
-				unsafe { mochi_rhi_create_surface_xcb(self.handle, conn, w.window.get()) }
+				unsafe { mochi_rhi_create_surface_xcb(dev_handle, conn, w.window.get()) }
 			}
 			(RawDisplayHandle::Windows(_), RawWindowHandle::Win32(w)) => {
 				let hinstance = w
@@ -197,7 +232,7 @@ impl Device {
 					.map(|h| h.get() as *mut std::ffi::c_void)
 					.unwrap_or(std::ptr::null_mut());
 				let hwnd = w.hwnd.get() as *mut std::ffi::c_void;
-				unsafe { mochi_rhi_create_surface_win32(self.handle, hinstance, hwnd) }
+				unsafe { mochi_rhi_create_surface_win32(dev_handle, hinstance, hwnd) }
 			}
 			(disp, win) => {
 				return Err(format!(
@@ -211,18 +246,6 @@ impl Device {
 			return Err("failed to create surface".to_string());
 		}
 
-		Ok(Surface::new(self.handle, surface_handle))
-	}
-
-}
-
-impl Drop for Device {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_device_wait_idle(self.handle);
-				mochi_rhi_device_dis(self.handle);
-			}
-		}
+		Ok(Surface::new(self.inner.clone(), surface_handle))
 	}
 }

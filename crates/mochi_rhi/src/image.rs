@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -10,10 +10,13 @@
 */
 
 
+use std::marker::PhantomData;
+use std::sync::Arc;
 use bitflags::bitflags;
 use mochi_math::Extent;
 
 use crate::ffi::*;
+use crate::manager::allocator::AllocatorInner;
 
 
 pub enum ImageTiling {
@@ -45,13 +48,17 @@ bitflags! {
 }
 
 
-pub struct ImageView2 {
+pub struct ImageView2<'a> {
 	handle: MochiImage2Handle,
+	_marker: PhantomData<&'a Image2>,
 }
 
-impl ImageView2 {
+unsafe impl<'a> Send for ImageView2<'a> {}
+unsafe impl<'a> Sync for ImageView2<'a> {}
+
+impl<'a> ImageView2<'a> {
 	pub fn from_handle(handle: MochiImage2Handle) -> Self {
-		Self { handle }
+		Self { handle, _marker: PhantomData }
 	}
 
 	pub fn handle(&self) -> MochiImage2Handle {
@@ -60,9 +67,13 @@ impl ImageView2 {
 }
 
 pub struct Image2 {
+	allocator: Arc<AllocatorInner>,
 	handle: MochiImage2Handle,
 	ext: Extent<2, u32>,
 }
+
+unsafe impl Send for Image2 {}
+unsafe impl Sync for Image2 {}
 
 impl Image2 {
 	pub fn new(
@@ -77,8 +88,12 @@ impl Image2 {
 		allocator.alloc_image2(ext, format, usage, tiling, create, location)
 	}
 
-	pub fn from_handle(handle: MochiImage2Handle, ext: Extent<2, u32>) -> Self {
-		Self { handle, ext }
+	pub fn from_handle(allocator: Arc<AllocatorInner>, handle: MochiImage2Handle, ext: Extent<2, u32>) -> Self {
+		Self { allocator, handle, ext }
+	}
+
+	pub fn allocator(&self) -> &Arc<AllocatorInner> {
+		&self.allocator
 	}
 
 	pub fn handle(&self) -> MochiImage2Handle {
@@ -89,7 +104,8 @@ impl Image2 {
 		self.ext
 	}
 
-	pub fn make_view(&self) -> ImageView2 {
+	/// Creates an ImageView2 borrowing from this Image2.
+	pub fn make_view<'a>(&'a self) -> ImageView2<'a> {
 		ImageView2::from_handle(self.handle)
 	}
 }
@@ -100,6 +116,7 @@ impl Drop for Image2 {
 			unsafe {
 				mochi_rhi_image2_dis(self.handle);
 			}
+			self.handle = std::ptr::null_mut();
 		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS / Mochi
+	This file is part of QAOS
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 

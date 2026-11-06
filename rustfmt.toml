@@ -1,0 +1,10 @@
+# Preserves visual layout: tabs for indentation, up to 2 empty lines between sections.
+
+unstable_features = true
+edition = "2024"
+hard_tabs = true
+tab_spaces = 2
+newline_style = "Unix"
+blank_lines_upper_bound = 2
+group_imports = "Preserve"
+reorder_imports = false

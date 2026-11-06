@@ -126,11 +126,33 @@ fn align_size(size: u64, alignment: u64) -> u64 {
 }
 
 
-pub struct PipelineMeta {
+pub struct PipelineMetaInner {
 	handle: MochiPipelineMetaHandle,
 	push: PushConstantList,
 	vert: VertexBindList,
 }
+
+unsafe impl Send for PipelineMetaInner {}
+unsafe impl Sync for PipelineMetaInner {}
+
+impl Drop for PipelineMetaInner {
+	fn drop(&mut self) {
+		if !self.handle.is_null() {
+			unsafe {
+				mochi_rhi_pipeline_meta_dis(self.handle);
+			}
+			self.handle = std::ptr::null_mut();
+		}
+	}
+}
+
+#[derive(Clone)]
+pub struct PipelineMeta {
+	inner: std::sync::Arc<PipelineMetaInner>,
+}
+
+unsafe impl Send for PipelineMeta {}
+unsafe impl Sync for PipelineMeta {}
 
 impl PipelineMeta {
 	pub fn new(push: PushConstantList, vert: VertexBindList) -> Self {
@@ -156,7 +178,9 @@ impl PipelineMeta {
 		};
 		assert!(!handle.is_null(), "RHI driver failed to create PipelineMeta");
 
-		Self { handle, push, vert }
+		Self {
+			inner: std::sync::Arc::new(PipelineMetaInner { handle, push, vert }),
+		}
 	}
 
 	pub fn new_raw(push_stages: ShaderStage, push_size: u32) -> Self {
@@ -169,42 +193,70 @@ impl PipelineMeta {
 		assert!(!handle.is_null(), "RHI driver failed to create PipelineMeta");
 
 		Self {
-			handle,
-			push: Vec::new(),
-			vert: Vec::new(),
+			inner: std::sync::Arc::new(PipelineMetaInner {
+				handle,
+				push: Vec::new(),
+				vert: Vec::new(),
+			}),
 		}
 	}
 
-	pub fn handle(&self) -> MochiPipelineMetaHandle {
-		self.handle
+	pub fn inner(&self) -> &std::sync::Arc<PipelineMetaInner> {
+		&self.inner
 	}
 
+	pub fn handle(&self) -> MochiPipelineMetaHandle {
+		self.inner.handle
+	}
 
 	pub fn push(&self) -> &[PushConstantSlot] {
-		&self.push
+		&self.inner.push
 	}
 
 	pub fn vert(&self) -> &[VertexBindSlot] {
-		&self.vert
+		&self.inner.vert
 	}
 }
 
-impl Drop for PipelineMeta {
+
+pub struct PipelineInner {
+	device: std::sync::Arc<crate::manager::DeviceInner>,
+	meta: std::sync::Arc<PipelineMetaInner>,
+	handle: MochiPipelineHandle,
+	kind: PipelineKind,
+}
+
+unsafe impl Send for PipelineInner {}
+unsafe impl Sync for PipelineInner {}
+
+impl PipelineInner {
+	pub fn device(&self) -> &std::sync::Arc<crate::manager::DeviceInner> {
+		&self.device
+	}
+
+	pub fn meta(&self) -> &std::sync::Arc<PipelineMetaInner> {
+		&self.meta
+	}
+}
+
+impl Drop for PipelineInner {
 	fn drop(&mut self) {
 		if !self.handle.is_null() {
 			unsafe {
-				mochi_rhi_pipeline_meta_dis(self.handle);
+				mochi_rhi_pipeline_dis(self.handle);
 			}
 			self.handle = std::ptr::null_mut();
 		}
 	}
 }
 
-
+#[derive(Clone)]
 pub struct Pipeline {
-	handle: MochiPipelineHandle,
-	kind: PipelineKind,
+	inner: std::sync::Arc<PipelineInner>,
 }
+
+unsafe impl Send for Pipeline {}
+unsafe impl Sync for Pipeline {}
 
 impl Pipeline {
 	pub fn new_graphics(
@@ -232,28 +284,32 @@ impl Pipeline {
 		assert!(!handle.is_null(), "RHI driver failed to create Graphics Pipeline");
 
 		Self {
-			handle,
-			kind: PipelineKind::Graphic,
+			inner: std::sync::Arc::new(PipelineInner {
+				device: device.inner().clone(),
+				meta: meta.inner().clone(),
+				handle,
+				kind: PipelineKind::Graphic,
+			}),
 		}
+	}
+
+	pub fn inner(&self) -> &std::sync::Arc<PipelineInner> {
+		&self.inner
+	}
+
+	pub fn device(&self) -> &std::sync::Arc<crate::manager::DeviceInner> {
+		self.inner.device()
+	}
+
+	pub fn meta(&self) -> &std::sync::Arc<PipelineMetaInner> {
+		self.inner.meta()
 	}
 
 	pub fn handle(&self) -> MochiPipelineHandle {
-		self.handle
+		self.inner.handle
 	}
 
-	
 	pub fn kind(&self) -> PipelineKind {
-		self.kind
-	}
-}
-
-impl Drop for Pipeline {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_pipeline_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
+		self.inner.kind
 	}
 }

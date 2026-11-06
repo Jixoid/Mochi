@@ -9,12 +9,14 @@
 	Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
-mod allocator;
-mod command_manager;
-mod device;
-mod swapchain;
-mod synchronizer;
-mod uploader;
+
+pub mod allocator;
+pub mod command_manager;
+pub mod device;
+pub mod swapchain;
+pub mod synchronizer;
+pub mod uploader;
+
 
 pub use allocator::*;
 pub use command_manager::*;

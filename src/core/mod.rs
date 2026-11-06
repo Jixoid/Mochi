@@ -178,25 +178,12 @@ impl ApplicationHandler for EngineApp {
 				}
 
 				if let (Some(display), Some(rendering), Some(sync), Some(cmdmng)) = (
-					&self.display,
-					&self.rendering_system,
-					&self.syncer,
+					&mut self.display,
+					&mut self.rendering_system,
+					&mut self.syncer,
 					&self.cmdmng,
 				) {
-					let cmd = rendering.begin_frame(sync);
-					let wait_sem = sync.image_available_semaphore();
-					let img_idx = display.acquire_next_image_with_semaphore(wait_sem);
-
-					if let Some(target) = display.render_target(img_idx) {
-						// Clear color: Cornflower Blue / Mochi Theme [0.1, 0.15, 0.25, 1.0]
-						rendering.begin_pass(cmd, &target, [0.1, 0.15, 0.25, 1.0]);
-						rendering.draw_triangle(cmd, display.width(), display.height());
-						rendering.end_pass(cmd, &target);
-					}
-
-					let sig_sem = display.render_finished_semaphore(img_idx);
-					rendering.end_frame(cmd, cmdmng, sync, wait_sem, sig_sem);
-					display.present_with_semaphore(img_idx, sig_sem);
+					rendering.render(sync, cmdmng, display, [0.1, 0.15, 0.25, 1.0]);
 
 					self.frame_count += 1;
 
