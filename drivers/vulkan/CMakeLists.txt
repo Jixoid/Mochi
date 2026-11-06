@@ -9,8 +9,10 @@ pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
 add_library(${TARGET_NAME} STATIC ${SOURCES})
 set_target_properties(${TARGET_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+target_include_directories(${TARGET_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 target_link_libraries(${TARGET_NAME} PRIVATE
   Vulkan::Vulkan
   PkgConfig::SHADERC
   VulkanMemoryAllocator
+  qaos_mochi_driver_common
 )

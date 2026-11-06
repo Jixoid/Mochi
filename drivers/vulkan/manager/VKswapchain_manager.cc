@@ -35,11 +35,25 @@ namespace mochi::rhi::vulkan
   {}
 
   VK_SwapchainManager::~VK_SwapchainManager() {
+    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
+    vk_dmng.get().waitIdle();
     destroy_resources();
+    m_cmd_buffer.clear();
+    m_cmd_pool.clear();
+    m_acquire_fence.clear();
+    m_swapchain.clear();
+    if (m_owns_surface && m_surface != VK_NULL_HANDLE) {
+      auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
+      vk_dmng.inst().getDispatcher()->vkDestroySurfaceKHR(*vk_dmng.inst(), m_surface, nullptr);
+      m_surface = VK_NULL_HANDLE;
+    }
   }
 
   void VK_SwapchainManager::destroy_resources() {
     auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
+    m_targets.clear();
+    m_image_views.clear();
+    m_render_finished_sems.clear();
     m_depth_view.clear();
     m_depth_image_handle.clear();
     m_depth_memory.clear();
@@ -95,7 +109,18 @@ namespace mochi::rhi::vulkan
     m_swapchain = vk::raii::SwapchainKHR(vk_dmng.get(), swp_info);
     m_images = m_swapchain.getImages();
     m_image_views.clear();
-    m_render_finished_sems.clear();
+    if (!*m_acquire_fence) {
+      m_acquire_fence = vk::raii::Fence(vk_dmng.get(), vk::FenceCreateInfo());
+    }
+
+    if (!*m_cmd_pool) {
+      auto family = vk_dmng.graphics_q().best().family();
+      vk::CommandPoolCreateInfo pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, family);
+      m_cmd_pool = vk::raii::CommandPool(vk_dmng.get(), pool_info);
+      vk::CommandBufferAllocateInfo cmd_alloc_info(*m_cmd_pool, vk::CommandBufferLevel::ePrimary, 1);
+      auto bufs = vk::raii::CommandBuffers(vk_dmng.get(), cmd_alloc_info);
+      m_cmd_buffer = std::move(bufs[0]);
+    }
 
     for (const auto &img: m_images) {
       vk::ImageViewCreateInfo view_info(
@@ -150,18 +175,22 @@ namespace mochi::rhi::vulkan
     ME_LOG_VERB("swapchain (re)created {}x{}, {} images", m_extent.width, m_extent.height, m_images.size());
   }
 
-  fun VK_SwapchainManager::init(void* windowHandle, u32 width, u32 height) -> void {
-    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
+  fun VK_SwapchainManager::initWithSurface(VkSurfaceKHR surface, u32 width, u32 height) -> void {
     m_width = width;
     m_height = height;
+    m_surface = surface;
+    m_owns_surface = false;
+    create_resources();
+  }
 
+  fun VK_SwapchainManager::init(void* windowHandle, u32 width, u32 height) -> void {
+    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
     VkSurfaceKHR c_surface;
     if (glfwCreateWindowSurface(*vk_dmng.inst(), static_cast<GLFWwindow*>(windowHandle), nullptr, &c_surface) != VK_SUCCESS) {
       throw rhi_error("Failed to create window surface");
     }
-    m_surface = vk::raii::SurfaceKHR(vk_dmng.inst(), c_surface);
-
-    create_resources();
+    initWithSurface(c_surface, width, height);
+    m_owns_surface = true;
   }
 
   fun VK_SwapchainManager::resize(u32 width, u32 height) -> void {
@@ -172,8 +201,19 @@ namespace mochi::rhi::vulkan
   }
 
   fun VK_SwapchainManager::acquireNextImage(void* signalSemaphore) -> u32 {
+    auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
     try {
-      auto [result, img_idx] = m_swapchain.acquireNextImage(UINT64_MAX, static_cast<VkSemaphore>(signalSemaphore), nullptr);
+      vk::ResultValue<u32> rv{vk::Result::eSuccess, 0};
+      if (signalSemaphore) {
+        rv = m_swapchain.acquireNextImage(UINT64_MAX, static_cast<VkSemaphore>(signalSemaphore), nullptr);
+      } else {
+        rv = m_swapchain.acquireNextImage(UINT64_MAX, nullptr, *m_acquire_fence);
+        auto wait_res = vk_dmng.get().waitForFences(*m_acquire_fence, VK_TRUE, UINT64_MAX);
+        (void)wait_res;
+        vk_dmng.get().resetFences(*m_acquire_fence);
+      }
+
+      auto [result, img_idx] = rv;
       if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
         ME_LOG_WARN("swapchain out of date, recreating")
         create_resources();
@@ -190,6 +230,71 @@ namespace mochi::rhi::vulkan
 
   fun VK_SwapchainManager::present(u32 imageIndex, void* waitSemaphore) -> void {
     auto& vk_dmng = static_cast<VK_Device&>(m_dmng);
+
+    if (!waitSemaphore && imageIndex < m_targets.size()) {
+      m_cmd_buffer.reset();
+      m_cmd_buffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+      const auto& target = m_targets[imageIndex];
+      vk::ImageMemoryBarrier2 color_barrier(
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eNone,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal,
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+        target.color_image,
+        vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
+      );
+
+      vk::DependencyInfo dep_info({}, {}, {}, color_barrier);
+      m_cmd_buffer.pipelineBarrier2(dep_info);
+
+      vk::ClearValue cv_color;
+      cv_color.color = vk::ClearColorValue(std::array<float, 4>{0.05f, 0.05f, 0.08f, 1.0f});
+
+      vk::RenderingAttachmentInfo color_attach(
+        target.color_view, vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ResolveModeFlagBits::eNone, nil, vk::ImageLayout::eUndefined,
+        vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, cv_color
+      );
+
+      vk::RenderingInfo rendering_info(
+        {}, vk::Rect2D(vk::Offset2D(0, 0), target.extent),
+        1, 0,
+        1, &color_attach, nullptr, nil
+      );
+
+      m_cmd_buffer.beginRendering(rendering_info);
+      m_cmd_buffer.endRendering();
+
+      vk::ImageMemoryBarrier2 post_barrier(
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::PipelineStageFlagBits2::eBottomOfPipe,
+        vk::AccessFlagBits2::eNone,
+        vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+        target.color_image,
+        vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
+      );
+
+      vk::DependencyInfo post_dep({}, {}, {}, post_barrier);
+      m_cmd_buffer.pipelineBarrier2(post_dep);
+      m_cmd_buffer.end();
+
+      vk::SubmitInfo submit_info;
+      submit_info.commandBufferCount = 1;
+      vk::CommandBuffer cb = *m_cmd_buffer;
+      submit_info.pCommandBuffers = &cb;
+
+      auto family = vk_dmng.graphics_q().best().family();
+      auto& queue = vk_dmng.active_queue(family);
+      queue.submit(submit_info, *m_acquire_fence);
+      auto wait_res = vk_dmng.get().waitForFences(*m_acquire_fence, VK_TRUE, UINT64_MAX);
+      (void)wait_res;
+      vk_dmng.get().resetFences(*m_acquire_fence);
+    }
     
     vk::Semaphore sem = static_cast<VkSemaphore>(waitSemaphore);
     vk::SwapchainKHR swp = *m_swapchain;

@@ -42,6 +42,7 @@ namespace mochi::ahi
       fun is_playing() const -> bool override;
 
       fun decode_audio(const std::string& file_path) -> std::optional<AudioData> override;
+      fun decode_audio_memory(const uint8_t* memory, size_t size) -> std::optional<AudioData>;
   };
 
 }

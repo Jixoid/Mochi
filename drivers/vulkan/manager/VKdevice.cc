@@ -65,9 +65,41 @@ namespace mochi::rhi::vulkan
       //if (ext && !ext->instance_layers.empty())
       //  layers.append_range(ext->instance_layers);
       
+      std::vector<const char*> extensions;
+      std::vector<const char*> wanted_extensions = {
+        "VK_KHR_surface",
+#if defined(__linux__)
+        "VK_KHR_wayland_surface",
+        "VK_KHR_xcb_surface",
+        "VK_KHR_xlib_surface",
+#elif defined(_WIN32)
+        "VK_KHR_win32_surface",
+#endif
+      };
+
       u32 glfwExtensionCount = 0;
       const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-      std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+      if (glfwExtensions) {
+        for (u32 i = 0; i < glfwExtensionCount; i++) {
+          wanted_extensions.push_back(glfwExtensions[i]);
+        }
+      }
+
+      auto supported_props = vk_ctx.enumerateInstanceExtensionProperties();
+      for (const char* wanted : wanted_extensions) {
+        bool is_supported = false;
+        for (const auto& prop : supported_props) {
+          if (std::strcmp(wanted, prop.extensionName) == 0) {
+            is_supported = true;
+            break;
+          }
+        }
+        if (is_supported) {
+          if (std::find_if(extensions.begin(), extensions.end(), [wanted](const char* e) { return std::strcmp(e, wanted) == 0; }) == extensions.end()) {
+            extensions.push_back(wanted);
+          }
+        }
+      }
 
       vk::InstanceCreateInfo createInfo({}, &appInfo, layers, extensions);
       vk_inst = vk::raii::Instance(ctx(), createInfo);
@@ -208,6 +240,14 @@ namespace mochi::rhi::vulkan
 
     vk::CommandPoolCreateInfo main_pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, main_q().family());
     m_mainPool = vk::raii::CommandPool(vk_device, main_pool_info);
+
+    // Query descriptor size for images/samplers
+    vk::PhysicalDeviceDescriptorHeapPropertiesEXT heap_props;
+    vk::PhysicalDeviceProperties2 props2 = {};
+    props2.pNext = &heap_props;
+    vkGetPhysicalDeviceProperties2(*vk_phys_dev, reinterpret_cast<VkPhysicalDeviceProperties2*>(&props2));
+    m_descriptor_size = heap_props.imageDescriptorSize ? heap_props.imageDescriptorSize : 32;
+    m_sampler_descriptor_size = heap_props.samplerDescriptorSize ? heap_props.samplerDescriptorSize : 32;
   }
 
 

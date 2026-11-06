@@ -1,9 +1,2 @@
-# Helpers
-**/!*
-/.vscode
 /build
-/.cache
-/html
-/latex
-/xml
-/perf.data*
+/target

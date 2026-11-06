@@ -61,7 +61,7 @@ namespace mochi::ahi
   }
 
 
-  void MADevice::set_callback(AudioCallback callback, void* user_data) {
+  fun MADevice::set_callback(AudioCallback callback, void* user_data) -> void {
     m_user_callback = callback;
     m_user_data = user_data;
   }
@@ -96,6 +96,25 @@ namespace mochi::ahi
     ma_uint64 total_frames = 0;
     ma_decoder_get_length_in_pcm_frames(&decoder, &total_frames);
     
+    std::vector<float> pcm(total_frames * 2);
+    ma_decoder_read_pcm_frames(&decoder, pcm.data(), total_frames, nullptr);
+    ma_decoder_uninit(&decoder);
+
+    return AudioData{44100, 2, std::move(pcm)};
+  }
+
+  fun MADevice::decode_audio_memory(const uint8_t* memory, size_t size) -> std::optional<AudioData> {
+    if (!memory || size == 0) return std::nullopt;
+    ma_decoder decoder;
+    ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 2, 44100);
+
+    if (ma_decoder_init_memory(memory, size, &config, &decoder) != MA_SUCCESS) {
+      return std::nullopt;
+    }
+
+    ma_uint64 total_frames = 0;
+    ma_decoder_get_length_in_pcm_frames(&decoder, &total_frames);
+
     std::vector<float> pcm(total_frames * 2);
     ma_decoder_read_pcm_frames(&decoder, pcm.data(), total_frames, nullptr);
     ma_decoder_uninit(&decoder);

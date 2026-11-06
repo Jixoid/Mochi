@@ -1,0 +1,9 @@
+[package]
+name = "mochi_rhi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = "2.13.2"
+raw-window-handle = "0.6"
+mochi_math = { path = "../mochi_math" }
