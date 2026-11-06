@@ -11,6 +11,7 @@
 
 
 use mochi_rhi as rhi;
+use mochi_math::Vec4;
 
 static VERT_SPV: &[u8] = include_bytes!("../../res/shaders/base.vert.spv");
 static FRAG_SPV: &[u8] = include_bytes!("../../res/shaders/bare.frag.spv");
@@ -19,10 +20,10 @@ static FRAG_SPV: &[u8] = include_bytes!("../../res/shaders/bare.frag.spv");
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
-	pub pos: [f32; 4],
-	pub normal: [f32; 4],
-	pub color: [f32; 4],
-	pub uv: [f32; 4],
+	pub pos: Vec4<f32>,
+	pub normal: Vec4<f32>,
+	pub color: Vec4<f32>,
+	pub uv: Vec4<f32>,
 }
 
 #[repr(C)]
@@ -104,22 +105,22 @@ impl RenderingSystem {
 		// Triangle vertices with counter-clockwise winding
 		let vertices = [
 			Vertex {
-				pos: [0.0, -0.5, 0.0, 0.0],
-				normal: [0.0, 0.0, 1.0, 0.0],
-				color: [1.0, 0.2, 0.2, 1.0], // Red
-				uv: [0.5, 0.0, 0.0, 0.0],
+				pos: Vec4::new_with(0.0, -0.5, 0.0, 0.0),
+				normal: Vec4::new_with(0.0, 0.0, 1.0, 0.0),
+				color: Vec4::new_with(1.0, 0.2, 0.2, 1.0), // Red
+				uv: Vec4::new_with(0.5, 0.0, 0.0, 0.0),
 			},
 			Vertex {
-				pos: [-0.5, 0.5, 0.0, 0.0],
-				normal: [0.0, 0.0, 1.0, 0.0],
-				color: [0.2, 1.0, 0.2, 1.0], // Green
-				uv: [0.0, 1.0, 0.0, 0.0],
+				pos: Vec4::new_with(-0.5, 0.5, 0.0, 0.0),
+				normal: Vec4::new_with(0.0, 0.0, 1.0, 0.0),
+				color: Vec4::new_with(0.2, 1.0, 0.2, 1.0), // Green
+				uv: Vec4::new_with(0.0, 1.0, 0.0, 0.0),
 			},
 			Vertex {
-				pos: [0.5, 0.5, 0.0, 0.0],
-				normal: [0.0, 0.0, 1.0, 0.0],
-				color: [0.2, 0.4, 1.0, 1.0], // Blue
-				uv: [1.0, 1.0, 0.0, 0.0],
+				pos: Vec4::new_with(0.5, 0.5, 0.0, 0.0),
+				normal: Vec4::new_with(0.0, 0.0, 1.0, 0.0),
+				color: Vec4::new_with(0.2, 0.4, 1.0, 1.0), // Blue
+				uv: Vec4::new_with(1.0, 1.0, 0.0, 0.0),
 			},
 		];
 
@@ -194,8 +195,8 @@ impl RenderingSystem {
 		cmd
 	}
 
-	pub fn begin_pass(&self, cmd: &rhi::Command, target: &rhi::RenderTarget, clear_color: [f32; 4]) {
-		cmd.begin_rendering(target, clear_color);
+	pub fn begin_pass(&self, cmd: &rhi::Command, target: &rhi::RenderTarget, clear_color: impl Into<Vec4<f32>>) {
+		cmd.begin_rendering(target, clear_color.into());
 	}
 
 	pub fn draw_triangle(&self, cmd: &rhi::Command, width: u32, height: u32) {

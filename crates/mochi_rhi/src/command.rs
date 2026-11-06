@@ -10,6 +10,8 @@
 */
 
 
+use mochi_math::Vec4;
+
 use crate::ffi::*;
 use crate::render_target::RenderTarget;
 
@@ -37,15 +39,16 @@ impl Command {
 	}
 
 
-	pub fn begin_rendering(&self, target: &RenderTarget, clear_color: [f32; 4]) {
+	pub fn begin_rendering(&self, target: &RenderTarget, clear_color: impl Into<Vec4<f32>>) {
+		let col = clear_color.into();
 		unsafe {
 			mochi_rhi_command_begin_rendering(
 				self.handle,
 				target.handle(),
-				clear_color[0],
-				clear_color[1],
-				clear_color[2],
-				clear_color[3],
+				col.x,
+				col.y,
+				col.z,
+				col.w,
 			)
 		}
 	}

@@ -11,6 +11,7 @@
 
 
 use std::sync::Arc;
+use mochi_math::Vec3;
 use crate::audio::AudioClip;
 
 
@@ -26,7 +27,7 @@ pub struct AudioSource {
 	cursor: usize,
 	state: SourceState,
 	looping: bool,
-	pub position: [f32; 3],
+	pub position: Vec3<f32>,
 	pub volume: f32,
 	pub pitch: f32,
 	pub min_distance: f32,
@@ -40,7 +41,7 @@ impl AudioSource {
 			cursor: 0,
 			state: SourceState::Stopped,
 			looping: false,
-			position: [0.0, 0.0, 0.0],
+			position: Vec3::ZERO,
 			volume: 1.0,
 			pitch: 1.0,
 			min_distance: 1.0,
@@ -104,8 +105,8 @@ impl AudioSource {
 		self.volume = volume.max(0.0);
 	}
 
-	pub fn set_position(&mut self, position: [f32; 3]) {
-		self.position = position;
+	pub fn set_position(&mut self, position: impl Into<Vec3<f32>>) {
+		self.position = position.into();
 	}
 
 	pub fn set_distance_range(&mut self, min: f32, max: f32) {
@@ -185,3 +186,50 @@ impl Default for AudioSource {
 		Self::new()
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_audio_source_lifecycle_and_looping() {
+		let pcm = vec![1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0]; // 4 frames stereo
+		let clip = Arc::new(AudioClip::new(44100, 2, pcm));
+
+		let mut source = AudioSource::new();
+		assert_eq!(source.state(), SourceState::Stopped);
+
+		source.bind_clip(Arc::clone(&clip));
+		source.play();
+		assert_eq!(source.state(), SourceState::Playing);
+
+		let mut buffer = vec![0.0f32; 8];
+		// Read 2 frames
+		let read = source.mix_frames(&mut buffer, 2, 1.0, 1.0);
+		assert_eq!(read, 2);
+		assert_eq!(source.state(), SourceState::Playing);
+		assert_eq!(&buffer[0..4], &[1.0, 1.0, 2.0, 2.0]);
+
+		// Read next 2 frames (end of clip, non-looping)
+		let mut buffer2 = vec![0.0f32; 8];
+		let read2 = source.mix_frames(&mut buffer2, 2, 1.0, 1.0);
+		assert_eq!(read2, 2);
+		assert_eq!(source.state(), SourceState::Stopped);
+		assert_eq!(&buffer2[0..4], &[3.0, 3.0, 4.0, 4.0]);
+
+		// With looping enabled
+		source.set_looping(true);
+		source.play();
+		let mut buffer3 = vec![0.0f32; 8];
+		let read3 = source.mix_frames(&mut buffer3, 3, 1.0, 1.0);
+		assert_eq!(read3, 3);
+		assert_eq!(source.state(), SourceState::Playing);
+		// Next read wraps around seamlessly
+		let mut buffer4 = vec![0.0f32; 8];
+		let read4 = source.mix_frames(&mut buffer4, 2, 1.0, 1.0);
+		assert_eq!(read4, 2);
+		assert_eq!(source.state(), SourceState::Playing);
+		assert_eq!(&buffer4[0..2], &[4.0, 4.0]);
+	}
+}
+

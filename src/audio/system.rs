@@ -66,12 +66,17 @@ impl AudioSystem {
 		}
 	}
 
-	pub fn set_listener_transform(&self, position: [f32; 3], forward: [f32; 3], up: [f32; 3]) {
+	pub fn set_listener_transform(
+		&self,
+		position: impl Into<mochi_math::Vec3<f32>>,
+		forward: impl Into<mochi_math::Vec3<f32>>,
+		up: impl Into<mochi_math::Vec3<f32>>,
+	) {
 		if let Ok(mut mixer) = self.mixer.lock() {
 			mixer.set_listener(Listener {
-				position,
-				forward,
-				up,
+				position: position.into(),
+				forward: forward.into(),
+				up: up.into(),
 			});
 		}
 	}
@@ -108,12 +113,12 @@ impl AudioSystem {
 	pub fn play_one_shot_3d(
 		&self,
 		clip: Arc<AudioClip>,
-		position: [f32; 3],
+		position: impl Into<mochi_math::Vec3<f32>>,
 		volume: f32,
 	) -> Arc<Mutex<AudioSource>> {
 		let mut source = AudioSource::new();
 		source.bind_clip(clip);
-		source.set_position(position);
+		source.set_position(position.into());
 		source.set_volume(volume);
 		source.play();
 

@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -10,14 +10,14 @@
 */
 
 
-use core::ops::{Add, Div, Mul, Neg, Sub};
+use core::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
+use crate::Number;
 
-use num_traits::Float;
 
-
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec2<T>
 where
-	T: Float,
+	T: Number,
 {
 	pub x: T,
 	pub y: T,
@@ -25,17 +25,13 @@ where
 
 impl<T> Vec2<T>
 where
-	T: Default + Float,
+	T: Number,
 {
-	pub fn new() -> Self {
-		Self {
-			x: T::default(),
-			y: T::default(),
-		}
-	}
+	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO};
+	pub const ONE: Self = Self{x: T::ONE, y: T::ONE};
 
 	pub fn new_with(x: T, y: T) -> Self {
-		Self { x: x, y: y }
+		Self { x, y }
 	}
 
 	pub fn new_cast(v: T) -> Self {
@@ -67,13 +63,24 @@ where
 
 	pub fn normalize(&self) -> Self {
 		let len = self.length();
-		Self {
-			x: self.x / len,
-			y: self.y / len,
+		if len > T::ZERO {
+			Self {
+				x: self.x / len,
+				y: self.y / len,
+			}
+		} else {
+			Self::ZERO
 		}
 	}
 
+	pub fn lerp(&self, it: &Self, t: T) -> Self {
+		Self {
+			x: self.x + (it.x - self.x) * t,
+			y: self.y + (it.y - self.y) * t,
+		}
+	}
 
+	
 	pub fn clamp(&self, min: &Self, max: &Self) -> Self {
 		Self {
 			x: T::clamp(self.x, min.x, max.x),
@@ -94,19 +101,94 @@ where
 			y: T::max(self.y, it.y),
 		}
 	}
+
+
+	pub fn to_array(&self) -> [T; 2] {
+		[self.x, self.y]
+	}
+	
+	pub fn to_tuple(&self) -> (T, T) {
+		(self.x, self.y)
+	}
+}
+
+
+impl<T> Default for Vec2<T>
+where
+	T: Number,
+{
+	fn default() -> Self {
+		Self::ZERO
+	}
+}
+
+
+impl<T> From<[T; 2]> for Vec2<T>
+where
+	T: Number,
+{
+	fn from(arr: [T; 2]) -> Self {
+		Self::new_with(arr[0], arr[1])
+	}
+}
+
+impl<T> From<(T, T)> for Vec2<T>
+where
+	T: Number,
+{
+	fn from(tup: (T, T)) -> Self {
+		Self::new_with(tup.0, tup.1)
+	}
+}
+
+impl<T> From<Vec2<T>> for [T; 2]
+where
+	T: Number,
+{
+	fn from(v: Vec2<T>) -> Self {
+		[v.x, v.y]
+	}
+}
+
+
+impl<T> Index<usize> for Vec2<T>
+where
+	T: Number,
+{
+	type Output = T;
+	fn index(&self, index: usize) -> &Self::Output {
+		match index {
+			0 => &self.x,
+			1 => &self.y,
+			_ => panic!("Index out of bounds for Vec2"),
+		}
+	}
+}
+
+impl<T> IndexMut<usize> for Vec2<T>
+where
+	T: Number,
+{
+	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+		match index {
+			0 => &mut self.x,
+			1 => &mut self.y,
+			_ => panic!("Index out of bounds for Vec2"),
+		}
+	}
 }
 
 
 impl<T> Neg for Vec2<T>
 where
-	T: Float,
+	T: Number + Neg<Output = T>,
 {
 	type Output = Self;
 
 	fn neg(self) -> Self::Output {
 		Self {
-			x: self.x.neg(),
-			y: self.y.neg(),
+			x: -self.x,
+			y: -self.y,
 		}
 	}
 }
@@ -114,7 +196,7 @@ where
 
 impl<T> Add<Self> for Vec2<T>
 where
-	T: Float,
+	T: Number,
 {
 	type Output = Vec2<T>;
 
@@ -128,7 +210,7 @@ where
 
 impl<T> Sub<Self> for Vec2<T>
 where
-	T: Float,
+	T: Number,
 {
 	type Output = Vec2<T>;
 
@@ -143,7 +225,7 @@ where
 
 impl<T> Mul<Self> for Vec2<T>
 where
-	T: Float,
+	T: Number,
 {
 	type Output = Vec2<T>;
 
@@ -157,7 +239,7 @@ where
 
 impl<T> Div<Self> for Vec2<T>
 where
-	T: Float,
+	T: Number,
 {
 	type Output = Vec2<T>;
 
@@ -172,7 +254,7 @@ where
 
 impl<T> Mul<T> for Vec2<T>
 where
-	T: Float,
+	T: Number,
 {
 	type Output = Vec2<T>;
 
@@ -186,7 +268,7 @@ where
 
 impl<T> Div<T> for Vec2<T>
 where
-	T: Float,
+	T: Number,
 {
 	type Output = Vec2<T>;
 
@@ -195,5 +277,47 @@ where
 			x: self.x / rhs,
 			y: self.y / rhs,
 		}
+	}
+}
+
+
+impl<T> AddAssign for Vec2<T>
+where
+	T: Number,
+{
+	fn add_assign(&mut self, rhs: Self) {
+		self.x = self.x + rhs.x;
+		self.y = self.y + rhs.y;
+	}
+}
+
+impl<T> SubAssign for Vec2<T>
+where
+	T: Number,
+{
+	fn sub_assign(&mut self, rhs: Self) {
+		self.x = self.x - rhs.x;
+		self.y = self.y - rhs.y;
+	}
+}
+
+
+impl<T> MulAssign<T> for Vec2<T>
+where
+	T: Number,
+{
+	fn mul_assign(&mut self, rhs: T) {
+		self.x = self.x * rhs;
+		self.y = self.y * rhs;
+	}
+}
+
+impl<T> DivAssign<T> for Vec2<T>
+where
+	T: Number,
+{
+	fn div_assign(&mut self, rhs: T) {
+		self.x = self.x / rhs;
+		self.y = self.y / rhs;
 	}
 }
