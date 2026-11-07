@@ -29,6 +29,7 @@ use mochi_rhi::format::Format;
 use mochi_rhi::pipeline::{PolygonMode, PrimitiveTopology};
 use mochi_rhi::shader::ShaderStage;
 use mochi_rhi::traits::RhiDevice;
+use mochi_except::*;
 
 
 pub struct DeviceInner {
@@ -262,7 +263,7 @@ impl AshDevice {
 
 		let props = unsafe { instance.get_physical_device_properties(physical_device) };
 		let dev_name = unsafe { std::ffi::CStr::from_ptr(props.device_name.as_ptr()) }.to_string_lossy();
-		println!("[mochi_rhi] Ash Vulkan 1.3/1.4 device initialized: {}", dev_name);
+		mochi_disp!("Ash Vulkan device initialized: {}", dev_name);
 
 		let inner = DeviceInner {
 			entry,

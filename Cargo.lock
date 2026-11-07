@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.13.2",
  "mochi_ahi",
+ "mochi_except",
  "mochi_math",
  "mochi_rhi",
  "mochi_rhi_ash",
@@ -755,6 +756,7 @@ name = "mochi_ahi"
 version = "0.1.0"
 dependencies = [
  "cpal",
+ "mochi_except",
  "symphonia",
 ]
 
@@ -791,6 +793,7 @@ dependencies = [
  "ash-window",
  "bitflags 2.13.2",
  "gpu-allocator",
+ "mochi_except",
  "mochi_math",
  "mochi_rhi",
  "raw-window-handle",

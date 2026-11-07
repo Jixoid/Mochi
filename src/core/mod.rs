@@ -20,6 +20,7 @@ use crate::rhi as rhi;
 use crate::audio::AudioSystem;
 use crate::display::Display;
 use crate::rendering::RenderingSystem;
+use mochi_except::*;
 
 
 pub struct EngineApp {
@@ -60,7 +61,7 @@ impl EngineApp {
 			title: title.to_string(),
 			width,
 			height,
-			
+
 			device: Some(device),
 			alloca: Some(alloca),
 			cmdmng: Some(cmdmng),
@@ -117,10 +118,10 @@ impl ApplicationHandler for EngineApp {
 					}
 					display.request_redraw();
 					self.display = Some(display);
-					println!("[Engine] Display and Vulkan swapchain attached successfully.");
+					mochi_disp!("Display and Vulkan swapchain attached successfully.");
 				}
 				Err(err) => {
-					eprintln!("[Engine] Failed to initialize display: {err}");
+					mochi_error!("Failed to initialize display: {err}");
 					event_loop.exit();
 				}
 			}
@@ -130,7 +131,7 @@ impl ApplicationHandler for EngineApp {
 	fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
 		match event {
 			WindowEvent::CloseRequested => {
-				println!("[Engine] Window close requested, shutting down...");
+				mochi_log!("Window close requested, shutting down...");
 				event_loop.exit();
 			}
 			WindowEvent::KeyboardInput {
@@ -142,7 +143,7 @@ impl ApplicationHandler for EngineApp {
 					},
 				..
 			} => {
-				println!("[Engine] Escape pressed, shutting down...");
+				mochi_log!("Escape pressed, shutting down...");
 				event_loop.exit();
 			}
 			WindowEvent::Resized(physical_size) => {
@@ -190,7 +191,7 @@ impl ApplicationHandler for EngineApp {
 					if let Ok(limit_str) = std::env::var("MOCHI_TEST_EXIT_FRAMES") {
 						if let Ok(limit) = limit_str.parse::<u64>() {
 							if self.frame_count >= limit {
-								println!("[Engine] Reached test frame limit ({limit}), exiting...");
+								mochi_log!("Reached test frame limit ({limit}), exiting...");
 								event_loop.exit();
 								return;
 							}
@@ -205,11 +206,11 @@ impl ApplicationHandler for EngineApp {
 	}
 
 	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-		println!("[Engine] Cleaning up Engine resources...");
+		mochi_log!("Cleaning up Engine resources...");
 		self.audio_system = None;
 
 		self.device.as_ref().unwrap().wait_idle();
-		
+
 		self.rendering_system = None;
 		self.display = None;
 
@@ -218,7 +219,7 @@ impl ApplicationHandler for EngineApp {
 		self.alloca = None;
 		self.device = None;
 
-		println!("[Engine] Cleanup completed cleanly.");
+		mochi_disp!("Cleanup completed cleanly.");
 	}
 }
 

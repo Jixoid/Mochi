@@ -12,6 +12,7 @@
 
 use std::sync::{Arc, Mutex};
 use mochi_ahi::Device;
+use mochi_except::*;
 use crate::audio::{AudioClip, AudioSource, Listener, Mixer};
 
 
@@ -34,9 +35,9 @@ impl AudioSystem {
 
 		let started = device.start();
 		if started {
-			println!("[AudioSystem] Audio device started successfully (44100Hz, Stereo Float).");
+			mochi_disp!("Audio device started successfully.");
 		} else {
-			eprintln!("[AudioSystem] Failed to start audio device!");
+			mochi_error!("Failed to start audio device!");
 		}
 
 		Self { device, mixer }

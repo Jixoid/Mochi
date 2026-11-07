@@ -22,6 +22,7 @@ use symphonia::core::formats::probe::Hint;
 use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::{MediaSource, MediaSourceStream};
 use symphonia::core::meta::MetadataOptions;
+use mochi_except::*;
 
 use crate::data::AudioData;
 
@@ -49,9 +50,9 @@ impl Device {
 				.description()
 				.map(|d| d.name().to_string())
 				.unwrap_or_else(|_| "Default".to_string());
-			println!("[mochi_ahi] CPAL audio device initialized for {app_name}: {dev_name}");
+			mochi_disp!("CPAL audio device initialized for {app_name}: {dev_name}");
 		} else {
-			eprintln!("[mochi_ahi] No audio output device available for {app_name}");
+			mochi_warn!("No audio output device available for {app_name}");
 		}
 
 		Self {
@@ -91,14 +92,14 @@ impl Device {
 				(stream_cfg, fmt)
 			}
 			Err(err) => {
-				eprintln!("[mochi_ahi] Could not query default audio config: {err}");
+				mochi_warn!("Could not query default audio config: {err}");
 				return;
 			}
 		};
 
 		let callback_clone = Arc::clone(&self.callback);
 		let is_playing_clone = Arc::clone(&self.is_playing);
-		let err_fn = |err| eprintln!("[mochi_ahi] Stream error: {err}");
+		let err_fn = |err| mochi_error!("Stream error: {err}");
 
 		let stream_res = match sample_format {
 			SampleFormat::F32 => {
@@ -172,7 +173,7 @@ impl Device {
 				)
 			}
 			_ => {
-				eprintln!("[mochi_ahi] Unsupported audio sample format: {sample_format:?}");
+				mochi_error!("Unsupported audio sample format: {sample_format:?}");
 				return;
 			}
 		};
@@ -184,7 +185,7 @@ impl Device {
 				self.stream = Some(stream);
 			}
 			Err(err) => {
-				eprintln!("[mochi_ahi] Failed to build audio output stream: {err}");
+				mochi_error!("Failed to build audio output stream: {err}");
 			}
 		}
 	}
@@ -346,7 +347,7 @@ fn decode_media_source<R: MediaSource + 'static>(
 				return Err(format!("Audio decode IO error: {err}"));
 			}
 			Err(symphonia::core::errors::Error::DecodeError(err)) => {
-				eprintln!("[mochi_ahi] Corrupted audio packet ignored: {err}");
+				mochi_warn!("Corrupted audio packet ignored: {err}");
 			}
 			Err(err) => return Err(format!("Audio decode error: {err}")),
 		}

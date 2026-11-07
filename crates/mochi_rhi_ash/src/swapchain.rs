@@ -20,6 +20,7 @@ use crate::AshVulkanBackend;
 use mochi_rhi::error::{RhiError, RhiResult};
 use mochi_rhi::format::Format;
 use mochi_rhi::traits::{RhiRenderTarget, RhiSwapchain};
+use mochi_except::*;
 
 
 #[derive(Clone, Copy)]
@@ -222,7 +223,7 @@ impl AshSwapchain {
 
 		let (targets, semaphores) = Self::build_targets(&mut inner)?;
 
-		println!("[mochi_rhi] Ash Vulkan swapchain created: {}x{}, {} images", inner.extent.width, inner.extent.height, targets.len());
+		mochi_disp!("Ash Vulkan swapchain created: {}x{}, {} images", inner.extent.width, inner.extent.height, targets.len());
 
 		Ok(Self {
 			inner: Arc::new(Mutex::new(inner)),

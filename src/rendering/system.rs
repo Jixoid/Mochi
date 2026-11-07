@@ -11,6 +11,7 @@
 
 
 use crate::rhi;
+use mochi_except::*;
 use mochi_math::Vec4;
 
 
@@ -83,7 +84,7 @@ impl RenderingSystem {
 		color_format: rhi::Format,
 		depth_format: rhi::Format,
 	) {
-		println!("[RenderingSystem] Initializing graphics pipeline with BDA & Dynamic Rendering...");
+		mochi_verb!("Initializing graphics pipeline with BDA & Dynamic Rendering...");
 
 		let vert = rhi::Shader::new(device, rhi::ShaderStage::Vertex, VERT_SPV, "main");
 		let frag = rhi::Shader::new(device, rhi::ShaderStage::Pixel, FRAG_SPV, "main");
@@ -174,8 +175,8 @@ impl RenderingSystem {
 		};
 		uploader.copy_memory_to_buffer(rhi::TransferTime::Now, camera_bytes, &mut camera_ubo);
 
-		println!(
-			"[RenderingSystem] Pipeline ready. Vertex buffer address: 0x{:x}, Camera UBO address: 0x{:x}",
+		mochi_disp!(
+			"Pipeline ready. Vertex buffer address: 0x{:x}, Camera UBO address: 0x{:x}",
 			vertex_buffer.address(),
 			camera_ubo.address()
 		);

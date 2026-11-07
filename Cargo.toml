@@ -16,3 +16,4 @@ mochi_rhi = { path = "crates/mochi_rhi" }
 mochi_rhi_ash = { path = "crates/mochi_rhi_ash" }
 mochi_ahi = { path = "crates/mochi_ahi" }
 mochi_math = { path = "crates/mochi_math" }
+mochi_except = { path = "crates/mochi_except" }

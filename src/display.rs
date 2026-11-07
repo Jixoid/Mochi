@@ -16,6 +16,7 @@ use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
 
 use crate::rhi::{self as rhi, Device, Surface, Swapchain};
+use mochi_except::*;
 
 
 pub struct Display {
@@ -39,7 +40,7 @@ impl Display {
 		let surface = device.create_surface(&*window)?;
 		let swapchain = Swapchain::new(device, &surface, width, height);
 
-		println!("[Display] Native window created ({}x{}) with Vulkan swapchain ({} images)",width,height,swapchain.image_count());
+		mochi_disp!("Native window created ({}x{}) with Vulkan swapchain ({} images)", width, height, swapchain.image_count());
 
 		Ok(Self {
 			swapchain,
@@ -59,7 +60,6 @@ impl Display {
 		self.swapchain.resize(width, height);
 	}
 
-	
 	pub fn acquire_next_image(&mut self) -> u32 {
 		self.swapchain.acquire_next_image()
 	}
@@ -101,7 +101,6 @@ impl Display {
 		self.height
 	}
 
-	
 	pub fn swapchain(&self) -> &Swapchain {
 		&self.swapchain
 	}
