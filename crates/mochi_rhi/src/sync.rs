@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -12,18 +12,6 @@
 
 use crate::error::RhiResult;
 use crate::traits::{RhiBackend, RhiDevice};
-
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Semaphore(pub *mut std::ffi::c_void);
-unsafe impl Send for Semaphore {}
-unsafe impl Sync for Semaphore {}
-
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Fence(pub *mut std::ffi::c_void);
-unsafe impl Send for Fence {}
-unsafe impl Sync for Fence {}
 
 
 pub struct FrameSynchronizer<B: RhiBackend> {
@@ -51,7 +39,6 @@ impl<B: RhiBackend> FrameSynchronizer<B> {
 		})
 	}
 
-	
 	pub fn begin_frame(&mut self, device: &B::Device) -> RhiResult<()> {
 		let fence = &self.in_flight_fences[self.current_frame];
 		device.wait_fence(fence, u64::MAX)?;

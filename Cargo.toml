@@ -13,5 +13,6 @@ bitflags = "2.13.2"
 raw-window-handle = "0.6"
 winit = "0.30"
 mochi_rhi = { path = "crates/mochi_rhi" }
+mochi_rhi_ash = { path = "crates/mochi_rhi_ash" }
 mochi_ahi = { path = "crates/mochi_ahi" }
 mochi_math = { path = "crates/mochi_math" }

@@ -12,9 +12,9 @@
 
 use std::sync::Arc;
 
-use crate::ffi::*;
-use crate::manager::DeviceInner;
-use crate::{Buffer, Device, Image2};
+use crate::manager::device::Device;
+use crate::traits::RhiBackend;
+use crate::{Buffer, Image2};
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -24,81 +24,37 @@ pub enum TransferTime {
 	Lazy = 1,
 }
 
-pub struct UploaderInner {
-	device: Arc<DeviceInner>,
-	handle: MochiUploaderHandle,
-}
-
-unsafe impl Send for UploaderInner {}
-unsafe impl Sync for UploaderInner {}
-
-impl UploaderInner {
-	pub fn handle(&self) -> MochiUploaderHandle {
-		self.handle
-	}
-
-	pub fn device(&self) -> &Arc<DeviceInner> {
-		&self.device
-	}
-}
-
-impl Drop for UploaderInner {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_uploader_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
-	}
-}
 
 #[derive(Clone)]
-pub struct Uploader {
-	inner: Arc<UploaderInner>,
+pub struct Uploader<B: RhiBackend> {
+	device: Arc<B::Device>,
 }
 
-unsafe impl Send for Uploader {}
-unsafe impl Sync for Uploader {}
+unsafe impl<B: RhiBackend> Send for Uploader<B> {}
+unsafe impl<B: RhiBackend> Sync for Uploader<B> {}
 
-impl Uploader {
-	pub fn new(device: &Device) -> Self {
-		let handle = unsafe { mochi_rhi_uploader_new(device.handle()) };
-		assert!(!handle.is_null(), "RHI driver failed to create Uploader");
+impl<B: RhiBackend> Uploader<B> {
+	pub fn new(device: &Device<B>) -> Self {
 		Self {
-			inner: Arc::new(UploaderInner {
-				device: device.inner().clone(),
-				handle,
-			}),
+			device: device.raw_arc().clone(),
 		}
 	}
 
-	pub fn inner(&self) -> &Arc<UploaderInner> {
-		&self.inner
+	pub fn device(&self) -> &B::Device {
+		&self.device
 	}
 
-	pub fn handle(&self) -> MochiUploaderHandle {
-		self.inner.handle
-	}
-
-	pub fn copy_memory_to_buffer(&self, time: TransferTime, src: &[u8], dst: &mut Buffer) {
+	pub fn copy_memory_to_buffer(&self, _time: TransferTime, src: &[u8], dst: &mut Buffer<B>) {
 		assert!(
 			(src.len() as u64) <= dst.size(),
 			"Uploader: Source slice ({} bytes) exceeds destination buffer capacity ({} bytes)",
 			src.len(),
 			dst.size()
 		);
-		unsafe {
-			mochi_rhi_uploader_copy_memory_to_buffer(
-				self.inner.handle,
-				time as u32,
-				src.as_ptr() as *const std::ffi::c_void,
-				dst.handle(),
-			);
-		}
+		dst.write_bytes(0, src).expect("Failed to write memory to buffer in Uploader");
 	}
 
-	pub fn copy_memory_to_image(&self, time: TransferTime, src: &[u8], dst: &mut Image2) {
+	pub fn copy_memory_to_image(&self, _time: TransferTime, src: &[u8], dst: &mut Image2<B>) {
 		assert!(!src.is_empty(), "Uploader: Cannot copy empty slice to Image2");
 		let ext = dst.ext();
 		assert!(ext[0] > 0 && ext[1] > 0, "Uploader: Cannot copy to 0-sized Image2 (extent: {:?})", ext);
@@ -109,13 +65,5 @@ impl Uploader {
 			ext[0],
 			ext[1]
 		);
-		unsafe {
-			mochi_rhi_uploader_copy_memory_to_image(
-				self.inner.handle,
-				time as u32,
-				src.as_ptr() as *const std::ffi::c_void,
-				dst.handle(),
-			);
-		}
 	}
 }

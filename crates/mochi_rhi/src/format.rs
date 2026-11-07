@@ -184,7 +184,7 @@ impl Format {
 }
 
 
-
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct VT {
 	size: u64,
 	align: u64,

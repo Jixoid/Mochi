@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -10,13 +10,11 @@
 */
 
 
-use std::ffi::CString;
 use std::sync::Arc;
 use bitflags::bitflags;
 
-use crate::Device;
-use crate::ffi::*;
-use crate::manager::DeviceInner;
+use crate::manager::device::Device;
+use crate::traits::{RhiBackend, RhiDevice};
 
 
 bitflags! {
@@ -36,23 +34,32 @@ bitflags! {
 	}
 }
 
-pub struct ShaderInner {
-	device: Arc<DeviceInner>,
-	handle: MochiShaderHandle,
+
+#[derive(Clone)]
+pub struct Shader<B: RhiBackend> {
+	inner: Arc<B::Shader>,
 	stage: ShaderStage,
 	entry: String,
 }
 
-unsafe impl Send for ShaderInner {}
-unsafe impl Sync for ShaderInner {}
+unsafe impl<B: RhiBackend> Send for Shader<B> {}
+unsafe impl<B: RhiBackend> Sync for Shader<B> {}
 
-impl ShaderInner {
-	pub fn handle(&self) -> MochiShaderHandle {
-		self.handle
+impl<B: RhiBackend> Shader<B> {
+	pub fn new(device: &Device<B>, stage: ShaderStage, code: &[u8], entry: &str) -> Self {
+		let sh = device
+			.raw()
+			.create_shader(stage, code, entry)
+			.expect("Failed to create shader");
+		Self {
+			inner: Arc::new(sh),
+			stage,
+			entry: entry.to_string(),
+		}
 	}
 
-	pub fn device(&self) -> &Arc<DeviceInner> {
-		&self.device
+	pub fn raw(&self) -> &B::Shader {
+		&self.inner
 	}
 
 	pub fn stage(&self) -> ShaderStage {
@@ -61,65 +68,5 @@ impl ShaderInner {
 
 	pub fn entry(&self) -> &str {
 		&self.entry
-	}
-}
-
-impl Drop for ShaderInner {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_shader_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
-	}
-}
-
-#[derive(Clone)]
-pub struct Shader {
-	inner: Arc<ShaderInner>,
-}
-
-unsafe impl Send for Shader {}
-unsafe impl Sync for Shader {}
-
-impl Shader {
-	pub fn new(device: &Device, stage: ShaderStage, code: &[u8], entry: &str) -> Self {
-		let c_entry = CString::new(entry).expect("CString failed for shader entry");
-		let handle = unsafe {
-			mochi_rhi_shader_new(
-				device.handle(),
-				stage.bits(),
-				code.as_ptr(),
-				code.len(),
-				c_entry.as_ptr(),
-			)
-		};
-		assert!(!handle.is_null(), "RHI driver failed to create Shader");
-
-		Self {
-			inner: Arc::new(ShaderInner {
-				device: device.inner().clone(),
-				handle,
-				stage,
-				entry: entry.to_string(),
-			}),
-		}
-	}
-
-	pub fn inner(&self) -> &Arc<ShaderInner> {
-		&self.inner
-	}
-
-	pub fn handle(&self) -> MochiShaderHandle {
-		self.inner.handle
-	}
-
-	pub fn stage(&self) -> ShaderStage {
-		self.inner.stage
-	}
-
-	pub fn entry(&self) -> &str {
-		&self.inner.entry
 	}
 }

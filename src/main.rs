@@ -14,10 +14,10 @@ pub mod audio;
 pub mod core;
 pub mod display;
 pub mod rendering;
+pub mod rhi;
 
 pub use mochi_ahi as ahi;
 pub use mochi_math as math;
-pub use mochi_rhi as rhi;
 
 use core::Engine;
 

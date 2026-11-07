@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -17,7 +17,7 @@ use crate::error::RhiResult;
 use crate::types::*;
 
 
-/// Marker trait representing an RHI backend driver
+/// Central backend trait representing an RHI driver implementation
 pub trait RhiBackend: 'static + Sized + Send + Sync {
 	type Device: RhiDevice<Self>;
 	type Allocator: RhiAllocator<Self>;
@@ -32,8 +32,13 @@ pub trait RhiBackend: 'static + Sized + Send + Sync {
 	type CommandQueue: RhiCommandQueue<Self>;
 	type Swapchain: RhiSwapchain<Self>;
 	type RenderTarget: RhiRenderTarget;
-	type Semaphore: Send + Sync;
-	type Fence: Send + Sync;
+	type Semaphore: Send + Sync + Clone;
+	type Fence: Send + Sync + Clone;
+
+	fn create_device(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> RhiResult<Self::Device>;
+	fn create_allocator(device: &Self::Device) -> RhiResult<Self::Allocator>;
+	fn create_command_queue(device: &Self::Device) -> RhiResult<Self::CommandQueue>;
+	fn create_swapchain(device: &Self::Device, surface: u64, width: u32, height: u32) -> RhiResult<Self::Swapchain>;
 }
 
 
@@ -49,6 +54,18 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 
 	fn create_surface<W: HasWindowHandle + HasDisplayHandle>(&self, window: &W) -> RhiResult<u64>;
 	fn destroy_surface(&self, surface_handle: u64);
+
+	fn create_shader(&self, stage: ShaderStage, code: &[u8], entry: &str) -> RhiResult<B::Shader>;
+	fn create_pipeline_meta(&self, push_stages: ShaderStage, push_size: u32) -> RhiResult<B::PipelineMeta>;
+	fn create_graphics_pipeline(
+		&self,
+		meta: &B::PipelineMeta,
+		shaders: &[&B::Shader],
+		polymode: PolygonMode,
+		primitive_topology: PrimitiveTopology,
+		color_format: Format,
+		depth_format: Format,
+	) -> RhiResult<B::Pipeline>;
 
 	fn init_descriptor_heap(&self, allocator: &B::Allocator) -> RhiResult<()>;
 	fn fini_descriptor_heap(&self);
@@ -130,7 +147,7 @@ pub trait RhiPipeline: Send + Sync {
 
 
 /// Abstract Render Target (Framebuffer / Dynamic Rendering Attachment)
-pub trait RhiRenderTarget: Send + Sync {
+pub trait RhiRenderTarget: Send + Sync + Clone {
 	fn color_format(&self) -> Format;
 	fn depth_format(&self) -> Format;
 }

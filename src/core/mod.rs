@@ -16,7 +16,7 @@ use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
-use mochi_rhi::{self as rhi, Synchronizer};
+use crate::rhi as rhi;
 use crate::audio::AudioSystem;
 use crate::display::Display;
 use crate::rendering::RenderingSystem;
@@ -48,7 +48,7 @@ impl EngineApp {
 		let device = rhi::Device::new("MochiEngine", 0, 1, 0, 0);
 		let alloca = rhi::Allocator::new(&device);
 		let cmdmng = rhi::CommandManager::new(&device);
-		let syncer = Synchronizer::new(&device, RenderingSystem::MAX_FRAMES_IN_FLIGHT);
+		let syncer = rhi::Synchronizer::new(&device, RenderingSystem::MAX_FRAMES_IN_FLIGHT);
 
 		// Audio
 		let audio_system = AudioSystem::new("Mochi Audio", 0, 1, 0, 0);

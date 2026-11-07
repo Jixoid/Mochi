@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -10,12 +10,9 @@
 */
 
 
-pub mod backend;
 pub mod buffer;
 pub mod command;
-pub mod driver;
 pub mod error;
-pub mod ffi;
 pub mod format;
 pub mod guard;
 pub mod image;
@@ -28,11 +25,9 @@ pub mod sync;
 pub mod traits;
 pub mod types;
 
-// re-exports
-pub use backend::CurrentBackend;
+
 pub use buffer::*;
 pub use command::*;
-pub use driver::*;
 pub use error::*;
 pub use format::*;
 pub use guard::*;

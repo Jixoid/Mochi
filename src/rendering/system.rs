@@ -10,8 +10,9 @@
 */
 
 
-use mochi_rhi as rhi;
+use crate::rhi;
 use mochi_math::Vec4;
+
 
 static VERT_SPV: &[u8] = include_bytes!("../../res/shaders/base.vert.spv");
 static FRAG_SPV: &[u8] = include_bytes!("../../res/shaders/bare.frag.spv");

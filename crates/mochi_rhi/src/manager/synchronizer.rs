@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS
+	This file is part of QAOS / Mochi
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -10,89 +10,54 @@
 */
 
 
-use std::sync::Arc;
-use crate::ffi::*;
-pub use crate::sync::{Fence, Semaphore};
-use crate::manager::DeviceInner;
-use crate::Device;
+use std::sync::{Arc, Mutex};
 
+use crate::manager::device::Device;
+use crate::sync::FrameSynchronizer;
+use crate::traits::RhiBackend;
 
-pub struct SynchronizerInner {
-	device: Arc<DeviceInner>,
-	handle: MochiSynchronizerHandle,
-}
-
-unsafe impl Send for SynchronizerInner {}
-unsafe impl Sync for SynchronizerInner {}
-
-impl SynchronizerInner {
-	pub fn handle(&self) -> MochiSynchronizerHandle {
-		self.handle
-	}
-
-	pub fn device(&self) -> &Arc<DeviceInner> {
-		&self.device
-	}
-}
-
-impl Drop for SynchronizerInner {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_synchronizer_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
-	}
-}
 
 #[derive(Clone)]
-pub struct Synchronizer {
-	inner: Arc<SynchronizerInner>,
+pub struct Synchronizer<B: RhiBackend> {
+	sync: Arc<Mutex<FrameSynchronizer<B>>>,
+	device: Arc<B::Device>,
 }
 
-unsafe impl Send for Synchronizer {}
-unsafe impl Sync for Synchronizer {}
+unsafe impl<B: RhiBackend> Send for Synchronizer<B> {}
+unsafe impl<B: RhiBackend> Sync for Synchronizer<B> {}
 
-impl Synchronizer {
-	pub fn new(device: &Device, max_frames_in_flight: u32) -> Self {
-		let handle = unsafe { mochi_rhi_synchronizer_new(device.handle(), max_frames_in_flight) };
-		assert!(!handle.is_null(), "RHI driver failed to create Synchronizer");
+impl<B: RhiBackend> Synchronizer<B> {
+	pub fn new(device: &Device<B>, max_frames_in_flight: u32) -> Self {
+		let frame_sync = FrameSynchronizer::new(device.raw(), max_frames_in_flight as usize)
+			.expect("Failed to create FrameSynchronizer");
 		Self {
-			inner: Arc::new(SynchronizerInner {
-				device: device.inner().clone(),
-				handle,
-			}),
+			sync: Arc::new(Mutex::new(frame_sync)),
+			device: device.raw_arc().clone(),
 		}
-	}
-
-	pub fn inner(&self) -> &Arc<SynchronizerInner> {
-		&self.inner
-	}
-
-	pub fn handle(&self) -> MochiSynchronizerHandle {
-		self.inner.handle
 	}
 
 	pub fn begin_frame(&mut self) {
-		unsafe { mochi_rhi_synchronizer_begin_frame(self.inner.handle) }
+		self
+			.sync
+			.lock()
+			.unwrap()
+			.begin_frame(&self.device)
+			.expect("Failed to wait/reset fence on begin_frame");
 	}
 
 	pub fn end_frame(&mut self) {
-		unsafe { mochi_rhi_synchronizer_end_frame(self.inner.handle) }
+		self.sync.lock().unwrap().end_frame();
 	}
 
 	pub fn current_frame(&self) -> u32 {
-		unsafe { mochi_rhi_synchronizer_current_frame(self.inner.handle) }
+		self.sync.lock().unwrap().current_frame() as u32
 	}
 
-	pub fn image_available_semaphore(&self) -> Semaphore {
-		let ptr = unsafe { mochi_rhi_synchronizer_get_image_available_semaphore(self.inner.handle) };
-		Semaphore(ptr)
+	pub fn image_available_semaphore(&self) -> B::Semaphore {
+		self.sync.lock().unwrap().image_available_semaphore().clone()
 	}
 
-	pub fn in_flight_fence(&self) -> Fence {
-		let ptr = unsafe { mochi_rhi_synchronizer_get_in_flight_fence(self.inner.handle) };
-		Fence(ptr)
+	pub fn in_flight_fence(&self) -> B::Fence {
+		self.sync.lock().unwrap().in_flight_fence().clone()
 	}
 }

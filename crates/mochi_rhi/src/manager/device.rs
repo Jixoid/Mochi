@@ -10,13 +10,14 @@
 */
 
 
-use std::ffi::CString;
-use std::sync::{Arc, Mutex};
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
+use std::marker::PhantomData;
+use std::sync::Arc;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
-use crate::ffi::*;
-use crate::manager::allocator::AllocatorInner;
-use crate::{Allocator, Buffer, ImageView2, Sampler2, Surface};
+use crate::manager::allocator::Allocator;
+use crate::manager::swapchain::Surface;
+use crate::traits::{RhiBackend, RhiDevice};
+use crate::{Buffer, ImageView2, Sampler2};
 
 
 #[derive(Clone, Debug)]
@@ -51,7 +52,7 @@ impl QueueGroup {
 	pub fn add_primary(&mut self, q: Queue) {
 		self.primary.push(q);
 	}
-	
+
 	pub fn add_secondary(&mut self, q: Queue) {
 		self.secondary.push(q);
 	}
@@ -78,76 +79,49 @@ impl QueueGroup {
 }
 
 
-pub struct DeviceInner {
-	handle: MochiDeviceHandle,
-	descriptor_allocator: Mutex<Option<Arc<AllocatorInner>>>,
-}
-
-unsafe impl Send for DeviceInner {}
-unsafe impl Sync for DeviceInner {}
-
-impl DeviceInner {
-	pub fn handle(&self) -> MochiDeviceHandle {
-		self.handle
-	}
-}
-
-impl Drop for DeviceInner {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_device_wait_idle(self.handle);
-				mochi_rhi_device_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
-	}
-}
-
-
 #[derive(Clone)]
-pub struct Device {
-	inner: Arc<DeviceInner>,
+pub struct Device<B: RhiBackend> {
+	inner: Arc<B::Device>,
 	main_q: Queue,
 	graphics_q: QueueGroup,
 	compute_q: QueueGroup,
 	transfer_q: QueueGroup,
+	_marker: PhantomData<B>,
 }
 
-impl Device {
-	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> Self {
-		let c_str = CString::new(app_name).expect("c string failed");
-		let handle = unsafe { mochi_rhi_device_new(c_str.as_ptr(), major, minor, patch, build) };
-		assert!(!handle.is_null(), "RHI driver failed to create Device");
+unsafe impl<B: RhiBackend> Send for Device<B> {}
+unsafe impl<B: RhiBackend> Sync for Device<B> {}
 
-		let q_family = unsafe { mochi_rhi_device_get_main_queue_family(handle) };
+impl<B: RhiBackend> Device<B> {
+	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> Self {
+		let dev = B::create_device(app_name, major, minor, patch, build)
+			.expect("Failed to initialize RHI device");
+		let q_family = dev.main_queue_family();
 		let main_q = Queue::new(q_family);
 
 		let mut graphics_q = QueueGroup::new();
 		graphics_q.add_primary(Queue::new(q_family));
 
 		Self {
-			inner: Arc::new(DeviceInner {
-				handle,
-				descriptor_allocator: Mutex::new(None),
-			}),
+			inner: Arc::new(dev),
 			main_q,
 			graphics_q,
 			compute_q: QueueGroup::new(),
 			transfer_q: QueueGroup::new(),
+			_marker: PhantomData,
 		}
 	}
 
-	pub fn inner(&self) -> &Arc<DeviceInner> {
+	pub fn raw(&self) -> &B::Device {
 		&self.inner
 	}
 
-	pub fn handle(&self) -> MochiDeviceHandle {
-		self.inner.handle
+	pub fn raw_arc(&self) -> &Arc<B::Device> {
+		&self.inner
 	}
 
 	pub fn wait_idle(&self) {
-		unsafe { mochi_rhi_device_wait_idle(self.inner.handle); }
+		let _ = self.inner.wait_idle();
 	}
 
 	pub fn main_q(&self) -> &Queue {
@@ -166,86 +140,29 @@ impl Device {
 		&self.transfer_q
 	}
 
-	pub fn init_descriptor_heap(&mut self, alloc: &Allocator) {
-		*self.inner.descriptor_allocator.lock().unwrap() = Some(alloc.inner().clone());
-		unsafe { mochi_rhi_device_init_descriptor_heap(self.inner.handle, alloc.handle()); }
+	pub fn init_descriptor_heap(&mut self, alloc: &Allocator<B>) {
+		let _ = self.inner.init_descriptor_heap(alloc.raw());
 	}
 
 	pub fn fini_descriptor_heap(&mut self) {
-		*self.inner.descriptor_allocator.lock().unwrap() = None;
-		unsafe { mochi_rhi_device_fini_descriptor_heap(self.inner.handle); }
+		self.inner.fini_descriptor_heap();
 	}
 
-	pub fn write_texture_descriptor(&mut self, view: &ImageView2<'_>, sampler: &Sampler2) -> u32 {
-		unsafe { mochi_rhi_device_write_texture_descriptor(self.inner.handle, view.handle(), sampler.handle()) }
+	pub fn write_texture_descriptor(&mut self, view: &ImageView2<'_, B>, sampler: &Sampler2<B>) -> u32 {
+		self.inner.write_texture_descriptor(view.raw(), sampler.raw())
 	}
 
-	pub fn descriptor_heap(&self) -> Option<Buffer> {
-		let h = unsafe { mochi_rhi_device_get_descriptor_heap(self.inner.handle) };
-		if h.is_null() {
-			None
-		} else {
-			let alloc_opt = self.inner.descriptor_allocator.lock().unwrap().clone();
-			alloc_opt.map(|alloc| Buffer::from_handle_unowned(alloc, h))
-		}
+	pub fn descriptor_heap(&self) -> Option<Buffer<B>> {
+		self.inner.descriptor_heap().map(Buffer::from_raw)
 	}
 
-	pub fn sampler_heap(&self) -> Option<Buffer> {
-		let h = unsafe { mochi_rhi_device_get_sampler_heap(self.inner.handle) };
-		if h.is_null() {
-			None
-		} else {
-			let alloc_opt = self.inner.descriptor_allocator.lock().unwrap().clone();
-			alloc_opt.map(|alloc| Buffer::from_handle_unowned(alloc, h))
-		}
+	pub fn sampler_heap(&self) -> Option<Buffer<B>> {
+		self.inner.sampler_heap().map(Buffer::from_raw)
 	}
 
-	pub fn create_surface<W: HasWindowHandle + HasDisplayHandle>(&self, window: &W) -> Result<Surface, String> {
-		let display_handle = window
-			.display_handle()
-			.map_err(|e| format!("failed to get display handle: {e}"))?;
-
-		let window_handle = window
-			.window_handle()
-			.map_err(|e| format!("failed to get window handle: {e}"))?;
-
-		let dev_handle = self.inner.handle;
-		let surface_handle = match (display_handle.as_raw(), window_handle.as_raw()) {
-			(RawDisplayHandle::Wayland(d), RawWindowHandle::Wayland(w)) => unsafe {
-				mochi_rhi_create_surface_wayland(
-					dev_handle,
-					d.display.as_ptr(),
-					w.surface.as_ptr(),
-				)
-			},
-			(RawDisplayHandle::Xlib(d), RawWindowHandle::Xlib(w)) => {
-				let dpy = d.display.map(|p| p.as_ptr()).unwrap_or(std::ptr::null_mut());
-				unsafe { mochi_rhi_create_surface_xlib(dev_handle, dpy, w.window) }
-			}
-			(RawDisplayHandle::Xcb(d), RawWindowHandle::Xcb(w)) => {
-				let conn = d.connection.map(|p| p.as_ptr()).unwrap_or(std::ptr::null_mut());
-				unsafe { mochi_rhi_create_surface_xcb(dev_handle, conn, w.window.get()) }
-			}
-			(RawDisplayHandle::Windows(_), RawWindowHandle::Win32(w)) => {
-				let hinstance = w
-					.hinstance
-					.map(|h| h.get() as *mut std::ffi::c_void)
-					.unwrap_or(std::ptr::null_mut());
-				let hwnd = w.hwnd.get() as *mut std::ffi::c_void;
-				unsafe { mochi_rhi_create_surface_win32(dev_handle, hinstance, hwnd) }
-			}
-			(disp, win) => {
-				return Err(format!(
-					"unsupported window/display handle combination: {:?}, {:?}",
-					disp, win
-				));
-			}
-		};
-
-		if surface_handle == 0 {
-			return Err("failed to create surface".to_string());
-		}
-
-		Ok(Surface::new(self.inner.clone(), surface_handle))
+	pub fn create_surface<W: HasWindowHandle + HasDisplayHandle>(&self, window: &W) -> Result<Surface<B>, String> {
+		let handle = self.inner.create_surface(window)
+			.map_err(|e| format!("Failed to create surface: {e}"))?;
+		Ok(Surface::new(self.inner.clone(), handle))
 	}
 }
