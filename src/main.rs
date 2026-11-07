@@ -14,15 +14,17 @@ pub mod audio;
 pub mod core;
 pub mod display;
 pub mod rendering;
+pub mod rhi;
 
 pub use mochi_ahi as ahi;
+pub use mochi_except::*;
 pub use mochi_math as math;
-pub use mochi_rhi as rhi;
 
 use core::Engine;
 
 
 fn main() {
+	mochi_except::start();
 	let mut engine = Engine::new("Mochi Engine", 1280, 720);
 
 	// Play a procedural startup chime to verify audio subsystem
@@ -36,6 +38,6 @@ fn main() {
 	});
 
 	if let Err(err) = engine.run() {
-		eprintln!("[Engine] Runtime error: {err}");
+		mochi_error!("Runtime error: {err}");
 	}
 }

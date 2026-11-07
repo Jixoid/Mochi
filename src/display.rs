@@ -15,7 +15,8 @@ use winit::dpi::PhysicalSize;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
 
-use crate::rhi::{Device, Surface, Swapchain};
+use crate::rhi::{self as rhi, Device, Surface, Swapchain};
+use mochi_except::*;
 
 
 pub struct Display {
@@ -39,7 +40,7 @@ impl Display {
 		let surface = device.create_surface(&*window)?;
 		let swapchain = Swapchain::new(device, &surface, width, height);
 
-		println!("[Display] Native window created ({}x{}) with Vulkan swapchain ({} images)",width,height,swapchain.image_count());
+		mochi_disp!("Native window created ({}x{}) with Vulkan swapchain ({} images)", width, height, swapchain.image_count());
 
 		Ok(Self {
 			swapchain,
@@ -59,28 +60,27 @@ impl Display {
 		self.swapchain.resize(width, height);
 	}
 
-	
-	pub fn acquire_next_image(&self) -> u32 {
+	pub fn acquire_next_image(&mut self) -> u32 {
 		self.swapchain.acquire_next_image()
 	}
 
-	pub fn acquire_next_image_with_semaphore(&self, signal_semaphore: *mut std::ffi::c_void) -> u32 {
-		self.swapchain.acquire_next_image_with_semaphore(signal_semaphore)
+	pub fn acquire_next_image_with_semaphore(&mut self, signal_semaphore: &rhi::Semaphore) -> u32 {
+		self.swapchain.acquire_next_image_with_semaphore(Some(signal_semaphore))
 	}
 
-	pub fn present(&self, image_index: u32) {
+	pub fn present(&mut self, image_index: u32) {
 		self.swapchain.present(image_index);
 	}
 
-	pub fn present_with_semaphore(&self, image_index: u32, wait_semaphore: *mut std::ffi::c_void) {
-		self.swapchain.present_with_semaphore(image_index, wait_semaphore);
+	pub fn present_with_semaphore(&mut self, image_index: u32, wait_semaphore: &rhi::Semaphore) {
+		self.swapchain.present_with_semaphore(image_index, Some(wait_semaphore));
 	}
 
-	pub fn render_target(&self, index: u32) -> Option<mochi_rhi::RenderTarget> {
+	pub fn render_target(&self, index: u32) -> Option<rhi::RenderTarget<'_>> {
 		self.swapchain.render_target(index)
 	}
 
-	pub fn render_finished_semaphore(&self, index: u32) -> *mut std::ffi::c_void {
+	pub fn render_finished_semaphore(&self, index: u32) -> rhi::Semaphore {
 		self.swapchain.render_finished_semaphore(index)
 	}
 
@@ -101,7 +101,6 @@ impl Display {
 		self.height
 	}
 
-	
 	pub fn swapchain(&self) -> &Swapchain {
 		&self.swapchain
 	}

@@ -16,10 +16,11 @@ use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
-use mochi_rhi::{self as rhi, Synchronizer};
+use crate::rhi as rhi;
 use crate::audio::AudioSystem;
 use crate::display::Display;
 use crate::rendering::RenderingSystem;
+use mochi_except::*;
 
 
 pub struct EngineApp {
@@ -48,7 +49,7 @@ impl EngineApp {
 		let device = rhi::Device::new("MochiEngine", 0, 1, 0, 0);
 		let alloca = rhi::Allocator::new(&device);
 		let cmdmng = rhi::CommandManager::new(&device);
-		let syncer = Synchronizer::new(&device, RenderingSystem::MAX_FRAMES_IN_FLIGHT);
+		let syncer = rhi::Synchronizer::new(&device, RenderingSystem::MAX_FRAMES_IN_FLIGHT);
 
 		// Audio
 		let audio_system = AudioSystem::new("Mochi Audio", 0, 1, 0, 0);
@@ -60,7 +61,7 @@ impl EngineApp {
 			title: title.to_string(),
 			width,
 			height,
-			
+
 			device: Some(device),
 			alloca: Some(alloca),
 			cmdmng: Some(cmdmng),
@@ -117,10 +118,10 @@ impl ApplicationHandler for EngineApp {
 					}
 					display.request_redraw();
 					self.display = Some(display);
-					println!("[Engine] Display and Vulkan swapchain attached successfully.");
+					mochi_disp!("Display and Vulkan swapchain attached successfully.");
 				}
 				Err(err) => {
-					eprintln!("[Engine] Failed to initialize display: {err}");
+					mochi_error!("Failed to initialize display: {err}");
 					event_loop.exit();
 				}
 			}
@@ -130,7 +131,7 @@ impl ApplicationHandler for EngineApp {
 	fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
 		match event {
 			WindowEvent::CloseRequested => {
-				println!("[Engine] Window close requested, shutting down...");
+				mochi_log!("Window close requested, shutting down...");
 				event_loop.exit();
 			}
 			WindowEvent::KeyboardInput {
@@ -142,7 +143,7 @@ impl ApplicationHandler for EngineApp {
 					},
 				..
 			} => {
-				println!("[Engine] Escape pressed, shutting down...");
+				mochi_log!("Escape pressed, shutting down...");
 				event_loop.exit();
 			}
 			WindowEvent::Resized(physical_size) => {
@@ -178,32 +179,19 @@ impl ApplicationHandler for EngineApp {
 				}
 
 				if let (Some(display), Some(rendering), Some(sync), Some(cmdmng)) = (
-					&self.display,
-					&self.rendering_system,
-					&self.syncer,
+					&mut self.display,
+					&mut self.rendering_system,
+					&mut self.syncer,
 					&self.cmdmng,
 				) {
-					let cmd = rendering.begin_frame(sync);
-					let wait_sem = sync.image_available_semaphore();
-					let img_idx = display.acquire_next_image_with_semaphore(wait_sem);
-
-					if let Some(target) = display.render_target(img_idx) {
-						// Clear color: Cornflower Blue / Mochi Theme [0.1, 0.15, 0.25, 1.0]
-						rendering.begin_pass(cmd, &target, [0.1, 0.15, 0.25, 1.0]);
-						rendering.draw_triangle(cmd, display.width(), display.height());
-						rendering.end_pass(cmd, &target);
-					}
-
-					let sig_sem = display.render_finished_semaphore(img_idx);
-					rendering.end_frame(cmd, cmdmng, sync, wait_sem, sig_sem);
-					display.present_with_semaphore(img_idx, sig_sem);
+					rendering.render(sync, cmdmng, display, [0.1, 0.15, 0.25, 1.0]);
 
 					self.frame_count += 1;
 
 					if let Ok(limit_str) = std::env::var("MOCHI_TEST_EXIT_FRAMES") {
 						if let Ok(limit) = limit_str.parse::<u64>() {
 							if self.frame_count >= limit {
-								println!("[Engine] Reached test frame limit ({limit}), exiting...");
+								mochi_log!("Reached test frame limit ({limit}), exiting...");
 								event_loop.exit();
 								return;
 							}
@@ -218,11 +206,11 @@ impl ApplicationHandler for EngineApp {
 	}
 
 	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-		println!("[Engine] Cleaning up Engine resources...");
+		mochi_log!("Cleaning up Engine resources...");
 		self.audio_system = None;
 
 		self.device.as_ref().unwrap().wait_idle();
-		
+
 		self.rendering_system = None;
 		self.display = None;
 
@@ -231,7 +219,7 @@ impl ApplicationHandler for EngineApp {
 		self.alloca = None;
 		self.device = None;
 
-		println!("[Engine] Cleanup completed cleanly.");
+		mochi_disp!("Cleanup completed cleanly.");
 	}
 }
 

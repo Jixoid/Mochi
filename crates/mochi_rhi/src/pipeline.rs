@@ -10,34 +10,36 @@
 */
 
 
-use crate::ffi::*;
-use crate::{Device, Format, Shader, ShaderStage, VT};
+use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
+use bitflags::bitflags;
 
+use crate::format::{Format, VT};
+use crate::manager::device::Device;
+use crate::shader::{Shader, ShaderStage};
+use crate::traits::{RhiBackend, RhiDevice};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum VertexInputRate {
-	Vertex = 0,
-	Instance = 1,
-}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DescriptorType {
-	UniformBuffer = 6,
-	UniformBufferDynamic = 8,
-	StorageBuffer = 7,
-	StorageBufferDynamic = 9,
-	TextureSampler = 1,
+	Sampler = 0,
+	CombinedImageSampler = 1,
+	SampledImage = 2,
 	StorageImage = 3,
-	SeparateImage = 2,
-	SeparateSampler = 0,
-	AccelerationStructure = 1000150000,
+	UniformTexelBuffer = 4,
+	StorageTexelBuffer = 5,
+	UniformBuffer = 6,
+	StorageBuffer = 7,
+	UniformBufferDynamic = 8,
+	StorageBufferDynamic = 9,
+	InputAttachment = 10,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PipelineKind {
-	Graphic = 0,
-	Compute = 1,
-	RayTracing = 1000165000,
+	Graphic,
+	Compute,
+	RayTracing,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -55,11 +57,25 @@ pub enum PrimitiveTopology {
 	TriangleList = 3,
 	TriangleStrip = 4,
 	TriangleFan = 5,
-	PatchList = 10,
+	PatchList = 9,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum VertexInputRate {
+	Vertex = 0,
+	Instance = 1,
+}
+
+bitflags! {
+	#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+	pub struct DynamicState: u32 {
+		const Viewport = 0x00000001;
+		const Scissor  = 0x00000002;
+	}
 }
 
 
-// Helpers
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PushConstantSlot {
 	stage: ShaderStage,
 	types: Vec<VT>,
@@ -80,21 +96,18 @@ impl PushConstantSlot {
 }
 pub type PushConstantList = Vec<PushConstantSlot>;
 
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VertexBindSlot {
-	stride: u64,
 	items: Vec<VT>,
+	stride: u64,
 	input_rate: VertexInputRate,
 	index: u8,
 }
 
 impl VertexBindSlot {
-	pub fn new(stride: u64, items: Vec<VT>, input_rate: VertexInputRate, index: u8) -> Self {
-		Self {
-			stride,
-			items,
-			input_rate,
-			index,
-		}
+	pub fn new(items: Vec<VT>, stride: u64, input_rate: VertexInputRate, index: u8) -> Self {
+		Self { items, stride, input_rate, index }
 	}
 
 	pub fn items(&self) -> &[VT] {
@@ -126,13 +139,20 @@ fn align_size(size: u64, alignment: u64) -> u64 {
 }
 
 
-pub struct PipelineMeta {
-	handle: MochiPipelineMetaHandle,
+#[derive(Clone)]
+pub struct PipelineMeta<B: RhiBackend> {
+	push_stages: ShaderStage,
+	push_size: u32,
 	push: PushConstantList,
 	vert: VertexBindList,
+	raw: Arc<Mutex<Option<Arc<B::PipelineMeta>>>>,
+	_marker: PhantomData<B>,
 }
 
-impl PipelineMeta {
+unsafe impl<B: RhiBackend> Send for PipelineMeta<B> {}
+unsafe impl<B: RhiBackend> Sync for PipelineMeta<B> {}
+
+impl<B: RhiBackend> PipelineMeta<B> {
 	pub fn new(push: PushConstantList, vert: VertexBindList) -> Self {
 		let mut all_stages = ShaderStage::empty();
 		let mut total_size: u64 = 0;
@@ -148,37 +168,34 @@ impl PipelineMeta {
 		}
 		total_size = align_size(total_size, max_align);
 
-		let handle = unsafe {
-			mochi_rhi_pipeline_meta_new(
-				all_stages.bits(),
-				total_size as u32,
-			)
-		};
-		assert!(!handle.is_null(), "RHI driver failed to create PipelineMeta");
-
-		Self { handle, push, vert }
-	}
-
-	pub fn new_raw(push_stages: ShaderStage, push_size: u32) -> Self {
-		let handle = unsafe {
-			mochi_rhi_pipeline_meta_new(
-				push_stages.bits(),
-				push_size,
-			)
-		};
-		assert!(!handle.is_null(), "RHI driver failed to create PipelineMeta");
-
 		Self {
-			handle,
-			push: Vec::new(),
-			vert: Vec::new(),
+			push_stages: all_stages,
+			push_size: total_size as u32,
+			push,
+			vert,
+			raw: Arc::new(Mutex::new(None)),
+			_marker: PhantomData,
 		}
 	}
 
-	pub fn handle(&self) -> MochiPipelineMetaHandle {
-		self.handle
+	pub fn new_raw(push_stages: ShaderStage, push_size: u32) -> Self {
+		Self {
+			push_stages,
+			push_size,
+			push: Vec::new(),
+			vert: Vec::new(),
+			raw: Arc::new(Mutex::new(None)),
+			_marker: PhantomData,
+		}
 	}
 
+	pub fn push_stages(&self) -> ShaderStage {
+		self.push_stages
+	}
+
+	pub fn push_size(&self) -> u32 {
+		self.push_size
+	}
 
 	pub fn push(&self) -> &[PushConstantSlot] {
 		&self.push
@@ -187,73 +204,68 @@ impl PipelineMeta {
 	pub fn vert(&self) -> &[VertexBindSlot] {
 		&self.vert
 	}
-}
 
-impl Drop for PipelineMeta {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_pipeline_meta_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
+	pub fn get_or_create_raw(&self, device: &Device<B>) -> Arc<B::PipelineMeta> {
+		let mut lock = self.raw.lock().unwrap();
+		if let Some(existing) = &*lock {
+			return existing.clone();
 		}
+		let meta = device
+			.raw()
+			.create_pipeline_meta(self.push_stages, self.push_size)
+			.expect("Failed to create pipeline meta");
+		let arc_meta = Arc::new(meta);
+		*lock = Some(arc_meta.clone());
+		arc_meta
 	}
 }
 
 
-pub struct Pipeline {
-	handle: MochiPipelineHandle,
+#[derive(Clone)]
+pub struct Pipeline<B: RhiBackend> {
+	inner: Arc<B::Pipeline>,
 	kind: PipelineKind,
 }
 
-impl Pipeline {
+unsafe impl<B: RhiBackend> Send for Pipeline<B> {}
+unsafe impl<B: RhiBackend> Sync for Pipeline<B> {}
+
+impl<B: RhiBackend> Pipeline<B> {
 	pub fn new_graphics(
-		device: &Device,
-		meta: &PipelineMeta,
-		shaders: &[&Shader],
+		device: &Device<B>,
+		meta: &PipelineMeta<B>,
+		shaders: &[&Shader<B>],
 		polymode: PolygonMode,
 		primitive_topology: PrimitiveTopology,
 		color_format: Format,
 		depth_format: Format,
 	) -> Self {
-		let shader_handles: Vec<MochiShaderHandle> = shaders.iter().map(|s| s.handle()).collect();
-		let handle = unsafe {
-			mochi_rhi_pipeline_graphics_new(
-				device.handle(),
-				meta.handle(),
-				shader_handles.as_ptr(),
-				shader_handles.len() as u32,
-				polymode as u8,
-				primitive_topology as u8,
-				color_format as u32,
-				depth_format as u32,
+		let raw_meta = meta.get_or_create_raw(device);
+		let raw_shaders: Vec<&B::Shader> = shaders.iter().map(|s| s.raw()).collect();
+
+		let pipe = device
+			.raw()
+			.create_graphics_pipeline(
+				&*raw_meta,
+				&raw_shaders,
+				polymode,
+				primitive_topology,
+				color_format,
+				depth_format,
 			)
-		};
-		assert!(!handle.is_null(), "RHI driver failed to create Graphics Pipeline");
+			.expect("Failed to create Graphics Pipeline");
 
 		Self {
-			handle,
+			inner: Arc::new(pipe),
 			kind: PipelineKind::Graphic,
 		}
 	}
 
-	pub fn handle(&self) -> MochiPipelineHandle {
-		self.handle
+	pub fn raw(&self) -> &B::Pipeline {
+		&self.inner
 	}
 
-	
 	pub fn kind(&self) -> PipelineKind {
 		self.kind
-	}
-}
-
-impl Drop for Pipeline {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_pipeline_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
 	}
 }

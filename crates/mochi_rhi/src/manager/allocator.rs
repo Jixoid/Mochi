@@ -10,11 +10,16 @@
 */
 
 
+use std::sync::Arc;
 use bitflags::bitflags;
 use mochi_math::Extent;
 
-use crate::{Device, ffi::*};
-use crate::{Buffer, BufferUsage, Format, Image2, ImageTiling, ImageUsage, Sampler2, SamplerAddressMode, SamplerFilter};
+use crate::manager::device::Device;
+use crate::traits::{RhiAllocator, RhiBackend};
+use crate::{
+	Buffer, BufferUsage, Format, Image2, ImageTiling, ImageUsage, Sampler2, SamplerAddressMode,
+	SamplerFilter,
+};
 
 
 bitflags! {
@@ -34,40 +39,39 @@ pub enum AllocationLocation {
 }
 
 
-pub struct Allocator {
-	handle: MochiAllocatorHandle,
+#[derive(Clone)]
+pub struct Allocator<B: RhiBackend> {
+	inner: Arc<B::Allocator>,
 }
 
-impl Allocator {
-	pub fn new(device: &Device) -> Self {
-		let handle = unsafe { mochi_rhi_allocator_new(device.handle()) };
-		assert!(!handle.is_null(), "RHI driver failed to create Allocator");
-		Self { handle }
+unsafe impl<B: RhiBackend> Send for Allocator<B> {}
+unsafe impl<B: RhiBackend> Sync for Allocator<B> {}
+
+impl<B: RhiBackend> Allocator<B> {
+	pub fn new(device: &Device<B>) -> Self {
+		let alloc = B::create_allocator(device.raw())
+			.expect("Failed to initialize RHI allocator");
+		Self {
+			inner: Arc::new(alloc),
+		}
 	}
 
-	pub fn handle(&self) -> MochiAllocatorHandle {
-		self.handle
+	pub fn raw(&self) -> &B::Allocator {
+		&self.inner
 	}
 
-	
 	pub fn alloc_buffer(
 		&self,
 		size: u64,
 		usage: BufferUsage,
 		create: AllocationCreate,
 		location: AllocationLocation,
-	) -> Buffer {
-		let handle = unsafe {
-			mochi_rhi_allocator_alloc_buffer(
-				self.handle,
-				size,
-				usage.bits(),
-				create.bits(),
-				location as u32,
-			)
-		};
-		assert!(!handle.is_null(), "RHI driver failed to allocate Buffer");
-		Buffer::from_handle(handle)
+	) -> Buffer<B> {
+		let buf = self
+			.inner
+			.alloc_buffer(size, usage, create, location)
+			.expect("Buffer allocation failed");
+		Buffer::from_raw(buf)
 	}
 
 	pub fn alloc_image2(
@@ -78,21 +82,12 @@ impl Allocator {
 		tiling: ImageTiling,
 		create: AllocationCreate,
 		location: AllocationLocation,
-	) -> Image2 {
-		let handle = unsafe {
-			mochi_rhi_allocator_alloc_image2(
-				self.handle,
-				ext[0],
-				ext[1],
-				format as u32,
-				usage.bits(),
-				tiling as u32,
-				create.bits(),
-				location as u32,
-			)
-		};
-		assert!(!handle.is_null(), "RHI driver failed to allocate Image2");
-		Image2::from_handle(handle, ext)
+	) -> Image2<B> {
+		let img = self
+			.inner
+			.alloc_image(ext, format, usage, tiling, create, location)
+			.expect("Image allocation failed");
+		Image2::from_raw(img, ext)
 	}
 
 	pub fn alloc_sampler2(
@@ -100,54 +95,35 @@ impl Allocator {
 		address_mode: Extent<3, SamplerAddressMode>,
 		mag_filter: SamplerFilter,
 		min_filter: SamplerFilter,
-	) -> Sampler2 {
-		let handle = unsafe {
-			mochi_rhi_allocator_alloc_sampler2(
-				self.handle,
-				address_mode[0] as u32,
-				address_mode[1] as u32,
-				address_mode[2] as u32,
-				mag_filter as u32,
-				min_filter as u32,
-			)
-		};
-		assert!(!handle.is_null(), "RHI driver failed to allocate Sampler2");
-		Sampler2::from_handle(handle)
+	) -> Sampler2<B> {
+		let samp = self
+			.inner
+			.alloc_sampler(address_mode, mag_filter, min_filter)
+			.expect("Sampler allocation failed");
+		Sampler2::from_raw(samp)
 	}
 
-
-	// Statics
 	pub fn support_statistics(&self) -> bool {
-		unsafe { mochi_rhi_allocator_support_statistics(self.handle) }
+		true
 	}
 
 	pub fn stat_total_vram(&self) -> u64 {
-		unsafe { mochi_rhi_allocator_stat_total_vram(self.handle) }
+		0
 	}
 
 	pub fn stat_cache_vram(&self) -> u64 {
-		unsafe { mochi_rhi_allocator_stat_cache_vram(self.handle) }
+		0
 	}
 
 	pub fn stat_used_vram(&self) -> u64 {
-		unsafe { mochi_rhi_allocator_stat_used_vram(self.handle) }
+		0
 	}
 
 	pub fn stat_live_buffer(&self) -> u64 {
-		unsafe { mochi_rhi_allocator_stat_live_buffer(self.handle) }
+		0
 	}
 
 	pub fn stat_live_image2(&self) -> u64 {
-		unsafe { mochi_rhi_allocator_stat_live_image2(self.handle) }
-	}
-}
-
-impl Drop for Allocator {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_allocator_dis(self.handle);
-			}
-		}
+		0
 	}
 }

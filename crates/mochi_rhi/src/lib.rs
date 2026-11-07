@@ -10,27 +10,33 @@
 */
 
 
-pub mod ffi;
-pub mod format;
 pub mod buffer;
 pub mod command;
-pub mod driver;
+pub mod error;
+pub mod format;
+pub mod guard;
 pub mod image;
 pub mod manager;
 pub mod pipeline;
 pub mod render_target;
 pub mod sampler;
 pub mod shader;
+pub mod sync;
+pub mod traits;
+pub mod types;
 
 
 pub use buffer::*;
 pub use command::*;
-pub use driver::*;
+pub use error::*;
 pub use format::*;
+pub use guard::*;
 pub use image::*;
 pub use manager::*;
 pub use pipeline::*;
 pub use render_target::*;
 pub use sampler::*;
 pub use shader::*;
-
+pub use sync::*;
+pub use traits::*;
+pub use types::*;

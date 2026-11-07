@@ -10,168 +10,348 @@
 */
 
 
-use std::ffi::CString;
-use crate::ffi::*;
+use std::fs::File;
+use std::io::Cursor;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::{SampleFormat, Stream, StreamConfig};
+use symphonia::core::audio::{Audio, GenericAudioBufferRef};
+use symphonia::core::codecs::audio::AudioDecoderOptions;
+use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::FormatOptions;
+use symphonia::core::io::{MediaSource, MediaSourceStream};
+use symphonia::core::meta::MetadataOptions;
+use mochi_except::*;
+
+use crate::data::AudioData;
 
 
-unsafe extern "C" fn audio_callback_trampoline(user_data: *mut std::ffi::c_void, output: *mut f32, frame_count: u32) {
-	if user_data.is_null() || output.is_null() {
-		return;
-	}
-	unsafe {
-		let callback = &mut *(user_data as *mut Box<dyn FnMut(&mut [f32], u32) + Send>);
-		let slice = std::slice::from_raw_parts_mut(output, (frame_count * 2) as usize);
-		callback(slice, frame_count);
-	}
-}
-
+type AudioCallback = Box<dyn FnMut(&mut [f32], u32) + Send>;
 
 pub struct Device {
-	handle: MochiAudioDeviceHandle,
-	callback_box: Option<*mut Box<dyn FnMut(&mut [f32], u32) + Send>>,
+	device: Option<cpal::Device>,
+	stream: Option<Stream>,
+	callback: Arc<Mutex<Option<AudioCallback>>>,
+	is_playing: Arc<Mutex<bool>>,
+	sample_rate: u32,
+	channels: u16,
 }
 
 unsafe impl Send for Device {}
 
 impl Device {
-	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> Self {
-		let c_str = CString::new(app_name).expect("C string failed");
-		let handle = unsafe { mochi_ahi_device_new(c_str.as_ptr(), major, minor, patch, build) };
+	pub fn new(app_name: &str, _major: u16, _minor: u16, _patch: u16, _build: u16) -> Self {
+		let host = cpal::default_host();
+		let device = host.default_output_device();
 
-		assert!(!handle.is_null(), "AHI driver failed to create Device");
+		if let Some(dev) = &device {
+			let dev_name = dev
+				.description()
+				.map(|d| d.name().to_string())
+				.unwrap_or_else(|_| "Default".to_string());
+			mochi_disp!("CPAL audio device initialized for {app_name}: {dev_name}");
+		} else {
+			mochi_warn!("No audio output device available for {app_name}");
+		}
 
 		Self {
-			handle,
-			callback_box: None,
+			device,
+			stream: None,
+			callback: Arc::new(Mutex::new(None)),
+			is_playing: Arc::new(Mutex::new(false)),
+			sample_rate: 44100,
+			channels: 2,
 		}
 	}
 
-	pub fn handle(&self) -> MochiAudioDeviceHandle {
-		self.handle
+	pub fn sample_rate(&self) -> u32 {
+		self.sample_rate
 	}
 
-	
+	pub fn channels(&self) -> u16 {
+		self.channels
+	}
+
 	pub fn set_callback<F: FnMut(&mut [f32], u32) + Send + 'static>(&mut self, callback: F) {
-		if let Some(prev) = self.callback_box.take() {
-			unsafe {
-				drop(Box::from_raw(prev));
+		*self.callback.lock().unwrap() = Some(Box::new(callback));
+
+		let Some(device) = &self.device else {
+			return;
+		};
+
+		let default_config = device.default_output_config();
+		let (config, sample_format) = match default_config {
+			Ok(cfg) => {
+				let fmt = cfg.sample_format();
+				let stream_cfg = StreamConfig {
+					channels: 2,
+					sample_rate: 44100,
+					buffer_size: cpal::BufferSize::Default,
+				};
+				(stream_cfg, fmt)
+			}
+			Err(err) => {
+				mochi_warn!("Could not query default audio config: {err}");
+				return;
+			}
+		};
+
+		let callback_clone = Arc::clone(&self.callback);
+		let is_playing_clone = Arc::clone(&self.is_playing);
+		let err_fn = |err| mochi_error!("Stream error: {err}");
+
+		let stream_res = match sample_format {
+			SampleFormat::F32 => {
+				let cfg = config.clone();
+				device.build_output_stream(
+					cfg,
+					move |data: &mut [f32], _| {
+						if *is_playing_clone.lock().unwrap() {
+							let frame_count = (data.len() / 2) as u32;
+							if let Ok(mut cb) = callback_clone.lock() {
+								if let Some(f) = cb.as_mut() {
+									f(data, frame_count);
+									return;
+								}
+							}
+						}
+						data.fill(0.0);
+					},
+					err_fn,
+					None,
+				)
+			}
+			SampleFormat::I16 => {
+				let cfg = config.clone();
+				let mut temp_f32 = Vec::new();
+				device.build_output_stream(
+					cfg,
+					move |data: &mut [i16], _| {
+						if *is_playing_clone.lock().unwrap() {
+							let frame_count = (data.len() / 2) as u32;
+							temp_f32.resize(data.len(), 0.0);
+							if let Ok(mut cb) = callback_clone.lock() {
+								if let Some(f) = cb.as_mut() {
+									f(&mut temp_f32, frame_count);
+									for (dst, src) in data.iter_mut().zip(temp_f32.iter()) {
+										*dst = (src.clamp(-1.0, 1.0) * 32767.0) as i16;
+									}
+									return;
+								}
+							}
+						}
+						data.fill(0);
+					},
+					err_fn,
+					None,
+				)
+			}
+			SampleFormat::U16 => {
+				let cfg = config.clone();
+				let mut temp_f32 = Vec::new();
+				device.build_output_stream(
+					cfg,
+					move |data: &mut [u16], _| {
+						if *is_playing_clone.lock().unwrap() {
+							let frame_count = (data.len() / 2) as u32;
+							temp_f32.resize(data.len(), 0.0);
+							if let Ok(mut cb) = callback_clone.lock() {
+								if let Some(f) = cb.as_mut() {
+									f(&mut temp_f32, frame_count);
+									for (dst, src) in data.iter_mut().zip(temp_f32.iter()) {
+										*dst = ((src.clamp(-1.0, 1.0) * 32767.0) + 32768.0) as u16;
+									}
+									return;
+								}
+							}
+						}
+						data.fill(32768);
+					},
+					err_fn,
+					None,
+				)
+			}
+			_ => {
+				mochi_error!("Unsupported audio sample format: {sample_format:?}");
+				return;
+			}
+		};
+
+		match stream_res {
+			Ok(stream) => {
+				self.sample_rate = config.sample_rate;
+				self.channels = config.channels;
+				self.stream = Some(stream);
+			}
+			Err(err) => {
+				mochi_error!("Failed to build audio output stream: {err}");
 			}
 		}
-
-		let boxed: Box<dyn FnMut(&mut [f32], u32) + Send> = Box::new(callback);
-		let heap_box = Box::new(boxed);
-		let raw_ptr = Box::into_raw(heap_box);
-
-		unsafe {
-			mochi_ahi_device_set_callback(
-				self.handle,
-				Some(audio_callback_trampoline),
-				raw_ptr as *mut std::ffi::c_void,
-			);
-		}
-
-		self.callback_box = Some(raw_ptr);
 	}
 
 	pub fn start(&mut self) -> bool {
-		unsafe { mochi_ahi_device_start(self.handle) }
+		if let Some(stream) = &self.stream {
+			if stream.play().is_ok() {
+				*self.is_playing.lock().unwrap() = true;
+				return true;
+			}
+		}
+		false
 	}
 
 	pub fn stop(&mut self) {
-		unsafe { mochi_ahi_device_stop(self.handle) }
+		*self.is_playing.lock().unwrap() = false;
+		if let Some(stream) = &self.stream {
+			let _ = stream.pause();
+		}
 	}
 
 	pub fn is_playing(&self) -> bool {
-		unsafe { mochi_ahi_device_is_playing(self.handle) }
+		*self.is_playing.lock().unwrap()
 	}
 
-	pub fn decode_file(&self, path: &str) -> Result<crate::data::AudioData, String> {
-		let c_path = CString::new(path).map_err(|e| e.to_string())?;
-		let mut audio_data = MochiAudioData {
-			sample_rate: 0,
-			channels: 0,
-			frame_count: 0,
-			pcm_data: std::ptr::null_mut(),
-		};
-
-		let success = unsafe {
-			mochi_ahi_device_decode_file(
-				self.handle,
-				c_path.as_ptr(),
-				&mut audio_data,
-			)
-		};
-
-		if !success || audio_data.pcm_data.is_null() {
-			return Err(format!("Failed to decode audio file: {path}"));
-		}
-
-		let total_samples = (audio_data.frame_count * audio_data.channels as u64) as usize;
-		let pcm_slice = unsafe { std::slice::from_raw_parts(audio_data.pcm_data, total_samples) };
-		let pcm_vec = pcm_slice.to_vec();
-
-		unsafe {
-			mochi_ahi_free_audio_data(&mut audio_data);
-		}
-
-		Ok(crate::data::AudioData {
-			sample_rate: audio_data.sample_rate,
-			channels: audio_data.channels,
-			pcm_data: pcm_vec,
-		})
+	pub fn decode_file(&self, path: &str) -> Result<AudioData, String> {
+		let file = File::open(path).map_err(|e| format!("Failed to open audio file {path}: {e}"))?;
+		decode_media_source(file, Some(path))
 	}
 
-	pub fn decode_memory(&self, bytes: &[u8]) -> Result<crate::data::AudioData, String> {
-		let mut audio_data = MochiAudioData {
-			sample_rate: 0,
-			channels: 0,
-			frame_count: 0,
-			pcm_data: std::ptr::null_mut(),
-		};
-
-		let success = unsafe {
-			mochi_ahi_device_decode_memory(
-				self.handle,
-				bytes.as_ptr(),
-				bytes.len(),
-				&mut audio_data,
-			)
-		};
-
-		if !success || audio_data.pcm_data.is_null() {
-			return Err("Failed to decode audio from memory".to_string());
-		}
-
-		let total_samples = (audio_data.frame_count * audio_data.channels as u64) as usize;
-		let pcm_slice = unsafe { std::slice::from_raw_parts(audio_data.pcm_data, total_samples) };
-		let pcm_vec = pcm_slice.to_vec();
-
-		unsafe {
-			mochi_ahi_free_audio_data(&mut audio_data);
-		}
-
-		Ok(crate::data::AudioData {
-			sample_rate: audio_data.sample_rate,
-			channels: audio_data.channels,
-			pcm_data: pcm_vec,
-		})
+	pub fn decode_memory(&self, bytes: &[u8]) -> Result<AudioData, String> {
+		decode_media_source(Cursor::new(bytes.to_vec()), None)
 	}
 }
 
+
 impl Drop for Device {
 	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_ahi_device_stop(self.handle);
-				mochi_ahi_device_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
+		self.stop();
+		self.stream = None;
+	}
+}
 
-		if let Some(ptr) = self.callback_box.take() {
-			unsafe {
-				drop(Box::from_raw(ptr));
-			}
+
+fn decode_media_source<R: MediaSource + 'static>(
+	source: R,
+	hint_path: Option<&str>,
+) -> Result<AudioData, String> {
+	let mut hint = Hint::new();
+	if let Some(path) = hint_path {
+		if let Some(ext) = Path::new(path).extension().and_then(|e| e.to_str()) {
+			hint.with_extension(ext);
 		}
 	}
+
+	let mss = MediaSourceStream::new(Box::new(source), Default::default());
+	let format_opts = FormatOptions::default();
+	let metadata_opts = MetadataOptions::default();
+
+	let mut format = symphonia::default::get_probe()
+		.probe(&hint, mss, format_opts, metadata_opts)
+		.map_err(|e| format!("Failed to probe audio format: {e}"))?;
+
+	let track = format
+		.default_track(symphonia::core::formats::TrackType::Audio)
+		.or_else(|| {
+			format
+				.tracks()
+				.iter()
+				.find(|t| t.codec_params.as_ref().map_or(false, |p| p.is_audio()))
+		})
+		.ok_or_else(|| "No supported audio tracks found".to_string())?;
+
+	let track_id = track.id;
+	let codec_params = track
+		.codec_params
+		.as_ref()
+		.and_then(|p| p.audio())
+		.ok_or_else(|| "Track does not contain audio codec parameters".to_string())?;
+
+	let mut decoder = symphonia::default::get_codecs()
+		.make_audio_decoder(codec_params, &AudioDecoderOptions::default())
+		.map_err(|e| format!("Failed to create audio decoder: {e}"))?;
+
+	let mut sample_rate = 0;
+	let mut channels = 0;
+	let mut pcm_data = Vec::new();
+
+	while let Ok(Some(packet)) = format.next_packet() {
+		if packet.track_id != track_id {
+			continue;
+		}
+
+		match decoder.decode(&packet) {
+			Ok(decoded) => {
+				match decoded {
+					GenericAudioBufferRef::F32(buf) => {
+						sample_rate = buf.spec().rate();
+						channels = buf.spec().channels().count() as u8;
+						for frame in 0..buf.frames() {
+							for ch in 0..channels as usize {
+								if let Some(plane) = buf.plane(ch) {
+									pcm_data.push(plane[frame]);
+								}
+							}
+						}
+					}
+					GenericAudioBufferRef::S16(buf) => {
+						sample_rate = buf.spec().rate();
+						channels = buf.spec().channels().count() as u8;
+						for frame in 0..buf.frames() {
+							for ch in 0..channels as usize {
+								if let Some(plane) = buf.plane(ch) {
+									pcm_data.push(plane[frame] as f32 / 32768.0);
+								}
+							}
+						}
+					}
+					GenericAudioBufferRef::U8(buf) => {
+						sample_rate = buf.spec().rate();
+						channels = buf.spec().channels().count() as u8;
+						for frame in 0..buf.frames() {
+							for ch in 0..channels as usize {
+								if let Some(plane) = buf.plane(ch) {
+									pcm_data.push((plane[frame] as f32 - 128.0) / 128.0);
+								}
+							}
+						}
+					}
+					GenericAudioBufferRef::S32(buf) => {
+						sample_rate = buf.spec().rate();
+						channels = buf.spec().channels().count() as u8;
+						for frame in 0..buf.frames() {
+							for ch in 0..channels as usize {
+								if let Some(plane) = buf.plane(ch) {
+									pcm_data.push(plane[frame] as f32 / 2147483648.0);
+								}
+							}
+						}
+					}
+					GenericAudioBufferRef::F64(buf) => {
+						sample_rate = buf.spec().rate();
+						channels = buf.spec().channels().count() as u8;
+						for frame in 0..buf.frames() {
+							for ch in 0..channels as usize {
+								if let Some(plane) = buf.plane(ch) {
+									pcm_data.push(plane[frame] as f32);
+								}
+							}
+						}
+					}
+					_ => {}
+				}
+			}
+			Err(symphonia::core::errors::Error::IoError(err)) => {
+				if err.kind() == std::io::ErrorKind::UnexpectedEof {
+					break;
+				}
+				return Err(format!("Audio decode IO error: {err}"));
+			}
+			Err(symphonia::core::errors::Error::DecodeError(err)) => {
+				mochi_warn!("Corrupted audio packet ignored: {err}");
+			}
+			Err(err) => return Err(format!("Audio decode error: {err}")),
+		}
+	}
+
+	Ok(AudioData::new(sample_rate, channels, pcm_data))
 }

@@ -10,16 +10,23 @@
 */
 
 
-use crate::{Device, ffi::*};
+use std::sync::{Arc, Mutex};
+
+use crate::manager::device::Device;
+use crate::render_target::RenderTarget;
+use crate::traits::{RhiBackend, RhiDevice, RhiSwapchain};
 
 
-pub struct Surface {
-	device: MochiDeviceHandle,
+pub struct Surface<B: RhiBackend> {
+	device: Arc<B::Device>,
 	handle: u64,
 }
 
-impl Surface {
-	pub fn new(device: MochiDeviceHandle, handle: u64) -> Self {
+unsafe impl<B: RhiBackend> Send for Surface<B> {}
+unsafe impl<B: RhiBackend> Sync for Surface<B> {}
+
+impl<B: RhiBackend> Surface<B> {
+	pub fn new(device: Arc<B::Device>, handle: u64) -> Self {
 		Self { device, handle }
 	}
 
@@ -28,81 +35,72 @@ impl Surface {
 	}
 }
 
-impl Drop for Surface {
+impl<B: RhiBackend> Drop for Surface<B> {
 	fn drop(&mut self) {
-		if self.handle != 0 && !self.device.is_null() {
-			unsafe {
-				mochi_rhi_destroy_surface(self.device, self.handle);
-			}
-			self.handle = 0;
+		if self.handle != 0 {
+			self.device.destroy_surface(self.handle);
 		}
 	}
 }
 
 
-pub struct Swapchain {
-	handle: MochiSwapchainHandle,
+#[derive(Clone)]
+pub struct Swapchain<B: RhiBackend> {
+	inner: Arc<Mutex<B::Swapchain>>,
 }
 
-impl Swapchain {
-	pub fn new(device: &Device, surface: &Surface, width: u32, height: u32) -> Self {
-		let handle = unsafe { mochi_rhi_swapchain_new(device.handle(), surface.handle, width, height) };
-		assert!(!handle.is_null(), "RHI driver failed to create Swapchain");
-		Self { handle }
-	}
-	
-	pub fn handle(&self) -> MochiSwapchainHandle {
-		self.handle
-	}
+unsafe impl<B: RhiBackend> Send for Swapchain<B> {}
+unsafe impl<B: RhiBackend> Sync for Swapchain<B> {}
 
+impl<B: RhiBackend> Swapchain<B> {
+	pub fn new(device: &Device<B>, surface: &Surface<B>, width: u32, height: u32) -> Self {
+		let sw = B::create_swapchain(device.raw(), surface.handle(), width, height)
+			.expect("Failed to create swapchain");
+		Self {
+			inner: Arc::new(Mutex::new(sw)),
+		}
+	}
 
 	pub fn resize(&mut self, width: u32, height: u32) {
-		if !self.handle.is_null() {
-			unsafe { mochi_rhi_swapchain_resize(self.handle, width, height); }
-		}
+		self
+			.inner
+			.lock()
+			.unwrap()
+			.resize(width, height)
+			.expect("Failed to resize swapchain");
 	}
 
-	pub fn acquire_next_image(&self) -> u32 {
-		unsafe { mochi_rhi_swapchain_acquire_next_image(self.handle, std::ptr::null_mut()) }
+	pub fn acquire_next_image(&mut self) -> u32 {
+		self.acquire_next_image_with_semaphore(None)
 	}
 
-	pub fn acquire_next_image_with_semaphore(&self, signal_semaphore: *mut std::ffi::c_void) -> u32 {
-		unsafe { mochi_rhi_swapchain_acquire_next_image(self.handle, signal_semaphore) }
+	pub fn acquire_next_image_with_semaphore(&mut self, signal_semaphore: Option<&B::Semaphore>) -> u32 {
+		self
+			.inner
+			.lock()
+			.unwrap()
+			.acquire_next_image(signal_semaphore)
+			.expect("Failed to acquire next swapchain image")
 	}
 
-	pub fn present(&self, image_index: u32) {
-		unsafe { mochi_rhi_swapchain_present(self.handle, image_index, std::ptr::null_mut()); }
+	pub fn present(&mut self, image_index: u32) {
+		self.present_with_semaphore(image_index, None);
 	}
 
-	pub fn present_with_semaphore(&self, image_index: u32, wait_semaphore: *mut std::ffi::c_void) {
-		unsafe { mochi_rhi_swapchain_present(self.handle, image_index, wait_semaphore); }
+	pub fn present_with_semaphore(&mut self, image_index: u32, wait_semaphore: Option<&B::Semaphore>) {
+		let _ = self.inner.lock().unwrap().present(image_index, wait_semaphore);
 	}
 
 	pub fn image_count(&self) -> u32 {
-		unsafe { mochi_rhi_swapchain_get_image_count(self.handle) }
+		self.inner.lock().unwrap().image_count()
 	}
 
-	pub fn render_target(&self, index: u32) -> Option<crate::render_target::RenderTarget> {
-		let target = unsafe { mochi_rhi_swapchain_get_render_target(self.handle, index) };
-		if target.is_null() {
-			None
-		} else {
-			Some(crate::render_target::RenderTarget::from_handle(target))
-		}
+	pub fn render_target<'a>(&'a self, index: u32) -> Option<RenderTarget<'a, B>> {
+		let lock = self.inner.lock().unwrap();
+		lock.render_target(index).cloned().map(RenderTarget::from_raw)
 	}
 
-	pub fn render_finished_semaphore(&self, index: u32) -> *mut std::ffi::c_void {
-		unsafe { mochi_rhi_swapchain_get_render_finished_semaphore(self.handle, index) }
-	}
-}
-
-impl Drop for Swapchain {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_swapchain_dis(self.handle);
-			}
-			self.handle = std::ptr::null_mut();
-		}
+	pub fn render_finished_semaphore(&self, index: u32) -> B::Semaphore {
+		self.inner.lock().unwrap().render_finished_semaphore(index).clone()
 	}
 }

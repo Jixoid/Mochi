@@ -10,7 +10,10 @@
 */
 
 
-use crate::ffi::*;
+use mochi_math::Extent;
+
+use crate::manager::allocator::Allocator;
+use crate::traits::RhiBackend;
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -26,39 +29,33 @@ pub enum SamplerAddressMode {
 pub enum SamplerFilter {
 	Nearest = 0,
 	Linear = 1,
-	Cubic = 1000015000, // requires extension
+	Cubic = 1000015000,
 }
 
 
-pub struct Sampler2 {
-	handle: MochiSampler2Handle,
+#[derive(Clone)]
+pub struct Sampler2<B: RhiBackend> {
+	inner: B::Sampler,
 }
 
-impl Sampler2 {
+unsafe impl<B: RhiBackend> Send for Sampler2<B> {}
+unsafe impl<B: RhiBackend> Sync for Sampler2<B> {}
+
+impl<B: RhiBackend> Sampler2<B> {
 	pub fn new(
-		allocator: &crate::Allocator,
-		address_mode: mochi_math::Extent<3, SamplerAddressMode>,
+		allocator: &Allocator<B>,
+		address_mode: Extent<3, SamplerAddressMode>,
 		mag_filter: SamplerFilter,
 		min_filter: SamplerFilter,
 	) -> Self {
 		allocator.alloc_sampler2(address_mode, mag_filter, min_filter)
 	}
 
-	pub fn from_handle(handle: MochiSampler2Handle) -> Self {
-		Self { handle }
+	pub fn from_raw(inner: B::Sampler) -> Self {
+		Self { inner }
 	}
 
-	pub fn handle(&self) -> MochiSampler2Handle {
-		self.handle
-	}
-}
-
-impl Drop for Sampler2 {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_sampler2_dis(self.handle);
-			}
-		}
+	pub fn raw(&self) -> &B::Sampler {
+		&self.inner
 	}
 }

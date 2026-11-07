@@ -1,9 +1,23 @@
+# Visual style: Tabs for indentation (tab_width = 2), LF line endings.
+# Layout convention:
+#   1. License header
+#   2. 2 blank lines
+#   3. Use / include section
+#   4. 2 blank lines
+#   5. Implementation code
+
 root = true
-  
+
 [*]
 indent_style = tab
 indent_size = 2
+tab_width = 2
 end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
+
+[*.{rs,cc,hh,c,h}]
+indent_style = tab
+indent_size = 2
+tab_width = 2

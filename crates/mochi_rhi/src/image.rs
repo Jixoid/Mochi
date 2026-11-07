@@ -10,12 +10,16 @@
 */
 
 
+use std::marker::PhantomData;
 use bitflags::bitflags;
 use mochi_math::Extent;
 
-use crate::ffi::*;
+use crate::format::Format;
+use crate::manager::allocator::{AllocationCreate, AllocationLocation, Allocator};
+use crate::traits::RhiBackend;
 
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ImageTiling {
 	Optimal = 0,
 	Linear = 1,
@@ -45,61 +49,58 @@ bitflags! {
 }
 
 
-pub struct ImageView2 {
-	handle: MochiImage2Handle,
+pub struct ImageView2<'a, B: RhiBackend> {
+	inner: &'a B::ImageView,
+	_marker: PhantomData<&'a B::Image>,
 }
 
-impl ImageView2 {
-	pub fn from_handle(handle: MochiImage2Handle) -> Self {
-		Self { handle }
+unsafe impl<'a, B: RhiBackend> Send for ImageView2<'a, B> {}
+unsafe impl<'a, B: RhiBackend> Sync for ImageView2<'a, B> {}
+
+impl<'a, B: RhiBackend> ImageView2<'a, B> {
+	pub fn new(inner: &'a B::ImageView) -> Self {
+		Self {
+			inner,
+			_marker: PhantomData,
+		}
 	}
 
-	pub fn handle(&self) -> MochiImage2Handle {
-		self.handle
+	pub fn raw(&self) -> &B::ImageView {
+		self.inner
 	}
 }
 
-pub struct Image2 {
-	handle: MochiImage2Handle,
+
+pub struct Image2<B: RhiBackend> {
+	inner: B::Image,
 	ext: Extent<2, u32>,
 }
 
-impl Image2 {
+unsafe impl<B: RhiBackend> Send for Image2<B> {}
+unsafe impl<B: RhiBackend> Sync for Image2<B> {}
+
+impl<B: RhiBackend> Image2<B> {
 	pub fn new(
-		allocator: &crate::Allocator,
+		allocator: &Allocator<B>,
 		ext: Extent<2, u32>,
-		format: crate::Format,
+		format: Format,
 		usage: ImageUsage,
 		tiling: ImageTiling,
-		create: crate::AllocationCreate,
-		location: crate::AllocationLocation,
+		create: AllocationCreate,
+		location: AllocationLocation,
 	) -> Self {
 		allocator.alloc_image2(ext, format, usage, tiling, create, location)
 	}
 
-	pub fn from_handle(handle: MochiImage2Handle, ext: Extent<2, u32>) -> Self {
-		Self { handle, ext }
+	pub fn from_raw(inner: B::Image, ext: Extent<2, u32>) -> Self {
+		Self { inner, ext }
 	}
 
-	pub fn handle(&self) -> MochiImage2Handle {
-		self.handle
+	pub fn raw(&self) -> &B::Image {
+		&self.inner
 	}
 
 	pub fn ext(&self) -> Extent<2, u32> {
 		self.ext
-	}
-
-	pub fn make_view(&self) -> ImageView2 {
-		ImageView2::from_handle(self.handle)
-	}
-}
-
-impl Drop for Image2 {
-	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_image2_dis(self.handle);
-			}
-		}
 	}
 }

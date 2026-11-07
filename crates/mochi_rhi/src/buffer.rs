@@ -10,13 +10,16 @@
 */
 
 
-use std::ops::Range;
+use std::ops::{Deref, DerefMut, Range};
 use bitflags::bitflags;
 
-use crate::ffi::*;
+use crate::error::RhiResult;
+use crate::manager::allocator::{AllocationCreate, AllocationLocation, Allocator};
+use crate::traits::{RhiBackend, RhiBuffer};
 
 
 bitflags! {
+	#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 	pub struct BufferUsage: u32 {
 		const TransferSrc              = 0x00000001;
 		const TransferDst              = 0x00000002;
@@ -33,67 +36,110 @@ bitflags! {
 }
 
 
-pub struct Buffer {
-	handle: MochiBufferHandle,
+pub struct Buffer<B: RhiBackend> {
+	inner: B::Buffer,
 }
 
-impl Buffer {
+unsafe impl<B: RhiBackend> Send for Buffer<B> {}
+unsafe impl<B: RhiBackend> Sync for Buffer<B> {}
+
+impl<B: RhiBackend> Buffer<B> {
 	pub fn new(
-		allocator: &crate::Allocator,
+		allocator: &Allocator<B>,
 		size: u64,
 		usage: BufferUsage,
-		create: crate::AllocationCreate,
-		location: crate::AllocationLocation,
+		create: AllocationCreate,
+		location: AllocationLocation,
 	) -> Self {
 		allocator.alloc_buffer(size, usage, create, location)
 	}
 
-	pub fn from_handle(handle: MochiBufferHandle) -> Self {
-		Self { handle }
+	pub fn from_raw(inner: B::Buffer) -> Self {
+		Self { inner }
 	}
 
-	pub fn handle(&self) -> MochiBufferHandle {
-		self.handle
+	pub fn raw(&self) -> &B::Buffer {
+		&self.inner
 	}
 
-	
+	pub fn raw_mut(&mut self) -> &mut B::Buffer {
+		&mut self.inner
+	}
+
 	pub fn size(&self) -> u64 {
-		unsafe { mochi_rhi_buffer_get_size(self.handle) }
-	}
-
-	pub fn map(&mut self) {
-		unsafe { mochi_rhi_buffer_map(self.handle) }
-	}
-
-	pub fn umap(&mut self) {
-		unsafe { mochi_rhi_buffer_unmap(self.handle) }
-	}
-
-	pub fn flush(&mut self, rng: Range<u64>) {
-		unsafe { mochi_rhi_buffer_flush(self.handle, rng.start, rng.end) }
-	}
-
-	pub fn mapped(&mut self) -> Option<&mut [u8]> {
-		let ptr = unsafe { mochi_rhi_buffer_get_mapped_ptr(self.handle) };
-		if ptr.is_null() {
-			None
-		} else {
-			let sz = self.size() as usize;
-			Some(unsafe { std::slice::from_raw_parts_mut(ptr, sz) })
-		}
+		self.inner.size()
 	}
 
 	pub fn address(&self) -> u64 {
-		unsafe { mochi_rhi_buffer_get_device_address(self.handle) }
+		self.inner.device_address()
+	}
+
+	pub fn flush(&mut self, rng: Range<u64>) {
+		let _ = self
+			.inner
+			.flush(rng.start, rng.end.saturating_sub(rng.start));
+	}
+
+	pub fn map(&mut self) {
+		let _ = self.inner.map();
+	}
+
+	pub fn unmap(&mut self) {
+		self.inner.unmap();
+	}
+
+	pub fn write_bytes(&mut self, offset: usize, data: &[u8]) -> RhiResult<()> {
+		let ptr = self.inner.map()?;
+		unsafe {
+			let dst = ptr.add(offset);
+			std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
+		}
+		self.inner.unmap();
+		Ok(())
+	}
+
+	pub fn map_scoped(&mut self) -> RhiResult<MappedBuffer<'_, B>> {
+		let ptr = self.inner.map()?;
+		let sz = self.inner.size() as usize;
+		let slice = unsafe { std::slice::from_raw_parts_mut(ptr, sz) };
+		Ok(MappedBuffer {
+			buffer: self,
+			slice,
+		})
+	}
+
+	pub fn mapped(&mut self) -> Option<&mut [u8]> {
+		if let Ok(ptr) = self.inner.map() {
+			let sz = self.inner.size() as usize;
+			Some(unsafe { std::slice::from_raw_parts_mut(ptr, sz) })
+		} else {
+			None
+		}
 	}
 }
 
-impl Drop for Buffer {
+
+pub struct MappedBuffer<'a, B: RhiBackend> {
+	buffer: &'a mut Buffer<B>,
+	slice: &'a mut [u8],
+}
+
+impl<'a, B: RhiBackend> Deref for MappedBuffer<'a, B> {
+	type Target = [u8];
+
+	fn deref(&self) -> &Self::Target {
+		self.slice
+	}
+}
+
+impl<'a, B: RhiBackend> DerefMut for MappedBuffer<'a, B> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		self.slice
+	}
+}
+
+impl<'a, B: RhiBackend> Drop for MappedBuffer<'a, B> {
 	fn drop(&mut self) {
-		if !self.handle.is_null() {
-			unsafe {
-				mochi_rhi_buffer_dis(self.handle);
-			}
-		}
+		self.buffer.unmap();
 	}
 }
