@@ -12,7 +12,6 @@
 
 pub mod data;
 pub mod device;
-pub mod ffi;
 
 pub use data::*;
 pub use device::*;

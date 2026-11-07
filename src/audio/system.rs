@@ -34,9 +34,9 @@ impl AudioSystem {
 
 		let started = device.start();
 		if started {
-			println!("[AudioSystem] Miniaudio device started successfully (44100Hz, Stereo Float).");
+			println!("[AudioSystem] Audio device started successfully (44100Hz, Stereo Float).");
 		} else {
-			eprintln!("[AudioSystem] Failed to start Miniaudio device!");
+			eprintln!("[AudioSystem] Failed to start audio device!");
 		}
 
 		Self { device, mixer }
