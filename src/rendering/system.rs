@@ -11,7 +11,7 @@
 
 
 use std::sync::Arc;
-use crate::material::{BlendMode, MaterialInstance, MaterialStorage, MaterialTemplate, PassKind};
+use crate::material::{BlendMode, MaterialInstance, MaterialStorage, MaterialTemplate, PassKind, TextureManager};
 use crate::rendering::frame::SceneFrameBuffer;
 use crate::rendering::queue::RenderQueue;
 use crate::rhi;
@@ -37,9 +37,11 @@ pub struct ObjectPushConstants {
 
 pub struct RenderingSystem {
 	cmd_buffers: Vec<rhi::Command>,
+	cmdmng: rhi::CommandManager,
 	frame_buffer: SceneFrameBuffer,
 	material_storage: MaterialStorage,
 	render_queue: RenderQueue,
+	texture_manager: Option<TextureManager>,
 	default_template: Option<Arc<MaterialTemplate>>,
 	default_material: Option<Arc<MaterialInstance>>,
 }
@@ -55,9 +57,11 @@ impl RenderingSystem {
 
 		Ok(Self {
 			cmd_buffers,
+			cmdmng: cmdmng.clone(),
 			frame_buffer: SceneFrameBuffer::new(),
 			material_storage: MaterialStorage::new(),
 			render_queue: RenderQueue::new(),
+			texture_manager: None,
 			default_template: None,
 			default_material: None,
 		})
@@ -71,6 +75,9 @@ impl RenderingSystem {
 		depth_format: rhi::Format,
 	) {
 		mochi_verb!("Initializing modern PBR graphics pipeline");
+
+		let texture_manager = TextureManager::new(device, alloc, &self.cmdmng);
+		self.texture_manager = Some(texture_manager);
 
 		let template = MaterialTemplate::new_forward(
 			device,
@@ -94,6 +101,18 @@ impl RenderingSystem {
 
 		self.default_template = Some(template);
 		self.default_material = Some(default_mat);
+	}
+
+	pub fn cmdmng(&self) -> &rhi::CommandManager {
+		&self.cmdmng
+	}
+
+	pub fn texture_manager(&self) -> Option<&TextureManager> {
+		self.texture_manager.as_ref()
+	}
+
+	pub fn texture_manager_mut(&mut self) -> Option<&mut TextureManager> {
+		self.texture_manager.as_mut()
 	}
 
 	pub fn default_material(&self) -> Option<Arc<MaterialInstance>> {

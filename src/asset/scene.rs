@@ -167,7 +167,7 @@ impl SceneAsset {
 		&self,
 		device: &rhi::Device,
 		alloc: &rhi::Allocator,
-		rendering: &RenderingSystem,
+		rendering: &mut RenderingSystem,
 		scene: &mut Scene,
 	) -> Result<(), String> {
 		let template = rendering
@@ -215,7 +215,14 @@ impl SceneAsset {
 			if let Some(mr) = &entity_desc.mesh_renderer {
 				match ModelAsset::load(&mr.asset) {
 					Ok(model) => {
-						let submeshes = model.build_runtime(device, alloc, &template);
+						let cmdmng = rendering.cmdmng().clone();
+						let submeshes = model.build_runtime(
+							device,
+							alloc,
+							&cmdmng,
+							rendering.texture_manager_mut(),
+							&template,
+						);
 						for (mesh, mat) in submeshes {
 							let mut renderer = MeshRendererComponent::new(mesh, mat);
 							renderer.is_visible = mr.is_visible;

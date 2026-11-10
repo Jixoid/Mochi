@@ -10,7 +10,6 @@
 */
 
 
-use std::marker::PhantomData;
 use bitflags::bitflags;
 use mochi_math::Extent;
 
@@ -49,24 +48,21 @@ bitflags! {
 }
 
 
-pub struct ImageView2<'a, B: RhiBackend> {
-	inner: &'a B::ImageView,
-	_marker: PhantomData<&'a B::Image>,
+#[derive(Clone)]
+pub struct ImageView2<B: RhiBackend> {
+	inner: B::ImageView,
 }
 
-unsafe impl<'a, B: RhiBackend> Send for ImageView2<'a, B> {}
-unsafe impl<'a, B: RhiBackend> Sync for ImageView2<'a, B> {}
+unsafe impl<B: RhiBackend> Send for ImageView2<B> {}
+unsafe impl<B: RhiBackend> Sync for ImageView2<B> {}
 
-impl<'a, B: RhiBackend> ImageView2<'a, B> {
-	pub fn new(inner: &'a B::ImageView) -> Self {
-		Self {
-			inner,
-			_marker: PhantomData,
-		}
+impl<B: RhiBackend> ImageView2<B> {
+	pub fn from_raw(inner: B::ImageView) -> Self {
+		Self { inner }
 	}
 
 	pub fn raw(&self) -> &B::ImageView {
-		self.inner
+		&self.inner
 	}
 }
 

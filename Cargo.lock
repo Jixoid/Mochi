@@ -11,6 +11,7 @@ dependencies = [
  "bytemuck",
  "gltf",
  "hecs",
+ "image",
  "libloading 0.8.9",
  "mochi_ahi",
  "mochi_ahi_cpal",

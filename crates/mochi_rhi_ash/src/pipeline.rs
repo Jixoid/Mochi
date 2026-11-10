@@ -62,7 +62,12 @@ impl AshPipelineMeta {
 		}
 	}
 
-	pub fn create(device: &ash::Device, push_stages: ShaderStage, push_size: u32) -> RhiResult<Self> {
+	pub fn create(
+		device: &ash::Device,
+		set_layout: Option<vk::DescriptorSetLayout>,
+		push_stages: ShaderStage,
+		push_size: u32,
+	) -> RhiResult<Self> {
 		let mut ranges = Vec::new();
 		if push_size > 0 {
 			ranges.push(vk::PushConstantRange {
@@ -71,7 +76,15 @@ impl AshPipelineMeta {
 				size: push_size,
 			});
 		}
-		let layout_info = vk::PipelineLayoutCreateInfo::default().push_constant_ranges(&ranges);
+
+		let mut set_layouts = Vec::new();
+		if let Some(sl) = set_layout {
+			set_layouts.push(sl);
+		}
+
+		let layout_info = vk::PipelineLayoutCreateInfo::default()
+			.set_layouts(&set_layouts)
+			.push_constant_ranges(&ranges);
 
 		let layout = unsafe {
 			device
@@ -94,6 +107,7 @@ pub struct PipelineInner {
 	device: ash::Device,
 	handle: vk::Pipeline,
 	layout: vk::PipelineLayout,
+	descriptor_set: Option<vk::DescriptorSet>,
 	kind: PipelineKind,
 }
 
@@ -120,12 +134,19 @@ unsafe impl Send for AshPipeline {}
 unsafe impl Sync for AshPipeline {}
 
 impl AshPipeline {
-	pub fn new(device: &ash::Device, handle: vk::Pipeline, layout: vk::PipelineLayout, kind: PipelineKind) -> Self {
+	pub fn new(
+		device: &ash::Device,
+		handle: vk::Pipeline,
+		layout: vk::PipelineLayout,
+		descriptor_set: Option<vk::DescriptorSet>,
+		kind: PipelineKind,
+	) -> Self {
 		Self {
 			inner: Arc::new(PipelineInner {
 				device: device.clone(),
 				handle,
 				layout,
+				descriptor_set,
 				kind,
 			}),
 		}
@@ -139,6 +160,7 @@ impl AshPipeline {
 		primitive_topology: PrimitiveTopology,
 		color_format: Format,
 		depth_format: Format,
+		descriptor_set: Option<vk::DescriptorSet>,
 	) -> RhiResult<Self> {
 		let mut c_entries = Vec::with_capacity(shaders.len());
 
@@ -226,7 +248,7 @@ impl AshPipeline {
 				.map_err(|(_, e)| RhiError::PipelineCreation(format!("Failed to create graphics pipeline: {e}")))?
 		};
 
-		Ok(Self::new(device, pipelines[0], meta.layout(), PipelineKind::Graphic))
+		Ok(Self::new(device, pipelines[0], meta.layout(), descriptor_set, PipelineKind::Graphic))
 	}
 
 	pub fn handle(&self) -> vk::Pipeline {
@@ -235,6 +257,10 @@ impl AshPipeline {
 
 	pub fn layout(&self) -> vk::PipelineLayout {
 		self.inner.layout
+	}
+
+	pub fn descriptor_set(&self) -> Option<vk::DescriptorSet> {
+		self.inner.descriptor_set
 	}
 
 	pub fn kind(&self) -> PipelineKind {

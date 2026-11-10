@@ -48,6 +48,8 @@ pub struct PbrMaterialGpuData {
 	pub albedo_texture_id: u32,
 	pub normal_texture_id: u32,
 	pub orm_texture_id: u32,
+	pub emissive_texture_id: u32,
+	pub _pad: [u32; 3],
 }
 
 impl Default for PbrMaterialGpuData {
@@ -63,6 +65,8 @@ impl Default for PbrMaterialGpuData {
 			albedo_texture_id: u32::MAX,
 			normal_texture_id: u32::MAX,
 			orm_texture_id: u32::MAX,
+			emissive_texture_id: u32::MAX,
+			_pad: [0; 3],
 		}
 	}
 }
@@ -80,6 +84,7 @@ pub struct PbrProperties {
 	pub albedo_texture_id: Option<u32>,
 	pub normal_texture_id: Option<u32>,
 	pub orm_texture_id: Option<u32>,
+	pub emissive_texture_id: Option<u32>,
 }
 
 impl Default for PbrProperties {
@@ -96,6 +101,7 @@ impl Default for PbrProperties {
 			albedo_texture_id: None,
 			normal_texture_id: None,
 			orm_texture_id: None,
+			emissive_texture_id: None,
 		}
 	}
 }
@@ -113,6 +119,8 @@ impl PbrProperties {
 			albedo_texture_id: self.albedo_texture_id.unwrap_or(u32::MAX),
 			normal_texture_id: self.normal_texture_id.unwrap_or(u32::MAX),
 			orm_texture_id: self.orm_texture_id.unwrap_or(u32::MAX),
+			emissive_texture_id: self.emissive_texture_id.unwrap_or(u32::MAX),
+			_pad: [0; 3],
 		}
 	}
 }

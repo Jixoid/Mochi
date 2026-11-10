@@ -10,7 +10,7 @@
 */
 
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum Format {
 	Undefined = 0,
@@ -108,6 +108,9 @@ pub enum Format {
 }
 
 impl Format {
+	pub const RGBA8_UNORM: Format = Format::V4Norm8U;
+	pub const RGBA8_SRGB: Format = Format::RGBA8Srgb;
+
 	pub fn from_raw(raw: u32) -> Self {
 		match raw {
 			0 => Format::Undefined,
@@ -184,7 +187,7 @@ impl Format {
 }
 
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct VT {
 	size: u64,
 	align: u64,

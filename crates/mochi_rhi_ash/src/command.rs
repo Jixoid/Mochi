@@ -99,12 +99,23 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 	fn bind_pipeline(&mut self, pipeline: &AshPipeline) {
 		self.current_pipeline_layout = pipeline.layout();
+		let bind_point = to_vk_pipeline_bind_point(pipeline.kind());
 		unsafe {
 			self.device.cmd_bind_pipeline(
 				self.handle,
-				to_vk_pipeline_bind_point(pipeline.kind()),
+				bind_point,
 				pipeline.handle(),
 			);
+			if let Some(set) = pipeline.descriptor_set() {
+				self.device.cmd_bind_descriptor_sets(
+					self.handle,
+					bind_point,
+					pipeline.layout(),
+					0,
+					&[set],
+					&[],
+				);
+			}
 		}
 	}
 

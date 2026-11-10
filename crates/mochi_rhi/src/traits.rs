@@ -72,6 +72,18 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 	fn write_texture_descriptor(&self, view: &B::ImageView, sampler: &B::Sampler) -> u32;
 	fn descriptor_heap(&self) -> Option<B::Buffer>;
 	fn sampler_heap(&self) -> Option<B::Buffer>;
+
+	fn create_image_view(&self, image: &B::Image, format: Format) -> RhiResult<B::ImageView>;
+	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<B::Sampler>;
+	fn upload_image_data(
+		&self,
+		alloc: &B::Allocator,
+		queue: &B::CommandQueue,
+		image: &B::Image,
+		width: u32,
+		height: u32,
+		data: &[u8],
+	) -> RhiResult<()>;
 }
 
 

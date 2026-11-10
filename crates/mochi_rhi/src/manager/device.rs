@@ -14,10 +14,12 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
+use crate::format::Format;
 use crate::manager::allocator::Allocator;
 use crate::manager::swapchain::Surface;
+use crate::sampler::{SamplerAddressMode, SamplerFilter};
 use crate::traits::{RhiBackend, RhiDevice};
-use crate::{Buffer, ImageView2, Sampler2};
+use crate::{Buffer, Image2, ImageView2, Sampler2};
 
 
 #[derive(Clone, Debug)]
@@ -148,8 +150,38 @@ impl<B: RhiBackend> Device<B> {
 		self.inner.fini_descriptor_heap();
 	}
 
-	pub fn write_texture_descriptor(&mut self, view: &ImageView2<'_, B>, sampler: &Sampler2<B>) -> u32 {
+	pub fn write_texture_descriptor(&self, view: &ImageView2<B>, sampler: &Sampler2<B>) -> u32 {
 		self.inner.write_texture_descriptor(view.raw(), sampler.raw())
+	}
+
+	pub fn create_image_view(&self, image: &Image2<B>, format: Format) -> Result<ImageView2<B>, String> {
+		let view = self
+			.inner
+			.create_image_view(image.raw(), format)
+			.map_err(|e| format!("Failed to create image view: {e}"))?;
+		Ok(ImageView2::from_raw(view))
+	}
+
+	pub fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> Result<Sampler2<B>, String> {
+		let sampler = self
+			.inner
+			.create_sampler(filter, address_mode)
+			.map_err(|e| format!("Failed to create sampler: {e}"))?;
+		Ok(Sampler2::from_raw(sampler))
+	}
+
+	pub fn upload_image_data(
+		&self,
+		alloc: &Allocator<B>,
+		queue: &B::CommandQueue,
+		image: &Image2<B>,
+		width: u32,
+		height: u32,
+		data: &[u8],
+	) -> Result<(), String> {
+		self.inner
+			.upload_image_data(alloc.raw(), queue, image.raw(), width, height, data)
+			.map_err(|e| format!("Failed to upload image data: {e}"))
 	}
 
 	pub fn descriptor_heap(&self) -> Option<Buffer<B>> {

@@ -10,11 +10,12 @@
 */
 
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use crate::material::{MaterialInstance, MaterialTemplate, PbrProperties};
+use crate::material::{MaterialInstance, MaterialTemplate, PbrProperties, TextureManager};
 use crate::rhi;
 use crate::scene::{Mesh, Vertex};
 use mochi_math::{Vec3, Vec4};
@@ -78,6 +79,7 @@ pub struct MaterialAsset {
 	pub albedo_texture: Option<String>,
 	pub normal_texture: Option<String>,
 	pub orm_texture: Option<String>,
+	pub emissive_texture: Option<String>,
 }
 
 impl Default for MaterialAsset {
@@ -94,6 +96,7 @@ impl Default for MaterialAsset {
 			albedo_texture: None,
 			normal_texture: None,
 			orm_texture: None,
+			emissive_texture: None,
 		}
 	}
 }
@@ -112,6 +115,7 @@ impl MaterialAsset {
 			albedo_texture_id: None,
 			normal_texture_id: None,
 			orm_texture_id: None,
+			emissive_texture_id: None,
 		}
 	}
 }
@@ -199,6 +203,7 @@ impl ModelAsset {
 				albedo_texture: None,
 				normal_texture: None,
 				orm_texture: None,
+				emissive_texture: None,
 			});
 		}
 
@@ -301,13 +306,139 @@ impl ModelAsset {
 		&self,
 		device: &rhi::Device,
 		alloc: &rhi::Allocator,
+		cmdmng: &rhi::CommandManager,
+		mut texture_manager: Option<&mut TextureManager>,
 		default_template: &Arc<MaterialTemplate>,
 	) -> Vec<(Arc<Mesh>, Arc<MaterialInstance>)> {
-		let material_instances: Vec<Arc<MaterialInstance>> = self
-			.materials
-			.iter()
-			.map(|m| MaterialInstance::new(Arc::clone(default_template), m.to_pbr_properties()))
-			.collect();
+		let mut material_instances: Vec<Arc<MaterialInstance>> = Vec::new();
+
+		if let (Some(source_path), Some(ref mut tm)) = (&self.source, texture_manager.as_deref_mut()) {
+			if (source_path.ends_with(".glb") || source_path.ends_with(".gltf"))
+				&& Path::new(source_path).exists()
+			{
+				if let Ok((document, _buffers, images)) = gltf::import(source_path) {
+					let decode_image_rgba8 = |img_data: &gltf::image::Data| -> Vec<u8> {
+						match img_data.format {
+							gltf::image::Format::R8G8B8A8 => img_data.pixels.clone(),
+							gltf::image::Format::R8G8B8 => {
+								let mut out = Vec::with_capacity((img_data.width * img_data.height * 4) as usize);
+								for c in img_data.pixels.chunks_exact(3) {
+									out.extend_from_slice(&[c[0], c[1], c[2], 255]);
+								}
+								out
+							}
+							gltf::image::Format::R8 => {
+								let mut out = Vec::with_capacity((img_data.width * img_data.height * 4) as usize);
+								for &p in &img_data.pixels {
+									out.extend_from_slice(&[p, p, p, 255]);
+								}
+								out
+							}
+							_ => img_data.pixels.clone(),
+						}
+					};
+
+					let mut uploaded_textures: HashMap<(usize, mochi_rhi::Format), u32> = HashMap::new();
+
+					let get_or_upload = |uploaded: &mut HashMap<(usize, mochi_rhi::Format), u32>, tm: &mut TextureManager, img_idx: usize, fmt: mochi_rhi::Format| -> u32 {
+						if let Some(&id) = uploaded.get(&(img_idx, fmt)) {
+							return id;
+						}
+						if let Some(img_data) = images.get(img_idx) {
+							let rgba = decode_image_rgba8(img_data);
+							let id = tm.load_raw_rgba8(device, alloc, cmdmng, img_data.width, img_data.height, fmt, &rgba);
+							uploaded.insert((img_idx, fmt), id);
+							id
+						} else {
+							0
+						}
+					};
+
+					for (mat_idx, doc_mat) in document.materials().enumerate() {
+						let pbr = doc_mat.pbr_metallic_roughness();
+
+						let albedo_id = pbr.base_color_texture().map(|t| {
+							get_or_upload(&mut uploaded_textures, tm, t.texture().source().index(), mochi_rhi::Format::RGBA8_SRGB)
+						});
+
+						let normal_id = doc_mat.normal_texture().map(|t| {
+							get_or_upload(&mut uploaded_textures, tm, t.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM)
+						});
+
+						let mr_tex = pbr.metallic_roughness_texture();
+						let occ_tex = doc_mat.occlusion_texture();
+						let orm_id = match (occ_tex, mr_tex) {
+							(Some(occ), Some(mr)) if occ.texture().source().index() == mr.texture().source().index() => {
+								Some(get_or_upload(&mut uploaded_textures, tm, occ.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM))
+							}
+							(Some(occ), Some(mr)) => {
+								let occ_idx = occ.texture().source().index();
+								let mr_idx = mr.texture().source().index();
+								let key = (usize::MAX - 1 - mat_idx, mochi_rhi::Format::RGBA8_UNORM);
+								if let Some(&id) = uploaded_textures.get(&key) {
+									Some(id)
+								} else if let (Some(occ_img), Some(mr_img)) = (images.get(occ_idx), images.get(mr_idx)) {
+									let occ_rgba = decode_image_rgba8(occ_img);
+									let mr_rgba = decode_image_rgba8(mr_img);
+									let w = mr_img.width;
+									let h = mr_img.height;
+									let pixel_count = (w * h) as usize;
+									let mut combined = Vec::with_capacity(pixel_count * 4);
+									for i in 0..pixel_count {
+										let r = occ_rgba.get(i * 4).copied().unwrap_or(255);
+										let g = mr_rgba.get(i * 4 + 1).copied().unwrap_or(255);
+										let b = mr_rgba.get(i * 4 + 2).copied().unwrap_or(255);
+										combined.extend_from_slice(&[r, g, b, 255]);
+									}
+									let id = tm.load_raw_rgba8(device, alloc, cmdmng, w, h, mochi_rhi::Format::RGBA8_UNORM, &combined);
+									uploaded_textures.insert(key, id);
+									Some(id)
+								} else {
+									None
+								}
+							}
+							(None, Some(mr)) => {
+								Some(get_or_upload(&mut uploaded_textures, tm, mr.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM))
+							}
+							(Some(occ), None) => {
+								Some(get_or_upload(&mut uploaded_textures, tm, occ.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM))
+							}
+							(None, None) => None,
+						};
+
+						let emissive_id = doc_mat.emissive_texture().map(|t| {
+							get_or_upload(&mut uploaded_textures, tm, t.texture().source().index(), mochi_rhi::Format::RGBA8_SRGB)
+						});
+
+						let mut props = self.materials.get(mat_idx).map(|m| m.to_pbr_properties()).unwrap_or_default();
+						props.albedo_texture_id = albedo_id;
+						props.normal_texture_id = normal_id;
+						props.orm_texture_id = orm_id;
+						props.emissive_texture_id = emissive_id;
+
+						crate::mochi_disp!(
+							"Model '{}': Material '{}' bound textures: albedo={:?}, normal={:?}, orm={:?}, emissive={:?}",
+							self.name,
+							doc_mat.name().unwrap_or("Material"),
+							albedo_id,
+							normal_id,
+							orm_id,
+							emissive_id
+						);
+
+						material_instances.push(MaterialInstance::new(Arc::clone(default_template), props));
+					}
+				}
+			}
+		}
+
+		if material_instances.is_empty() {
+			material_instances = self
+				.materials
+				.iter()
+				.map(|m| MaterialInstance::new(Arc::clone(default_template), m.to_pbr_properties()))
+				.collect();
+		}
 
 		let fallback_mat = MaterialInstance::new_default(Arc::clone(default_template));
 

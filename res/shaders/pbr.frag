@@ -15,6 +15,10 @@
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_nonuniform_qualifier : require
+
+
+layout(set = 0, binding = 0) uniform sampler2D u_textures[];
 
 
 struct DirectionalLight {
@@ -53,6 +57,10 @@ struct PbrMaterialData {
 	uint albedo_texture_id;
 	uint normal_texture_id;
 	uint orm_texture_id;
+	uint emissive_texture_id;
+	uint _pad0;
+	uint _pad1;
+	uint _pad2;
 };
 
 layout(buffer_reference, scalar) readonly buffer MaterialDataBuffer {
@@ -72,6 +80,7 @@ layout(location = 0) in vec3 in_world_pos;
 layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec4 in_color;
 layout(location = 3) in vec2 in_uv;
+layout(location = 4) in vec4 in_tangent;
 
 layout(location = 0) out vec4 out_color;
 
@@ -124,10 +133,40 @@ void main() {
 	PbrMaterialData mat = mat_buf.materials[pc.material_id];
 
 	vec4 albedo = mat.base_color * in_color;
+	if (mat.albedo_texture_id != 0xFFFFFFFFu) {
+		vec4 tex_albedo = texture(u_textures[nonuniformEXT(mat.albedo_texture_id)], in_uv);
+		albedo *= tex_albedo;
+	}
+
+	if (albedo.a < mat.alpha_cutoff) {
+		discard;
+	}
+
 	float metallic = clamp(mat.metallic, 0.0, 1.0);
 	float roughness = clamp(mat.roughness, 0.04, 1.0);
+	float occlusion = mat.occlusion;
+
+	if (mat.orm_texture_id != 0xFFFFFFFFu) {
+		vec3 orm = texture(u_textures[nonuniformEXT(mat.orm_texture_id)], in_uv).rgb;
+		occlusion *= orm.r;
+		roughness *= orm.g;
+		metallic *= orm.b;
+		roughness = clamp(roughness, 0.04, 1.0);
+		metallic = clamp(metallic, 0.0, 1.0);
+	}
 
 	vec3 N = normalize(in_normal);
+	if (mat.normal_texture_id != 0xFFFFFFFFu && length(in_tangent.xyz) > 0.001) {
+		vec3 T = normalize(in_tangent.xyz);
+		T = normalize(T - dot(T, N) * N);
+		vec3 B = cross(N, T) * in_tangent.w;
+		mat3 TBN = mat3(T, B, N);
+
+		vec3 raw_normal = texture(u_textures[nonuniformEXT(mat.normal_texture_id)], in_uv).rgb * 2.0 - 1.0;
+		raw_normal.xy *= mat.normal_scale;
+		N = normalize(TBN * raw_normal);
+	}
+
 	vec3 V = normalize(scene.camera_position.xyz - in_world_pos);
 
 	vec3 F0 = vec3(0.04);
@@ -190,8 +229,14 @@ void main() {
 		Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL;
 	}
 
-	vec3 ambient = scene.ambient_color.rgb * albedo.rgb;
-	vec3 color = ambient + Lo + mat.emissive.rgb * mat.emissive.w;
+	vec3 emissive = mat.emissive.rgb * mat.emissive.w;
+	if (mat.emissive_texture_id != 0xFFFFFFFFu) {
+		vec3 tex_emissive = texture(u_textures[nonuniformEXT(mat.emissive_texture_id)], in_uv).rgb;
+		emissive *= tex_emissive;
+	}
+
+	vec3 ambient = scene.ambient_color.rgb * albedo.rgb * occlusion;
+	vec3 color = ambient + Lo + emissive;
 
 	// Tonemapping and gamma correction for sRGB display
 	color = tonemap_aces(color);

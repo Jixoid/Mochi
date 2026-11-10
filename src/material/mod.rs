@@ -13,10 +13,12 @@
 pub mod instance;
 pub mod storage;
 pub mod template;
+pub mod texture;
 pub mod types;
 
 
 pub use instance::*;
 pub use storage::*;
 pub use template::*;
+pub use texture::*;
 pub use types::*;

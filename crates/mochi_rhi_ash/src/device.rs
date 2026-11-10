@@ -18,19 +18,29 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::allocator::AshAllocator;
 use crate::buffer::AshBuffer;
-use crate::image::AshImageView;
+use crate::command::AshCommandQueue;
+use crate::image::{AshImage, AshImageView};
 use crate::pipeline::{AshPipeline, AshPipelineMeta};
 use crate::sampler::AshSampler;
 use crate::shader::AshShader;
 use crate::sync::{AshFence, AshSemaphore};
+use crate::types::{to_vk_address_mode, to_vk_filter, to_vk_format};
 use crate::AshVulkanBackend;
 use mochi_rhi::error::{RhiError, RhiResult};
 use mochi_rhi::format::Format;
 use mochi_rhi::pipeline::{PolygonMode, PrimitiveTopology};
+use mochi_rhi::sampler::{SamplerAddressMode, SamplerFilter};
 use mochi_rhi::shader::ShaderStage;
 use mochi_rhi::traits::RhiDevice;
 use mochi_except::*;
 
+
+pub struct AshBindlessHeap {
+	pub layout: vk::DescriptorSetLayout,
+	pub pool: vk::DescriptorPool,
+	pub set: vk::DescriptorSet,
+	pub next_id: Mutex<u32>,
+}
 
 pub struct DeviceInner {
 	entry: ash::Entry,
@@ -41,6 +51,7 @@ pub struct DeviceInner {
 	physical_device: vk::PhysicalDevice,
 	queue: vk::Queue,
 	queue_family: u32,
+	bindless_heap: Option<AshBindlessHeap>,
 }
 
 unsafe impl Send for DeviceInner {}
@@ -62,6 +73,14 @@ impl DeviceInner {
 	pub fn allocator(&self) -> &Arc<Mutex<Allocator>> {
 		self.allocator.as_ref().expect("Ash allocator already destroyed")
 	}
+
+	pub fn bindless_layout(&self) -> Option<vk::DescriptorSetLayout> {
+		self.bindless_heap.as_ref().map(|h| h.layout)
+	}
+
+	pub fn bindless_set(&self) -> Option<vk::DescriptorSet> {
+		self.bindless_heap.as_ref().map(|h| h.set)
+	}
 }
 
 impl Drop for DeviceInner {
@@ -69,6 +88,10 @@ impl Drop for DeviceInner {
 		unsafe {
 			if let Some(device) = &self.device {
 				let _ = device.device_wait_idle();
+				if let Some(heap) = &self.bindless_heap {
+					device.destroy_descriptor_pool(heap.pool, None);
+					device.destroy_descriptor_set_layout(heap.layout, None);
+				}
 			}
 			drop(self.allocator.take());
 			if let Some(device) = self.device.take() {
@@ -223,7 +246,12 @@ impl AshDevice {
 		}
 
 		let mut features12 = vk::PhysicalDeviceVulkan12Features::default()
-			.buffer_device_address(true);
+			.buffer_device_address(true)
+			.descriptor_indexing(true)
+			.shader_sampled_image_array_non_uniform_indexing(true)
+			.descriptor_binding_partially_bound(true)
+			.descriptor_binding_variable_descriptor_count(true)
+			.runtime_descriptor_array(true);
 
 		let mut features13 = vk::PhysicalDeviceVulkan13Features::default()
 			.dynamic_rendering(true)
@@ -272,6 +300,65 @@ impl AshDevice {
 		};
 		mochi_disp!("Device initialized: {dev_name} ({pdt})");
 
+		const MAX_BINDLESS_TEXTURES: u32 = 4096;
+
+		let binding = vk::DescriptorSetLayoutBinding::default()
+			.binding(0)
+			.descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+			.descriptor_count(MAX_BINDLESS_TEXTURES)
+			.stage_flags(vk::ShaderStageFlags::ALL);
+
+		let binding_flags = [vk::DescriptorBindingFlags::PARTIALLY_BOUND
+			| vk::DescriptorBindingFlags::UPDATE_AFTER_BIND];
+
+		let mut binding_flags_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default()
+			.binding_flags(&binding_flags);
+
+		let bindings = [binding];
+		let layout_info = vk::DescriptorSetLayoutCreateInfo::default()
+			.flags(vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL)
+			.bindings(&bindings)
+			.push_next(&mut binding_flags_info);
+
+		let bindless_layout = unsafe {
+			device
+				.create_descriptor_set_layout(&layout_info, None)
+				.map_err(|e| RhiError::InitializationFailed(format!("Failed to create bindless set layout: {e}")))?
+		};
+
+		let pool_size = [vk::DescriptorPoolSize::default()
+			.ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+			.descriptor_count(MAX_BINDLESS_TEXTURES)];
+
+		let pool_info = vk::DescriptorPoolCreateInfo::default()
+			.flags(vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND)
+			.max_sets(1)
+			.pool_sizes(&pool_size);
+
+		let bindless_pool = unsafe {
+			device
+				.create_descriptor_pool(&pool_info, None)
+				.map_err(|e| RhiError::InitializationFailed(format!("Failed to create bindless pool: {e}")))?
+		};
+
+		let set_layouts = [bindless_layout];
+		let alloc_info = vk::DescriptorSetAllocateInfo::default()
+			.descriptor_pool(bindless_pool)
+			.set_layouts(&set_layouts);
+
+		let bindless_sets = unsafe {
+			device
+				.allocate_descriptor_sets(&alloc_info)
+				.map_err(|e| RhiError::InitializationFailed(format!("Failed to allocate bindless descriptor set: {e}")))?
+		};
+
+		let bindless_heap = AshBindlessHeap {
+			layout: bindless_layout,
+			pool: bindless_pool,
+			set: bindless_sets[0],
+			next_id: Mutex::new(0),
+		};
+
 		let inner = DeviceInner {
 			entry,
 			instance: Some(instance),
@@ -281,11 +368,20 @@ impl AshDevice {
 			queue_family,
 			allocator: Some(Arc::new(Mutex::new(allocator))),
 			surface_loader: Some(surface_loader),
+			bindless_heap: Some(bindless_heap),
 		};
 
 		Ok(Self {
 			inner: Arc::new(inner),
 		})
+	}
+
+	pub fn bindless_layout(&self) -> Option<vk::DescriptorSetLayout> {
+		self.inner.bindless_layout()
+	}
+
+	pub fn bindless_set(&self) -> Option<vk::DescriptorSet> {
+		self.inner.bindless_set()
 	}
 
 	pub fn device(&self) -> &ash::Device {
@@ -344,7 +440,7 @@ impl AshDevice {
 	}
 
 	pub fn create_pipeline_meta(&self, push_stages: ShaderStage, push_size: u32) -> RhiResult<AshPipelineMeta> {
-		AshPipelineMeta::create(self.inner.device(), push_stages, push_size)
+		AshPipelineMeta::create(self.inner.device(), self.inner.bindless_layout(), push_stages, push_size)
 	}
 
 	pub fn create_graphics_pipeline(
@@ -364,6 +460,7 @@ impl AshDevice {
 			primitive_topology,
 			color_format,
 			depth_format,
+			self.inner.bindless_set(),
 		)
 	}
 }
@@ -466,8 +563,32 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 
 	fn fini_descriptor_heap(&self) {}
 
-	fn write_texture_descriptor(&self, _view: &AshImageView, _sampler: &AshSampler) -> u32 {
-		0
+	fn write_texture_descriptor(&self, view: &AshImageView, sampler: &AshSampler) -> u32 {
+		if let Some(heap) = &self.inner.bindless_heap {
+			let mut lock = heap.next_id.lock().unwrap();
+			let id = *lock;
+			*lock += 1;
+
+			let image_info = [vk::DescriptorImageInfo::default()
+				.sampler(sampler.handle())
+				.image_view(view.handle())
+				.image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
+
+			let write = [vk::WriteDescriptorSet::default()
+				.dst_set(heap.set)
+				.dst_binding(0)
+				.dst_array_element(id)
+				.descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+				.image_info(&image_info)];
+
+			unsafe {
+				self.inner.device().update_descriptor_sets(&write, &[]);
+			}
+
+			id
+		} else {
+			0
+		}
 	}
 
 	fn descriptor_heap(&self) -> Option<AshBuffer> {
@@ -476,6 +597,190 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 
 	fn sampler_heap(&self) -> Option<AshBuffer> {
 		None
+	}
+
+	fn create_image_view(&self, image: &AshImage, format: Format) -> RhiResult<AshImageView> {
+		let is_depth = format == Format::Depth32f
+			|| format == Format::Depth24Stencil8
+			|| format == Format::Depth16
+			|| format == Format::Depth32fStencil8;
+
+		let aspect_mask = if is_depth {
+			vk::ImageAspectFlags::DEPTH
+		} else {
+			vk::ImageAspectFlags::COLOR
+		};
+
+		let subresource_range = vk::ImageSubresourceRange {
+			aspect_mask,
+			base_mip_level: 0,
+			level_count: 1,
+			base_array_layer: 0,
+			layer_count: 1,
+		};
+
+		let view_info = vk::ImageViewCreateInfo::default()
+			.image(image.handle())
+			.view_type(vk::ImageViewType::TYPE_2D)
+			.format(to_vk_format(format))
+			.subresource_range(subresource_range);
+
+		let view = unsafe {
+			self.inner
+				.device()
+				.create_image_view(&view_info, None)
+				.map_err(|e| RhiError::BackendError(format!("Failed to create image view: {e}")))?
+		};
+
+		Ok(AshImageView::new(self.inner.device(), view))
+	}
+
+	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<AshSampler> {
+		let vk_filter = to_vk_filter(filter);
+		let vk_addr = to_vk_address_mode(address_mode);
+		let sampler_info = vk::SamplerCreateInfo::default()
+			.mag_filter(vk_filter)
+			.min_filter(vk_filter)
+			.address_mode_u(vk_addr)
+			.address_mode_v(vk_addr)
+			.address_mode_w(vk_addr)
+			.anisotropy_enable(true)
+			.max_anisotropy(16.0)
+			.border_color(vk::BorderColor::INT_OPAQUE_BLACK)
+			.unnormalized_coordinates(false)
+			.compare_enable(false)
+			.compare_op(vk::CompareOp::ALWAYS)
+			.mipmap_mode(vk::SamplerMipmapMode::LINEAR);
+
+		let sampler = unsafe {
+			self.inner
+				.device()
+				.create_sampler(&sampler_info, None)
+				.map_err(|e| RhiError::ResourceCreation(format!("Failed to create sampler: {e}")))?
+		};
+
+		Ok(AshSampler::new(self.inner.device(), sampler))
+	}
+
+	fn upload_image_data(
+		&self,
+		alloc: &AshAllocator,
+		queue: &AshCommandQueue,
+		image: &AshImage,
+		width: u32,
+		height: u32,
+		data: &[u8],
+	) -> RhiResult<()> {
+		use mochi_rhi::traits::{RhiAllocator, RhiBuffer, RhiCommandQueue};
+
+		let mut staging_buf = alloc.alloc_buffer(
+			data.len() as u64,
+			mochi_rhi::BufferUsage::TransferSrc,
+			mochi_rhi::manager::AllocationCreate::HostSequentialWrite,
+			mochi_rhi::manager::AllocationLocation::PreferHost,
+		)?;
+		let ptr = staging_buf.map()?;
+		unsafe {
+			std::ptr::copy_nonoverlapping(data.as_ptr(), ptr, data.len());
+		}
+		staging_buf.unmap();
+
+		let cmd = queue.allocate_graphic_command()?;
+		let begin_info = vk::CommandBufferBeginInfo::default()
+			.flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+
+		let raw_dev = self.inner.device();
+		unsafe {
+			raw_dev
+				.begin_command_buffer(cmd.handle(), &begin_info)
+				.map_err(|e| RhiError::BackendError(format!("{e}")))?;
+
+			let barrier_to_dst = vk::ImageMemoryBarrier::default()
+				.old_layout(vk::ImageLayout::UNDEFINED)
+				.new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+				.src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+				.dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+				.image(image.handle())
+				.subresource_range(vk::ImageSubresourceRange {
+					aspect_mask: vk::ImageAspectFlags::COLOR,
+					base_mip_level: 0,
+					level_count: 1,
+					base_array_layer: 0,
+					layer_count: 1,
+				})
+				.src_access_mask(vk::AccessFlags::empty())
+				.dst_access_mask(vk::AccessFlags::TRANSFER_WRITE);
+
+			raw_dev.cmd_pipeline_barrier(
+				cmd.handle(),
+				vk::PipelineStageFlags::TOP_OF_PIPE,
+				vk::PipelineStageFlags::TRANSFER,
+				vk::DependencyFlags::empty(),
+				&[],
+				&[],
+				&[barrier_to_dst],
+			);
+
+			let region = vk::BufferImageCopy::default()
+				.buffer_offset(0)
+				.buffer_row_length(0)
+				.buffer_image_height(0)
+				.image_subresource(vk::ImageSubresourceLayers {
+					aspect_mask: vk::ImageAspectFlags::COLOR,
+					mip_level: 0,
+					base_array_layer: 0,
+					layer_count: 1,
+				})
+				.image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+				.image_extent(vk::Extent3D {
+					width,
+					height,
+					depth: 1,
+				});
+
+			raw_dev.cmd_copy_buffer_to_image(
+				cmd.handle(),
+				staging_buf.handle(),
+				image.handle(),
+				vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+				&[region],
+			);
+
+			let barrier_to_shader = vk::ImageMemoryBarrier::default()
+				.old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+				.new_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+				.src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+				.dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+				.image(image.handle())
+				.subresource_range(vk::ImageSubresourceRange {
+					aspect_mask: vk::ImageAspectFlags::COLOR,
+					base_mip_level: 0,
+					level_count: 1,
+					base_array_layer: 0,
+					layer_count: 1,
+				})
+				.src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+				.dst_access_mask(vk::AccessFlags::SHADER_READ);
+
+			raw_dev.cmd_pipeline_barrier(
+				cmd.handle(),
+				vk::PipelineStageFlags::TRANSFER,
+				vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::VERTEX_SHADER,
+				vk::DependencyFlags::empty(),
+				&[],
+				&[],
+				&[barrier_to_shader],
+			);
+
+			raw_dev
+				.end_command_buffer(cmd.handle())
+				.map_err(|e| RhiError::BackendError(format!("{e}")))?;
+		}
+
+		queue.submit(&cmd)?;
+		self.wait_idle()?;
+
+		Ok(())
 	}
 
 	fn create_shader(&self, stage: ShaderStage, code: &[u8], entry: &str) -> RhiResult<AshShader> {

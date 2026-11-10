@@ -68,6 +68,7 @@ layout(location = 0) out vec3 out_world_pos;
 layout(location = 1) out vec3 out_normal;
 layout(location = 2) out vec4 out_color;
 layout(location = 3) out vec2 out_uv;
+layout(location = 4) out vec4 out_tangent;
 
 
 void main() {
@@ -78,6 +79,7 @@ void main() {
 	vec4 world_pos = pc.model * vec4(v.position.xyz, 1.0);
 	out_world_pos = world_pos.xyz;
 	out_normal = normalize(mat3(pc.model) * v.normal.xyz);
+	out_tangent = vec4(normalize(mat3(pc.model) * v.tangent.xyz), v.tangent.w);
 	out_color = v.color;
 	out_uv = v.uv0;
 
