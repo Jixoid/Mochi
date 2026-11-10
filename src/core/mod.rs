@@ -10,23 +10,31 @@
 */
 
 
+pub mod config;
+
 use std::time::Instant;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
-use crate::rhi as rhi;
+use crate::asset::SceneAsset;
 use crate::audio::AudioSystem;
 use crate::display::Display;
 use crate::rendering::RenderingSystem;
+use crate::rhi as rhi;
+use crate::scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
 use mochi_except::*;
+use mochi_math::Vec3;
+
+pub use config::*;
 
 
 pub struct EngineApp {
 	title: String,
 	width: u32,
 	height: u32,
+	start_time: Instant,
 	last_frame_time: Option<Instant>,
 	fps_timer: Instant,
 	fps_counter: u32,
@@ -41,10 +49,12 @@ pub struct EngineApp {
 	rendering_system: Option<RenderingSystem>,
 	audio_system: Option<AudioSystem>,
 	display: Option<Display>,
+	scene: Scene,
+	config: ProjectConfig,
 }
 
 impl EngineApp {
-	pub fn new(title: &str, width: u32, height: u32) -> Self {
+	pub fn from_config(config: ProjectConfig) -> Self {
 		// RHI
 		let device = rhi::Device::new("MochiEngine", 0, 1, 0, 0);
 		let alloca = rhi::Allocator::new(&device);
@@ -58,10 +68,10 @@ impl EngineApp {
 		let rendering_system = RenderingSystem::new(&cmdmng).expect("failed to create RenderingSystem");
 
 		Self {
-			title: title.to_string(),
-			width,
-			height,
-
+			title: config.window.title.clone(),
+			width: config.window.width,
+			height: config.window.height,
+			start_time: Instant::now(),
 			device: Some(device),
 			alloca: Some(alloca),
 			cmdmng: Some(cmdmng),
@@ -70,6 +80,8 @@ impl EngineApp {
 			rendering_system: Some(rendering_system),
 			audio_system: Some(audio_system),
 			display: None,
+			scene: Scene::new(),
+			config,
 			last_frame_time: None,
 			fps_timer: Instant::now(),
 			fps_counter: 0,
@@ -78,11 +90,17 @@ impl EngineApp {
 		}
 	}
 
+	pub fn new(title: &str, width: u32, height: u32) -> Self {
+		let mut config = ProjectConfig::default();
+		config.window.title = title.to_string();
+		config.window.width = width;
+		config.window.height = height;
+		Self::from_config(config)
+	}
 
 	pub fn set_idle<F: FnMut(f32) + 'static>(&mut self, cb: F) {
 		self.idle_cb = Some(Box::new(cb));
 	}
-
 
 	pub fn device(&self) -> &rhi::Device {
 		self.device.as_ref().unwrap()
@@ -96,12 +114,22 @@ impl EngineApp {
 		self.audio_system.as_ref()
 	}
 
-
 	pub fn display(&self) -> Option<&Display> {
 		self.display.as_ref()
 	}
-}
 
+	pub fn scene(&self) -> &Scene {
+		&self.scene
+	}
+
+	pub fn scene_mut(&mut self) -> &mut Scene {
+		&mut self.scene
+	}
+
+	pub fn config(&self) -> &ProjectConfig {
+		&self.config
+	}
+}
 
 impl ApplicationHandler for EngineApp {
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -109,16 +137,40 @@ impl ApplicationHandler for EngineApp {
 			match Display::new(event_loop, self.device.as_ref().unwrap(), &self.title, self.width, self.height) {
 				Ok(display) => {
 					if let (Some(rendering), Some(target)) = (&mut self.rendering_system, display.render_target(0)) {
+						let device = self.device.as_ref().unwrap();
+						let alloc = self.alloca.as_ref().unwrap();
+
 						rendering.init_pipeline(
-							self.device.as_ref().unwrap(),
-							self.alloca.as_ref().unwrap(),
+							device,
+							alloc,
 							target.color_format(),
 							target.depth_format(),
 						);
+
+						let scene_path = &self.config.scene.start_scene;
+						match SceneAsset::load(scene_path) {
+							Ok(scene_asset) => {
+								mochi_disp!("Loaded scene asset '{}' from {}", scene_asset.name, scene_path);
+								if let Err(err) = scene_asset.instantiate(device, alloc, rendering, &mut self.scene) {
+									mochi_error!("Failed to instantiate scene: {err}");
+								}
+							}
+							Err(err) => {
+								mochi_warn!("Could not load scene '{scene_path}': {err}. Spawning fallback cube.");
+								if let Some(mat) = rendering.default_material() {
+									let cube_mesh = Mesh::create_cube(device, alloc, 1.2);
+									let cube_transform = TransformComponent::default();
+									self.scene.spawn((
+										cube_transform,
+										MeshRendererComponent::new(cube_mesh, mat),
+									));
+								}
+							}
+						}
 					}
 					display.request_redraw();
 					self.display = Some(display);
-					mochi_disp!("Display and Vulkan swapchain attached successfully.");
+					mochi_disp!("Display and Swapchain attached successfully");
 				}
 				Err(err) => {
 					mochi_error!("Failed to initialize display: {err}");
@@ -131,7 +183,7 @@ impl ApplicationHandler for EngineApp {
 	fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
 		match event {
 			WindowEvent::CloseRequested => {
-				mochi_log!("Window close requested, shutting down...");
+				mochi_log!("Window close requested, shutting down");
 				event_loop.exit();
 			}
 			WindowEvent::KeyboardInput {
@@ -143,7 +195,7 @@ impl ApplicationHandler for EngineApp {
 					},
 				..
 			} => {
-				mochi_log!("Escape pressed, shutting down...");
+				mochi_log!("Escape pressed, shutting down");
 				event_loop.exit();
 			}
 			WindowEvent::Resized(physical_size) => {
@@ -159,6 +211,14 @@ impl ApplicationHandler for EngineApp {
 
 				if let Some(cb) = &mut self.idle_cb {
 					cb(dt);
+				}
+
+				for (_e, (t, _r)) in self.scene.world_mut().query_mut::<(&mut TransformComponent, &MeshRendererComponent)>() {
+					let rot_delta = mochi_math::Quat::from_axis_angle(
+						Vec3::new(0.6, 1.0, 0.4).normalize(),
+						mochi_math::Rad::new(1.0 * dt),
+					);
+					t.rotation = (t.rotation * rot_delta).normalize();
 				}
 
 				self.fps_counter += 1;
@@ -178,20 +238,23 @@ impl ApplicationHandler for EngineApp {
 					audio.update();
 				}
 
-				if let (Some(display), Some(rendering), Some(sync), Some(cmdmng)) = (
+				if let (Some(display), Some(rendering), Some(sync), Some(cmdmng), Some(device), Some(alloc)) = (
 					&mut self.display,
 					&mut self.rendering_system,
 					&mut self.syncer,
 					&self.cmdmng,
+					&self.device,
+					&self.alloca,
 				) {
-					rendering.render(sync, cmdmng, display, [0.1, 0.15, 0.25, 1.0]);
+					let time = self.start_time.elapsed().as_secs_f32();
+					rendering.render(sync, cmdmng, display, device, alloc, &self.scene, time, dt);
 
 					self.frame_count += 1;
 
 					if let Ok(limit_str) = std::env::var("MOCHI_TEST_EXIT_FRAMES") {
 						if let Ok(limit) = limit_str.parse::<u64>() {
 							if self.frame_count >= limit {
-								mochi_log!("Reached test frame limit ({limit}), exiting...");
+								mochi_log!("Reached test frame limit ({limit}), exiting");
 								event_loop.exit();
 								return;
 							}
@@ -206,11 +269,14 @@ impl ApplicationHandler for EngineApp {
 	}
 
 	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-		mochi_log!("Cleaning up Engine resources...");
+		mochi_log!("Cleaning up Engine resources");
 		self.audio_system = None;
 
-		self.device.as_ref().unwrap().wait_idle();
+		if let Some(device) = &self.device {
+			device.wait_idle();
+		}
 
+		self.scene = Scene::new();
 		self.rendering_system = None;
 		self.display = None;
 
@@ -219,16 +285,22 @@ impl ApplicationHandler for EngineApp {
 		self.alloca = None;
 		self.device = None;
 
-		mochi_disp!("Cleanup completed cleanly.");
+		mochi_disp!("Cleanup completed cleanly");
 	}
 }
-
 
 pub struct Engine {
 	app: EngineApp,
 }
 
 impl Engine {
+	pub fn from_config(config_path: &str) -> Self {
+		let config = ProjectConfig::load_or_default(config_path);
+		Self {
+			app: EngineApp::from_config(config),
+		}
+	}
+
 	pub fn new(title: &str, width: u32, height: u32) -> Self {
 		Self {
 			app: EngineApp::new(title, width, height),
@@ -241,6 +313,18 @@ impl Engine {
 
 	pub fn audio_system(&self) -> Option<&AudioSystem> {
 		self.app.audio_system()
+	}
+
+	pub fn scene(&self) -> &Scene {
+		self.app.scene()
+	}
+
+	pub fn scene_mut(&mut self) -> &mut Scene {
+		self.app.scene_mut()
+	}
+
+	pub fn config(&self) -> &ProjectConfig {
+		self.app.config()
 	}
 
 	pub fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {

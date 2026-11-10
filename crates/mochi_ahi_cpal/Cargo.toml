@@ -1,0 +1,10 @@
+[package]
+name = "mochi_ahi_cpal"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cpal = "0.18"
+symphonia = { version = "0.6", features = ["all"] }
+mochi_ahi = { path = "../mochi_ahi" }
+mochi_except = { path = "../mochi_except" }

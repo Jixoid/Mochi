@@ -10,7 +10,8 @@
 */
 
 
-use mochi_ahi::{AudioData, Device};
+use mochi_ahi::AudioData;
+use crate::ahi::Device;
 
 
 #[derive(Clone, Debug)]
@@ -38,12 +39,12 @@ impl AudioClip {
 	}
 
 	pub fn from_file(device: &Device, path: &str) -> Result<Self, String> {
-		let data = device.decode_file(path)?;
+		let data = device.decode_file(path).map_err(|e| e.to_string())?;
 		Ok(Self::from_data(data))
 	}
 
 	pub fn from_memory(device: &Device, bytes: &[u8]) -> Result<Self, String> {
-		let data = device.decode_memory(bytes)?;
+		let data = device.decode_memory(bytes).map_err(|e| e.to_string())?;
 		Ok(Self::from_data(data))
 	}
 

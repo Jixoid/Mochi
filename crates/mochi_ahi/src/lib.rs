@@ -12,6 +12,11 @@
 
 pub mod data;
 pub mod device;
+pub mod error;
+pub mod traits;
+
 
 pub use data::*;
 pub use device::*;
+pub use error::*;
+pub use traits::*;

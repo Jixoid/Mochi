@@ -12,7 +12,7 @@
 
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
-use ash::vk::{self, Handle};
+use ash::vk::{self, Handle, PhysicalDeviceType};
 use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
@@ -263,7 +263,14 @@ impl AshDevice {
 
 		let props = unsafe { instance.get_physical_device_properties(physical_device) };
 		let dev_name = unsafe { std::ffi::CStr::from_ptr(props.device_name.as_ptr()) }.to_string_lossy();
-		mochi_disp!("Ash Vulkan device initialized: {}", dev_name);
+		let pdt = match props.device_type {
+			PhysicalDeviceType::INTEGRATED_GPU => "integrated",
+			PhysicalDeviceType::DISCRETE_GPU => "discrete",
+			PhysicalDeviceType::CPU => "cpu",
+			PhysicalDeviceType::VIRTUAL_GPU => "virtual",
+			_ => "other",
+		};
+		mochi_disp!("Device initialized: {dev_name} ({pdt})");
 
 		let inner = DeviceInner {
 			entry,

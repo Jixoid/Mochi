@@ -15,5 +15,11 @@ winit = "0.30"
 mochi_rhi = { path = "crates/mochi_rhi" }
 mochi_rhi_ash = { path = "crates/mochi_rhi_ash" }
 mochi_ahi = { path = "crates/mochi_ahi" }
+mochi_ahi_cpal = { path = "crates/mochi_ahi_cpal" }
 mochi_math = { path = "crates/mochi_math" }
 mochi_except = { path = "crates/mochi_except" }
+hecs = "0.10"
+bytemuck = { version = "1.25", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+ron = "0.8"
+bincode = "1.3"
