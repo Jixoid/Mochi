@@ -1,44 +1,76 @@
-## Mochi
+# Mochi
 
-Vulkan 1.4 tabanlı modern bir render motoru ve altyapısı (framework). 
-QAOS çatısı altında geliştirilen Mochi, modern prensipleri benimserken düşük seviyeli grafik programlamayı basitleştirmek için temiz ve katmanlı bir mimariye odaklanır.
+Modern ve saf Rust ile geliştirilen 3D oyun motoru ve render çerçevesi.  
+**QAOS** çatısı altında geliştirilen Mochi; temiz, katmanlı bir mimariye, modern Vulkan 1.3+ grafik standartlarına, bellek güvenliğine ve veri odaklı tasarıma odaklanır.
 
 Diğer diller: [en](README.md)
 
+---
 
 ## Özellikler
 
-Mochi, minimalist bir sarmalayıcı olmanın ötesine geçerek yüksek performanslı render işlemleri için sağlam bir temel sunar:
+Mochi, modern GPU mimarilerini ve Rust dilinin gücünü en üst düzeyde kullanacak şekilde sıfırdan tasarlanmıştır:
 
-* **Modern RHI:** `vulkan-hpp` (RAII) kullanılarak Vulkan 1.4 üzerinde inşa edilmiştir. Dinamik Render (Dynamic Rendering - eski nesil RenderPass/Framebuffer kalabalığı yok) ve modern veri bağlama için Buffer Device Address (BDA) özelliklerini içerir.
-* **Varlık Bileşen Sistemi (ECS):** Önbellek dostu (cache-friendly), esnek sahne ve nesne yönetimi (Transform'lar, Kameralar, Işıklar, Mesh'ler) için `EnTT` altyapısını kullanır.
-* **Akıllı Bellek ve Kaynak Yönetimi:** Vulkan Memory Allocator (VMA) ile entegredir. Darboğazsız kaynak yüklemesi için otomatik ve toplu (batched) bir transfer kuyruğu sistemine sahiptir.
-* **Sanal Dosya Sistemi (VFS):** Varlıkları (assets) hem fiziksel disk depolamasından hem de derlenmiş gömülü (embedded) dosyalardan sorunsuzca çözen özel bir VFS.
-* **SIMD Hızlandırmalı Matematik:** Ağır hesaplama yükleri için SSE/AVX komutlarıyla (intrinsics) optimize edilmiş özel bir matematik kütüphanesi.
-* **Varlık Akışı (Asset Pipeline):** Kullanıma hazır PBR materyal iş akışının yanı sıra yerleşik `.gltf` / `.glb` ve `.obj` ayrıştırma (parsing) desteği.
+* **Modern Vulkan 1.3+ RHI (`mochi_rhi_ash`):**
+  * **Dinamik Render (Dynamic Rendering):** Eski nesil `VkRenderPass` ve `VkFramebuffer` kalabalığını ortadan kaldırır.
+  * **Buffer Device Address (BDA):** Vertex ve sahne verilerine doğrudan 64-bit GPU adresleri üzerinden hızlı erişim.
+  * **Push Constants & Skaler Yerleşim:** Ağır descriptor set yükü olmadan anlık veri transferi.
+* **Fiziksel Tabanlı Render (PBR):**
+  * **Cook-Torrance BRDF:** GGX mikro yüzey dağılımı, Smith geometrik gölgelemesi ve Schlick Fresnel yaklaşımı.
+  * **Çoklu Işıklandırma Hattı:** Yumuşak mesafe düşüşü ve ortam aydınlatması ile 4 yönsel ışık (Directional Light) ve 64 nokta ışık (Point Light) desteği.
+  * **Modern PBR Materyal Sistemi:** Materyal şablonları (Templates), özellik geçersiz kılmalı örnekler (Instances) ve GPU Uniform Buffer entegrasyonu.
+* **64-Bit Radix Sort Sıralı Render Kuyruğu:**
+  * Çizim çağrıları 64-bit Radix Sort anahtarlarıyla sıralanır: Geçiş türü (Pass Type), Saydamlık (Translucency), GPU durum değişimlerini en aza indiren Pipeline/Materyal karma değeri (Hashing) ve Derinlik (Early-Z optimizasyonu için opak nesnelerde önden-arkaya, saydam nesnelerde arkadan-öne).
+* **Veri Odaklı ECS (`hecs`):**
+  * Hızlı, önbellek dostu (cache-friendly) arketip tabanlı Varlık Bileşen Sistemi.
+  * Yerleşik bileşenler: `TransformComponent`, `CameraComponent`, `DirectionalLightComponent`, `PointLightComponent`, `MeshRendererComponent`.
+* **Veri Odaklı Varlık ve Sahne Sistemi (`.masset` & `.mscene`):**
+  * **RON (Rusty Object Notation):** Geliştirme sürecinde ve versiyon kontrolünde kolay okunan insan dostu yapılandırma (`.masset.ron`, `.mscene.ron`, `mochi.ron`).
+  * **Bincode:** Dağıtım sürümleri için sıfır maliyetli ve ultra hızlı binary derleme.
+  * `hecs::World` içine doğrudan çalışma zamanı sahne örneklendirme (instantiation).
+* **Platformlar Arası Ses Desteği (`mochi_ahi_cpal`):**
+  * ALSA, PulseAudio, JACK, WASAPI ve CoreAudio destekli saf Rust CPAL ses backend'i.
 
+---
 
-## Mimari
+## Yapılandırma (`mochi.ron`)
 
-Proje, birbirinden olabildiğince bağımsız (highly decoupled) modüller halinde yapılandırılmıştır:
+Motor parametreleri proje kökündeki `mochi.ron` dosyası üzerinden ayarlanabilir:
 
-1. **RHI (Render Donanım Arayüzü):** Düşük seviyeli GPU kaynak yönetimi, pipeline'lar ve descriptor'lar.
-2. **ECS (Dünya):** Veri odaklı sahne varlıkları, transform'lar ve ışıklandırma temsili.
-3. **Asset & VFS:** Yüksek seviyeli veri yapıları (Mesh'ler, Dokular) ve donanımdan bağımsız dosya yükleme.
-4. **Çekirdek (Core) Modüller:** Ekran, Bellek, Cihaz ve Render döngülerinin birleşik yönetimi.
+```ron
+ProjectConfig(
+    name: "Mochi Engine",
+    version: "0.1.0",
+    window: WindowConfig(
+        title: "Mochi Engine",
+        width: 1280,
+        height: 720,
+        resizable: true,
+        vsync: true,
+    ),
+    rendering: RenderingConfig(
+        max_frames_in_flight: 2,
+    ),
+    scene: SceneConfig(
+        start_scene: "assets/scenes/main.mscene.ron",
+    ),
+)
+```
 
+---
 
 ## Görseller
 
-![WaterBottle 3D Model](/images/WaterBottle.png)
+![WaterBottle 3D Model](images/WaterBottle.png)  
 *PBR render testi.*
 
-![Avacado 3D Model](/images/Avacado.png)
+![Avacado 3D Model](images/Avacado.png)  
 *PBR render testi.*
 
-![Suzanne 3D Model](/images/Suzanne.png)
+![Suzanne 3D Model](images/Suzanne.png)  
 *PBR render testi.*
 
+---
 
 ## Lisans
 
@@ -46,6 +78,7 @@ Bu proje GNU Genel Kamu Lisansı sürüm 3 (GPL3) altında lisanslanmıştır.
 
 Telif Hakkı (c) 2025-2026 Kadir Aydın.
 
+---
 
 ## QAOS
 
