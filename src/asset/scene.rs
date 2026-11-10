@@ -16,6 +16,7 @@ use crate::asset::model::ModelAsset;
 use crate::rendering::RenderingSystem;
 use crate::rhi;
 use crate::scene::{CameraComponent, DirectionalLightComponent, MeshRendererComponent, PointLightComponent, Scene, TransformComponent};
+use crate::script::ScriptComponent;
 use mochi_except::*;
 use mochi_math::{Quat, Transform, Vec3, Vec4};
 
@@ -115,6 +116,13 @@ pub struct MeshRendererDesc {
 
 fn default_visible() -> bool { true }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ScriptDesc {
+	pub path: String,
+	#[serde(default = "default_active")]
+	pub is_active: bool,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EntityDesc {
 	pub name: Option<String>,
@@ -123,6 +131,7 @@ pub struct EntityDesc {
 	pub directional_light: Option<DirectionalLightDesc>,
 	pub point_light: Option<PointLightDesc>,
 	pub mesh_renderer: Option<MeshRendererDesc>,
+	pub script: Option<ScriptDesc>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -211,13 +220,28 @@ impl SceneAsset {
 							let mut renderer = MeshRendererComponent::new(mesh, mat);
 							renderer.is_visible = mr.is_visible;
 							renderer.cast_shadows = mr.cast_shadows;
-							scene.spawn((transform, renderer));
+
+							if let Some(sc) = &entity_desc.script {
+								let script_comp = ScriptComponent {
+									path: sc.path.clone(),
+									is_active: sc.is_active,
+								};
+								scene.spawn((transform, renderer, script_comp));
+							} else {
+								scene.spawn((transform, renderer));
+							}
 						}
 					}
 					Err(err) => {
 						mochi_error!("Failed to load model asset '{}': {err}", mr.asset);
 					}
 				}
+			} else if let Some(sc) = &entity_desc.script {
+				let script_comp = ScriptComponent {
+					path: sc.path.clone(),
+					is_active: sc.is_active,
+				};
+				scene.spawn((transform, script_comp));
 			}
 		}
 

@@ -1,0 +1,50 @@
+/*
+	Mochi Engine QW API Bindings
+	Copyright (c) 2025-2026 by Kadir Aydın.
+*/
+
+pub struct Vec3 {
+	pub x: f32;
+	pub y: f32;
+	pub z: f32;
+}
+
+![C]
+![import]
+pub fun mochi_get_position(entity: u64, out_pos: &mut Vec3);
+
+![C]
+![import]
+pub fun mochi_set_position(entity: u64, in_pos: &Vec3);
+
+![C]
+![import]
+pub fun mochi_rotate(entity: u64, dx: f32, dy: f32, dz: f32);
+
+![C]
+![import]
+pub fun mochi_get_scale(entity: u64, out_scale: &mut Vec3);
+
+![C]
+![import]
+pub fun mochi_set_scale(entity: u64, in_scale: &Vec3);
+
+![C]
+![import]
+pub fun mochi_is_key_down(keycode: i32) -> bool;
+
+![C]
+![import]
+pub fun mochi_is_key_just_pressed(keycode: i32) -> bool;
+
+![C]
+![import]
+pub fun mochi_get_mouse_delta(out_dx: &mut f32, out_dy: &mut f32);
+
+![C]
+![import]
+pub fun mochi_get_time() -> f32;
+
+![C]
+![import]
+pub fun mochi_log(msg: &str);

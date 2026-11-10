@@ -1,0 +1,33 @@
+pub mod mochi;
+use mochi::*;
+
+![C]
+![export]
+pub fun on_start(entity: u64) {
+}
+
+![C]
+![export]
+pub fun on_update(entity: u64, dt: f32) {
+	// Rotate cube continuously
+	mochi_rotate(entity, 0.6 * dt, 1.2 * dt, 0.4 * dt);
+
+	// Move cube with A/D/W/S keys
+	var pos = Vec3{ x: 0.0, y: 0.0, z: 0.0 };
+	mochi_get_position(entity, pos&mut);
+
+	if mochi_is_key_down(68) { // 'D'
+		pos.x = pos.x + 2.0 * dt;
+	}
+	if mochi_is_key_down(65) { // 'A'
+		pos.x = pos.x - 2.0 * dt;
+	}
+	if mochi_is_key_down(87) { // 'W'
+		pos.z = pos.z - 2.0 * dt;
+	}
+	if mochi_is_key_down(83) { // 'S'
+		pos.z = pos.z + 2.0 * dt;
+	}
+
+	mochi_set_position(entity, pos&);
+}

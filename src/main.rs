@@ -19,6 +19,7 @@ pub mod material;
 pub mod rendering;
 pub mod rhi;
 pub mod scene;
+pub mod script;
 
 pub use mochi_except::*;
 pub use mochi_math as math;

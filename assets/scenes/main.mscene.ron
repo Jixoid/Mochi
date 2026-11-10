@@ -47,6 +47,10 @@ SceneAsset(
 				is_visible: true,
 				cast_shadows: true,
 			)),
+			script: Some(ScriptDesc(
+				path: "assets/scripts/cube_rotator.qw",
+				is_active: true,
+			)),
 		),
 	],
 )

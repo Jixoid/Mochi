@@ -11,6 +11,7 @@
 
 
 pub mod config;
+pub mod input;
 
 use std::time::Instant;
 use winit::application::ApplicationHandler;
@@ -24,10 +25,12 @@ use crate::display::Display;
 use crate::rendering::RenderingSystem;
 use crate::rhi as rhi;
 use crate::scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
+use crate::script::ScriptSystem;
 use mochi_except::*;
 use mochi_math::Vec3;
 
 pub use config::*;
+pub use input::*;
 
 
 pub struct EngineApp {
@@ -48,6 +51,8 @@ pub struct EngineApp {
 
 	rendering_system: Option<RenderingSystem>,
 	audio_system: Option<AudioSystem>,
+	script_system: ScriptSystem,
+	input: Input,
 	display: Option<Display>,
 	scene: Scene,
 	config: ProjectConfig,
@@ -66,6 +71,8 @@ impl EngineApp {
 
 		// SYS
 		let rendering_system = RenderingSystem::new(&cmdmng).expect("failed to create RenderingSystem");
+		let script_system = ScriptSystem::new();
+		let input = Input::new();
 
 		Self {
 			title: config.window.title.clone(),
@@ -79,6 +86,8 @@ impl EngineApp {
 
 			rendering_system: Some(rendering_system),
 			audio_system: Some(audio_system),
+			script_system,
+			input,
 			display: None,
 			scene: Scene::new(),
 			config,
@@ -128,6 +137,18 @@ impl EngineApp {
 
 	pub fn config(&self) -> &ProjectConfig {
 		&self.config
+	}
+
+	pub fn input(&self) -> &Input {
+		&self.input
+	}
+
+	pub fn script_system(&self) -> &ScriptSystem {
+		&self.script_system
+	}
+
+	pub fn script_system_mut(&mut self) -> &mut ScriptSystem {
+		&mut self.script_system
 	}
 }
 
@@ -181,6 +202,8 @@ impl ApplicationHandler for EngineApp {
 	}
 
 	fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
+		self.input.handle_window_event(&event);
+
 		match event {
 			WindowEvent::CloseRequested => {
 				mochi_log!("Window close requested, shutting down");
@@ -208,17 +231,30 @@ impl ApplicationHandler for EngineApp {
 				let now = Instant::now();
 				let dt = self.last_frame_time.map_or(0.016, |t| (now - t).as_secs_f32());
 				self.last_frame_time = Some(now);
+				let time = self.start_time.elapsed().as_secs_f32();
 
 				if let Some(cb) = &mut self.idle_cb {
 					cb(dt);
 				}
 
-				for (_e, (t, _r)) in self.scene.world_mut().query_mut::<(&mut TransformComponent, &MeshRendererComponent)>() {
-					let rot_delta = mochi_math::Quat::from_axis_angle(
-						Vec3::new(0.6, 1.0, 0.4).normalize(),
-						mochi_math::Rad::new(1.0 * dt),
-					);
-					t.rotation = (t.rotation * rot_delta).normalize();
+				// Execute QW scripts on active entities
+				self.script_system.update(&mut self.scene, &self.input, dt, time);
+
+				// Fallback rotation for entities without a custom script
+				let mut fallback_entities = Vec::new();
+				for (e, (_t, _r)) in self.scene.world().query::<(&TransformComponent, &MeshRendererComponent)>().iter() {
+					if self.scene.world().get::<&crate::script::ScriptComponent>(e).is_err() {
+						fallback_entities.push(e);
+					}
+				}
+				for e in fallback_entities {
+					if let Ok(mut t) = self.scene.world_mut().get::<&mut TransformComponent>(e) {
+						let rot_delta = mochi_math::Quat::from_axis_angle(
+							Vec3::new(0.6, 1.0, 0.4).normalize(),
+							mochi_math::Rad::new(1.0 * dt),
+						);
+						t.rotation = (t.rotation * rot_delta).normalize();
+					}
 				}
 
 				self.fps_counter += 1;
@@ -246,7 +282,6 @@ impl ApplicationHandler for EngineApp {
 					&self.device,
 					&self.alloca,
 				) {
-					let time = self.start_time.elapsed().as_secs_f32();
 					rendering.render(sync, cmdmng, display, device, alloc, &self.scene, time, dt);
 
 					self.frame_count += 1;
@@ -263,6 +298,8 @@ impl ApplicationHandler for EngineApp {
 
 					display.request_redraw();
 				}
+
+				self.input.reset_frame();
 			}
 			_ => {}
 		}
