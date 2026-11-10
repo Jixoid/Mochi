@@ -1,0 +1,48 @@
+use mochi::*;
+
+![C, export]
+pub fun on_start(entity: u64) {
+}
+
+![C, export]
+pub fun on_update(entity: u64, dt: f32) {
+	// 1. Mouse Look
+	var dx = 0.0;
+	var dy = 0.0;
+	mochi_get_mouse_delta(dx&mut, dy&mut);
+
+	if dx != 0.0 || dy != 0.0 {
+		var sens = 0.002;
+		mochi_camera_look(entity, -dy * sens, -dx * sens);
+	}
+
+	// 2. Flight Movement (WASD + Space/Shift)
+	var speed = 3.5 * dt;
+
+	var forward = 0.0;
+	var right = 0.0;
+	var up = 0.0;
+
+	if mochi_is_key_down(87) { // 'W' - Forward
+		forward += speed;
+	}
+	if mochi_is_key_down(83) { // 'S' - Backward
+		forward -= speed;
+	}
+	if mochi_is_key_down(68) { // 'D' - Right
+		right += speed;
+	}
+	if mochi_is_key_down(65) { // 'A' - Left
+		right -= speed;
+	}
+	if mochi_is_key_down(32) { // Space - Up
+		up += speed;
+	}
+	if mochi_is_key_down(16) { // Shift - Down
+		up -= speed;
+	}
+
+	if forward != 0.0 || right != 0.0 || up != 0.0 {
+		mochi_move_relative(entity, forward, right, up);
+	}
+}

@@ -190,7 +190,16 @@ impl SceneAsset {
 					cam.clear_color[2],
 					cam.clear_color[3],
 				);
-				scene.spawn((transform, camera_comp));
+
+				if let Some(sc) = &entity_desc.script {
+					let script_comp = ScriptComponent {
+						path: sc.path.clone(),
+						is_active: sc.is_active,
+					};
+					scene.spawn((transform, camera_comp, script_comp));
+				} else {
+					scene.spawn((transform, camera_comp));
+				}
 			}
 
 			if let Some(dl) = &entity_desc.directional_light {

@@ -13,6 +13,10 @@ SceneAsset(
 				is_active: true,
 				clear_color: (0.1, 0.15, 0.25, 1.0),
 			)),
+			script: Some(ScriptDesc(
+				path: "assets/scripts/free_cam.qw",
+				is_active: true,
+			)),
 		),
 		EntityDesc(
 			name: Some("SunLight"),
@@ -38,7 +42,7 @@ SceneAsset(
 			)),
 		),
 		EntityDesc(
-			name: Some("RotatingHelmet"),
+			name: Some("Helmet"),
 			transform: Some(TransformDesc(
 				translation: (0.0, 0.0, 0.0),
 			)),
@@ -46,10 +50,6 @@ SceneAsset(
 				asset: "assets/models/helmet.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
-			)),
-			script: Some(ScriptDesc(
-				path: "assets/scripts/cube_rotator.qw",
-				is_active: true,
 			)),
 		),
 	],

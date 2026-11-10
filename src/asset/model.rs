@@ -173,8 +173,13 @@ impl ModelAsset {
 
 	pub fn load_gltf(path: impl AsRef<Path>) -> Result<Self, String> {
 		let path_ref = path.as_ref();
-		let (document, buffers, _images) = gltf::import(path_ref)
-			.map_err(|e| format!("Failed to import glTF {}: {e}", path_ref.display()))?;
+		let base = path_ref.parent().unwrap_or_else(|| Path::new("./"));
+		let file = fs::File::open(path_ref).map_err(|e| format!("Failed to open glTF {}: {e}", path_ref.display()))?;
+		let reader = std::io::BufReader::new(file);
+		let gltf = gltf::Gltf::from_reader(reader).map_err(|e| format!("Failed to parse glTF {}: {e}", path_ref.display()))?;
+		let (document, blob) = (gltf.document, gltf.blob);
+		let buffers = gltf::import_buffers(&document, Some(base), blob)
+			.map_err(|e| format!("Failed to import buffers for {}: {e}", path_ref.display()))?;
 
 		let mut materials = Vec::new();
 

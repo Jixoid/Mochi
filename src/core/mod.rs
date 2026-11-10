@@ -27,7 +27,6 @@ use crate::rhi as rhi;
 use crate::scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
 use crate::script::ScriptSystem;
 use mochi_except::*;
-use mochi_math::Vec3;
 
 pub use config::*;
 pub use input::*;
@@ -239,23 +238,6 @@ impl ApplicationHandler for EngineApp {
 
 				// Execute QW scripts on active entities
 				self.script_system.update(&mut self.scene, &self.input, dt, time);
-
-				// Fallback rotation for entities without a custom script
-				let mut fallback_entities = Vec::new();
-				for (e, (_t, _r)) in self.scene.world().query::<(&TransformComponent, &MeshRendererComponent)>().iter() {
-					if self.scene.world().get::<&crate::script::ScriptComponent>(e).is_err() {
-						fallback_entities.push(e);
-					}
-				}
-				for e in fallback_entities {
-					if let Ok(mut t) = self.scene.world_mut().get::<&mut TransformComponent>(e) {
-						let rot_delta = mochi_math::Quat::from_axis_angle(
-							Vec3::new(0.6, 1.0, 0.4).normalize(),
-							mochi_math::Rad::new(1.0 * dt),
-						);
-						t.rotation = (t.rotation * rot_delta).normalize();
-					}
-				}
 
 				self.fps_counter += 1;
 				if self.fps_timer.elapsed().as_secs() >= 1 {

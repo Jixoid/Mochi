@@ -111,6 +111,9 @@ impl Input {
 				self.last_mouse_position = Some(current);
 				self.mouse_position = current;
 			}
+			WindowEvent::CursorLeft { .. } => {
+				self.last_mouse_position = None;
+			}
 			WindowEvent::MouseInput { state, button, .. } => {
 				let btn_id = match button {
 					MouseButton::Left => 0,

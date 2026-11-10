@@ -16,7 +16,6 @@ use std::cell::RefCell;
 use std::ptr::NonNull;
 use crate::core::input::Input;
 use crate::scene::TransformComponent;
-use mochi_except::*;
 
 
 #[repr(C)]
@@ -125,6 +124,53 @@ pub extern "C" fn mochi_rotate(entity_id: u64, dx: f32, dy: f32, dz: f32) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mochi_move_relative(entity_id: u64, forward_delta: f32, right_delta: f32, up_delta: f32) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
+				let forward = transform.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
+				let right = transform.rotation * mochi_math::Vec3::new(1.0, 0.0, 0.0);
+				let up = mochi_math::Vec3::new(0.0, 1.0, 0.0);
+
+				transform.translation += forward * forward_delta + right * right_delta + up * up_delta;
+			}
+		}
+	});
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_camera_look(entity_id: u64, pitch_delta: f32, yaw_delta: f32) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
+				let yaw_rot = mochi_math::Quat::from_axis_angle(
+					mochi_math::Vec3::new(0.0, 1.0, 0.0),
+					mochi_math::Rad::new(yaw_delta),
+				);
+				let r1 = (yaw_rot * transform.rotation).normalize();
+				let local_right = r1 * mochi_math::Vec3::new(1.0, 0.0, 0.0);
+				let pitch_rot = mochi_math::Quat::from_axis_angle(
+					local_right,
+					mochi_math::Rad::new(pitch_delta),
+				);
+
+				transform.rotation = (pitch_rot * r1).normalize();
+			}
+		}
+	});
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mochi_get_scale(entity_id: u64, out_scale: *mut CVec3) {
 	if out_scale.is_null() {
 		return;
@@ -192,6 +238,18 @@ pub extern "C" fn mochi_is_key_just_pressed(keycode: i32) -> bool {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mochi_is_mouse_button_down(button: i32) -> bool {
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let input = unsafe { ctx.input.as_ref() };
+			input.is_mouse_button_down(button as u8)
+		} else {
+			false
+		}
+	})
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mochi_get_mouse_delta(out_dx: *mut f32, out_dy: *mut f32) {
 	CURRENT_CONTEXT.with(|ctx| {
 		if let Some(ctx) = ctx.borrow().as_ref() {
@@ -212,14 +270,4 @@ pub extern "C" fn mochi_get_time() -> f32 {
 	CURRENT_CONTEXT.with(|ctx| {
 		ctx.borrow().as_ref().map(|c| c.time).unwrap_or(0.0)
 	})
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mochi_log(ptr: *const u8, len: usize) {
-	if ptr.is_null() || len == 0 {
-		return;
-	}
-	let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
-	let msg = String::from_utf8_lossy(slice);
-	mochi_disp!("[QW] {}", msg);
 }

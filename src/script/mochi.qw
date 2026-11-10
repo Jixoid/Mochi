@@ -21,6 +21,12 @@ pub fun mochi_set_position(entity: u64, in_pos: &Vec3);
 pub fun mochi_rotate(entity: u64, dx: f32, dy: f32, dz: f32);
 
 ![C, import]
+pub fun mochi_move_relative(entity: u64, forward: f32, right: f32, up: f32);
+
+![C, import]
+pub fun mochi_camera_look(entity: u64, pitch: f32, yaw: f32);
+
+![C, import]
 pub fun mochi_get_scale(entity: u64, out_scale: &mut Vec3);
 
 ![C, import]
@@ -33,10 +39,10 @@ pub fun mochi_is_key_down(keycode: i32) -> bool;
 pub fun mochi_is_key_just_pressed(keycode: i32) -> bool;
 
 ![C, import]
+pub fun mochi_is_mouse_button_down(button: i32) -> bool;
+
+![C, import]
 pub fun mochi_get_mouse_delta(out_dx: &mut f32, out_dy: &mut f32);
 
 ![C, import]
 pub fun mochi_get_time() -> f32;
-
-![C, import]
-pub fun mochi_log(msg: &str);
