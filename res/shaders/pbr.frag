@@ -104,6 +104,19 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
 	return F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
+vec3 tonemap_aces(vec3 x) {
+	const float a = 2.51;
+	const float b = 0.03;
+	const float c = 2.43;
+	const float d = 0.59;
+	const float e = 0.14;
+	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+vec3 linear_to_srgb(vec3 color) {
+	return pow(color, vec3(1.0 / 2.2));
+}
+
 
 void main() {
 	SceneFrameData scene = SceneFrameData(pc.scene_address);
@@ -179,6 +192,10 @@ void main() {
 
 	vec3 ambient = scene.ambient_color.rgb * albedo.rgb;
 	vec3 color = ambient + Lo + mat.emissive.rgb * mat.emissive.w;
+
+	// Tonemapping and gamma correction for sRGB display
+	color = tonemap_aces(color);
+	color = linear_to_srgb(color);
 
 	out_color = vec4(color, albedo.a);
 }
