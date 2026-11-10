@@ -1,0 +1,4 @@
+ModelAsset(
+	name: "Duck",
+	source: Some("duck.glb"),
+)

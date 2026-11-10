@@ -38,12 +38,12 @@ SceneAsset(
 			)),
 		),
 		EntityDesc(
-			name: Some("RotatingPbrCube"),
+			name: Some("RotatingHelmet"),
 			transform: Some(TransformDesc(
 				translation: (0.0, 0.0, 0.0),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/cube.masset.ron",
+				asset: "assets/models/helmet.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),

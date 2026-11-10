@@ -151,9 +151,6 @@ impl RenderingSystem {
 			delta_time,
 		);
 
-		// Update material storage GPU buffer
-		self.material_storage.update_gpu(device, alloc);
-
 		// Extract packets and sort for ForwardLit pass
 		self.render_queue.extract_from_scene(
 			scene,
@@ -161,6 +158,9 @@ impl RenderingSystem {
 			cam_transform.translation,
 			&mut self.material_storage,
 		);
+
+		// Update material storage GPU buffer
+		self.material_storage.update_gpu(device, alloc);
 
 		let target = display.render_target(img_idx);
 		let cmd = &mut self.cmd_buffers[frame];

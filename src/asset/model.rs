@@ -11,6 +11,7 @@
 
 
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::material::{MaterialInstance, MaterialTemplate, PbrProperties};
@@ -64,6 +65,7 @@ pub struct SubmeshAsset {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct MaterialAsset {
 	pub name: String,
 	pub base_color: [f32; 4],
@@ -117,19 +119,170 @@ impl MaterialAsset {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ModelAsset {
 	pub name: String,
+	#[serde(default)]
+	pub source: Option<String>,
+	#[serde(default)]
 	pub submeshes: Vec<SubmeshAsset>,
+	#[serde(default)]
 	pub materials: Vec<MaterialAsset>,
 }
 
 impl ModelAsset {
 	pub fn load(path: &str) -> Result<Self, String> {
+		if path.ends_with(".glb") || path.ends_with(".gltf") {
+			return Self::load_gltf(path);
+		}
+
 		if path.ends_with(".masset") {
 			let bytes = fs::read(path).map_err(|e| format!("Failed to read binary asset {path}: {e}"))?;
 			bincode::deserialize::<Self>(&bytes).map_err(|e| format!("Failed to deserialize binary asset {path}: {e}"))
 		} else {
 			let content = fs::read_to_string(path).map_err(|e| format!("Failed to read RON asset {path}: {e}"))?;
-			ron::from_str::<Self>(&content).map_err(|e| format!("Failed to deserialize RON asset {path}: {e}"))
+			let desc = ron::from_str::<Self>(&content).map_err(|e| format!("Failed to deserialize RON asset {path}: {e}"))?;
+
+			if let Some(src) = &desc.source {
+				let resolved_source = if Path::new(src).is_absolute() {
+					PathBuf::from(src)
+				} else {
+					let parent = Path::new(path).parent().unwrap_or(Path::new(""));
+					let rel = parent.join(src);
+					if rel.exists() {
+						rel
+					} else {
+						PathBuf::from(src)
+					}
+				};
+
+				let mut imported = Self::load_gltf(&resolved_source)?;
+				if !desc.name.is_empty() {
+					imported.name = desc.name;
+				}
+				if !desc.materials.is_empty() {
+					imported.materials = desc.materials;
+				}
+				Ok(imported)
+			} else {
+				Ok(desc)
+			}
 		}
+	}
+
+	pub fn load_gltf(path: impl AsRef<Path>) -> Result<Self, String> {
+		let path_ref = path.as_ref();
+		let (document, buffers, _images) = gltf::import(path_ref)
+			.map_err(|e| format!("Failed to import glTF {}: {e}", path_ref.display()))?;
+
+		let mut materials = Vec::new();
+
+		for mat in document.materials() {
+			let pbr = mat.pbr_metallic_roughness();
+			let base_color = pbr.base_color_factor();
+			let metallic = pbr.metallic_factor();
+			let roughness = pbr.roughness_factor();
+			let emissive = if mat.emissive_texture().is_some() {
+				[0.0, 0.0, 0.0]
+			} else {
+				mat.emissive_factor()
+			};
+			let normal_scale = mat.normal_texture().map_or(1.0, |t| t.scale());
+			let occlusion = mat.occlusion_texture().map_or(1.0, |t| t.strength());
+
+			materials.push(MaterialAsset {
+				name: mat.name().unwrap_or("Material").to_string(),
+				base_color,
+				roughness,
+				metallic,
+				normal_scale,
+				occlusion,
+				emissive,
+				emissive_intensity: 1.0,
+				albedo_texture: None,
+				normal_texture: None,
+				orm_texture: None,
+			});
+		}
+
+		if materials.is_empty() {
+			materials.push(MaterialAsset::default());
+		}
+
+		let mut submeshes = Vec::new();
+
+		for mesh in document.meshes() {
+			for (prim_idx, primitive) in mesh.primitives().enumerate() {
+				let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+
+				let positions: Vec<[f32; 3]> = match reader.read_positions() {
+					Some(iter) => iter.collect(),
+					None => continue,
+				};
+
+				let normals: Vec<[f32; 3]> = reader
+					.read_normals()
+					.map(|iter| iter.collect())
+					.unwrap_or_else(|| vec![[0.0, 1.0, 0.0]; positions.len()]);
+
+				let tangents: Vec<[f32; 4]> = reader
+					.read_tangents()
+					.map(|iter| iter.collect())
+					.unwrap_or_else(|| vec![[1.0, 0.0, 0.0, 1.0]; positions.len()]);
+
+				let colors: Vec<[f32; 4]> = reader
+					.read_colors(0)
+					.map(|iter| iter.into_rgba_f32().collect())
+					.unwrap_or_else(|| vec![[1.0, 1.0, 1.0, 1.0]; positions.len()]);
+
+				let uvs: Vec<[f32; 2]> = reader
+					.read_tex_coords(0)
+					.map(|iter| iter.into_f32().collect())
+					.unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()]);
+
+				let indices: Vec<u32> = reader
+					.read_indices()
+					.map(|iter| iter.into_u32().collect())
+					.unwrap_or_else(|| (0..positions.len() as u32).collect());
+
+				let mut vertices = Vec::with_capacity(positions.len());
+				for (i, &p) in positions.iter().enumerate() {
+					let n = normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]);
+					let t = tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]);
+					let c = colors.get(i).copied().unwrap_or([1.0, 1.0, 1.0, 1.0]);
+					let uv = uvs.get(i).copied().unwrap_or([0.0, 0.0]);
+
+					vertices.push(VertexAsset {
+						pos: [p[0], p[1], p[2], 1.0],
+						normal: [n[0], n[1], n[2], 0.0],
+						tangent: t,
+						color: c,
+						uv0: uv,
+						uv1: [0.0, 0.0],
+					});
+				}
+
+				let material_index = primitive.material().index().unwrap_or(0);
+				let prim_name = format!("{}_{prim_idx}", mesh.name().unwrap_or("Mesh"));
+
+				submeshes.push(SubmeshAsset {
+					name: prim_name,
+					vertices,
+					indices,
+					material_index,
+				});
+			}
+		}
+
+		let model_name = path_ref
+			.file_stem()
+			.and_then(|s| s.to_str())
+			.unwrap_or("GltfModel")
+			.to_string();
+
+		Ok(Self {
+			name: model_name,
+			source: Some(path_ref.to_string_lossy().to_string()),
+			submeshes,
+			materials,
+		})
 	}
 
 	pub fn save_ron(&self, path: &str) -> Result<(), String> {
