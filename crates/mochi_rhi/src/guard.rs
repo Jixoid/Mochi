@@ -13,7 +13,7 @@
 use std::ops::{Deref, DerefMut};
 use crate::error::RhiResult;
 use crate::traits::{RhiBackend, RhiBuffer, RhiCommandBuffer};
-use crate::types::{ClearColor, Rect2D, ShaderStage, Viewport};
+use crate::types::{ClearColor, IndexType, Rect2D, ShaderStage, Viewport};
 
 
 /// RAII Scope Guard for Dynamic Rendering
@@ -66,8 +66,23 @@ impl<'a, B: RhiBackend> RenderingPass<'a, B> {
 		self.push_constant_bytes(stages, offset, slice);
 	}
 
+	pub fn bind_index_buffer(&mut self, buffer: &crate::Buffer<B>, offset: u64, index_type: IndexType) {
+		self.cmd.bind_index_buffer(buffer.raw(), offset, index_type);
+	}
+
 	pub fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
 		self.cmd.draw(vertex_count, instance_count, first_vertex, first_instance);
+	}
+
+	pub fn draw_indexed(
+		&mut self,
+		index_count: u32,
+		instance_count: u32,
+		first_index: u32,
+		vertex_offset: i32,
+		first_instance: u32,
+	) {
+		self.cmd.draw_indexed(index_count, instance_count, first_index, vertex_offset, first_instance);
 	}
 
 	pub fn finish(mut self) {

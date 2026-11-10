@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 use crate::material::{BlendMode, MaterialInstance, MaterialStorage, PassKind};
-use crate::scene::{MeshRendererComponent, Scene, TransformComponent};
+use crate::scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
 use mochi_math::Vec3;
 
 
@@ -25,6 +25,7 @@ pub struct RenderPacket {
 	pub vertex_count: u32,
 	pub material_id: u32,
 	pub material: Arc<MaterialInstance>,
+	pub mesh: Arc<Mesh>,
 	pub is_indexed: bool,
 }
 
@@ -105,6 +106,7 @@ impl RenderQueue {
 				vertex_count: mesh.vertex_count(),
 				material_id: slot_id,
 				material: Arc::clone(material),
+				mesh: Arc::clone(mesh),
 				is_indexed: mesh.is_indexed(),
 			});
 		}

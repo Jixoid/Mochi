@@ -102,3 +102,11 @@ pub fn to_vk_pipeline_bind_point(k: PipelineKind) -> vk::PipelineBindPoint {
 		PipelineKind::RayTracing => vk::PipelineBindPoint::RAY_TRACING_KHR,
 	}
 }
+
+#[inline]
+pub fn to_vk_index_type(it: mochi_rhi::IndexType) -> vk::IndexType {
+	match it {
+		mochi_rhi::IndexType::Uint16 => vk::IndexType::UINT16,
+		mochi_rhi::IndexType::Uint32 => vk::IndexType::UINT32,
+	}
+}

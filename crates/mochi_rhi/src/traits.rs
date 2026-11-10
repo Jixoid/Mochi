@@ -174,7 +174,9 @@ pub trait RhiCommandBuffer<B: RhiBackend>: Send + Sync {
 	fn bind_pipeline(&mut self, pipeline: &B::Pipeline);
 	fn bind_descriptor_heap(&mut self, res_heap: Option<&B::Buffer>, samp_heap: Option<&B::Buffer>, res_sz: u64, samp_sz: u64);
 	fn push_constant(&mut self, stages: ShaderStage, offset: u32, bytes: &[u8]);
+	fn bind_index_buffer(&mut self, buffer: &B::Buffer, offset: u64, index_type: IndexType);
 	fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32);
+	fn draw_indexed(&mut self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32);
 
 	fn begin_rendering(&mut self, target: &B::RenderTarget, clear_color: ClearColor);
 	fn end_rendering(&mut self, target: &B::RenderTarget);

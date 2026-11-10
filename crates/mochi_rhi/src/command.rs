@@ -16,7 +16,7 @@ use crate::pipeline::Pipeline;
 use crate::render_target::RenderTarget;
 use crate::shader::ShaderStage;
 use crate::traits::{RhiBackend, RhiCommandBuffer};
-use crate::types::{ClearColor, Rect2D, Viewport};
+use crate::types::{ClearColor, IndexType, Rect2D, Viewport};
 use crate::Buffer;
 
 
@@ -177,11 +177,34 @@ impl<B: RhiBackend> Command<B> {
 		self.push_constant_bytes(stage, offset, slice);
 	}
 
+	pub fn bind_index_buffer(&mut self, buffer: &Buffer<B>, offset: u64, index_type: IndexType) {
+		assert!(
+			self.state == CommandState::Rendering,
+			"Cannot bind index buffer: Command must be inside an active dynamic rendering pass"
+		);
+		self.inner.bind_index_buffer(buffer.raw(), offset, index_type);
+	}
+
 	pub fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
 		assert!(
 			self.state == CommandState::Rendering,
 			"Cannot draw: Command must be inside an active dynamic rendering pass (call render_pass or begin_rendering)"
 		);
 		self.inner.draw(vertex_count, instance_count, first_vertex, first_instance);
+	}
+
+	pub fn draw_indexed(
+		&mut self,
+		index_count: u32,
+		instance_count: u32,
+		first_index: u32,
+		vertex_offset: i32,
+		first_instance: u32,
+	) {
+		assert!(
+			self.state == CommandState::Rendering,
+			"Cannot draw indexed: Command must be inside an active dynamic rendering pass (call render_pass or begin_rendering)"
+		);
+		self.inner.draw_indexed(index_count, instance_count, first_index, vertex_offset, first_instance);
 	}
 }

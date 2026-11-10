@@ -81,3 +81,10 @@ impl From<Vec4<f32>> for ClearColor {
 		Self([v.x, v.y, v.z, v.w])
 	}
 }
+
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum IndexType {
+	Uint16,
+	Uint32,
+}

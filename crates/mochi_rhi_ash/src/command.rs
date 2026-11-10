@@ -17,12 +17,12 @@ use crate::buffer::AshBuffer;
 use crate::pipeline::AshPipeline;
 use crate::swapchain::AshRenderTarget;
 use crate::sync::{AshFence, AshSemaphore};
-use crate::types::{to_vk_pipeline_bind_point, to_vk_shader_stage};
+use crate::types::{to_vk_index_type, to_vk_pipeline_bind_point, to_vk_shader_stage};
 use crate::AshVulkanBackend;
 use mochi_rhi::error::{RhiError, RhiResult};
 use mochi_rhi::shader::ShaderStage;
 use mochi_rhi::traits::{RhiCommandBuffer, RhiCommandQueue};
-use mochi_rhi::types::{ClearColor, Rect2D, Viewport};
+use mochi_rhi::types::{ClearColor, IndexType, Rect2D, Viewport};
 
 
 pub struct AshCommandBuffer {
@@ -132,6 +132,17 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		}
 	}
 
+	fn bind_index_buffer(&mut self, buffer: &AshBuffer, offset: u64, index_type: IndexType) {
+		unsafe {
+			self.device.cmd_bind_index_buffer(
+				self.handle,
+				buffer.handle(),
+				offset,
+				to_vk_index_type(index_type),
+			);
+		}
+	}
+
 	fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
 		unsafe {
 			self.device.cmd_draw(
@@ -139,6 +150,26 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 				vertex_count,
 				instance_count,
 				first_vertex,
+				first_instance,
+			);
+		}
+	}
+
+	fn draw_indexed(
+		&mut self,
+		index_count: u32,
+		instance_count: u32,
+		first_index: u32,
+		vertex_offset: i32,
+		first_instance: u32,
+	) {
+		unsafe {
+			self.device.cmd_draw_indexed(
+				self.handle,
+				index_count,
+				instance_count,
+				first_index,
+				vertex_offset,
 				first_instance,
 			);
 		}

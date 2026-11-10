@@ -202,7 +202,12 @@ impl RenderingSystem {
 					);
 
 					if packet.is_indexed && packet.index_count > 0 {
-						pass.draw(packet.index_count, 1, 0, 0);
+						if let Some(index_buf) = packet.mesh.index_buffer() {
+							pass.bind_index_buffer(index_buf, 0, rhi::IndexType::Uint32);
+							pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
+						} else {
+							pass.draw(packet.vertex_count, 1, 0, 0);
+						}
 					} else {
 						pass.draw(packet.vertex_count, 1, 0, 0);
 					}

@@ -1,2 +1,4 @@
 /build
 /target
+assets/scripts/build
+*.so
