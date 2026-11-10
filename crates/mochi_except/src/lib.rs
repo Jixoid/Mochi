@@ -1,5 +1,5 @@
 /*
-	This file is part of QAOS / Mochi
+	This file is part of QAOS
 
 	This file is licensed under the GNU General Public License version 3 (GPL3).
 
@@ -12,9 +12,12 @@
 
 use std::io::Write;
 use std::panic::Location;
+use std::path::Path;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::OnceLock;
 use std::time::Instant;
+
+use owo_colors::OwoColorize;
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -58,28 +61,21 @@ pub fn get_log_level() -> LogType {
 }
 
 pub fn resolve_module_tag(module_path: &str) -> &'static str {
-	if module_path.starts_with("mochi_rhi") {
-		"MCH.RHI"
-	} else if module_path.starts_with("mochi_ahi") {
-		"MCH.AHI"
-	} else if module_path.starts_with("mochi_math") {
-		"MCH.MATH"
-	} else if module_path.starts_with("mochi_plugin") {
-		"MCH.PLUGIN"
-	} else if module_path.starts_with("mochi_except") {
-		"MCH.EXCEPT"
-	} else if module_path.starts_with("Mochi::audio") || module_path.starts_with("mochi::audio") {
-		"MCH.AUDIO"
-	} else if module_path.starts_with("Mochi::render") || module_path.starts_with("mochi::render") {
-		"MCH.RENDER"
-	} else if module_path.starts_with("Mochi::display") || module_path.starts_with("mochi::display") {
-		"MCH.DISP"
-	} else if module_path.starts_with("Mochi::core") || module_path.starts_with("mochi::core") {
-		"MCH.SYS"
-	} else if module_path.starts_with("Mochi") || module_path.starts_with("mochi") {
-		"MCH.SYS"
-	} else {
-		"MCH.LOG"
+	match () {
+		_ if module_path.starts_with("mochi_rhi") => "RHI",
+		_ if module_path.starts_with("mochi_ahi") => "AHI",
+
+		_ if module_path.starts_with("mochi_math")   => "MATH",
+		_ if module_path.starts_with("mochi_plugin") => "PLUGIN",
+		_ if module_path.starts_with("mochi_except") => "EXCEPT",
+		
+		_ if module_path.starts_with("Mochi::render") || module_path.starts_with("mochi::render")   => "RENDER",
+		_ if module_path.starts_with("Mochi::audio") || module_path.starts_with("mochi::audio")     => "AUDIO",
+		_ if module_path.starts_with("Mochi::display") || module_path.starts_with("mochi::display") => "DISPLAY",
+		
+		_ if module_path.starts_with("Mochi::core") || module_path.starts_with("mochi::core") => "CORE",
+
+		_ => "MOCHI",
 	}
 }
 
@@ -97,52 +93,44 @@ pub fn log(typ: LogType, module_path: &'static str, args: std::fmt::Arguments) {
 	let ms = total_ms % 1000;
 
 	let tag = resolve_module_tag(module_path);
-	let file_name = std::path::Path::new(loc.file())
+	let file_name = Path::new(loc.file())
 		.file_name()
 		.and_then(|s| s.to_str())
 		.unwrap_or(loc.file());
 
-	let (sym, col) = match typ {
-		LogType::Verbose => ('V', "\x1b[1;30m"),
-		LogType::Log     => ('L', "\x1b[1;30m"),
-		LogType::Display => ('D', "\x1b[1;37m"),
-		LogType::Warning => ('W', "\x1b[1;33m"),
-		LogType::Error   => ('E', "\x1b[1;31m"),
-		LogType::Panic   => ('P', "\x1b[1;31m"),
+	let sym = match typ {
+		LogType::Verbose => 'V',
+		LogType::Log     => 'L',
+		LogType::Display => 'D',
+		LogType::Warning => 'W',
+		LogType::Error   => 'E',
+		LogType::Panic   => 'P',
+	};
+
+	let msg = if (typ as u8) >= (LogType::Warning as u8) {
+		format!(
+			"{sym} [{sec}.{ms:03}] @{tag} {args}\n\
+			├─> mod: {module_path}\n\
+			╰─> file: {file_name}:{line}:{column}",
+			
+			line = loc.line(),
+			column = loc.column(),
+		)
+	} else {
+		format!("{sym} [{sec}.{ms:03}] @{tag} {args}")
 	};
 
 	let stderr = std::io::stderr();
 	let mut lock = stderr.lock();
 
-	if (typ as u8) >= (LogType::Warning as u8) {
-		let _ = writeln!(
-			lock,
-			"{col}{sym} [{sec}.{ms:03}] @{tag} {args}\n\
-			 ├─> \x1b[1;30mmodule: {module_path}\n{col}\
-			 ╰─> \x1b[1;30mfile: {file_name}:{line}:{column}\x1b[0m",
-			col = col,
-			sym = sym,
-			sec = sec,
-			ms = ms,
-			tag = tag,
-			args = args,
-			module_path = module_path,
-			file_name = file_name,
-			line = loc.line(),
-			column = loc.column()
-		);
-	} else {
-		let _ = writeln!(
-			lock,
-			"{col}{sym} [{sec}.{ms:03}] @{tag} {args}\x1b[0m",
-			col = col,
-			sym = sym,
-			sec = sec,
-			ms = ms,
-			tag = tag,
-			args = args,
-		);
-	}
+	let msg = match typ {
+		LogType::Log | LogType::Verbose => msg.bold().bright_black().to_string(),
+		LogType::Display => msg.to_string(),
+		LogType::Warning => msg.bold().yellow().to_string(),
+		LogType::Error | LogType::Panic => msg.bold().red().to_string(),
+	};
+
+	writeln!(lock, "{msg}").unwrap()
 }
 
 #[track_caller]

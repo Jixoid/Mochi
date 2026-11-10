@@ -11,7 +11,7 @@
 
 
 use std::sync::{Arc, Mutex};
-use mochi_ahi::Device;
+use crate::ahi::Device;
 use mochi_except::*;
 use crate::audio::{AudioClip, AudioSource, Listener, Mixer};
 
@@ -23,7 +23,8 @@ pub struct AudioSystem {
 
 impl AudioSystem {
 	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> Self {
-		let mut device = Device::new(app_name, major, minor, patch, build);
+		let mut device = Device::new(app_name, major, minor, patch, build)
+			.expect("Failed to initialize audio device");
 		let mixer = Arc::new(Mutex::new(Mixer::new()));
 
 		let mixer_cb = Arc::clone(&mixer);
@@ -35,7 +36,7 @@ impl AudioSystem {
 
 		let started = device.start();
 		if started {
-			mochi_disp!("Audio device started successfully.");
+			mochi_disp!("Audio device started successfully");
 		} else {
 			mochi_error!("Failed to start audio device!");
 		}

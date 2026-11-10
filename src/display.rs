@@ -40,7 +40,7 @@ impl Display {
 		let surface = device.create_surface(&*window)?;
 		let swapchain = Swapchain::new(device, &surface, width, height);
 
-		mochi_disp!("Native window created ({}x{}) with Vulkan swapchain ({} images)", width, height, swapchain.image_count());
+		mochi_disp!("Native window created ({}x{}) with swapchain ({} images)", width, height, swapchain.image_count());
 
 		Ok(Self {
 			swapchain,

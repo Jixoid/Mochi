@@ -84,7 +84,7 @@ impl RenderingSystem {
 		color_format: rhi::Format,
 		depth_format: rhi::Format,
 	) {
-		mochi_verb!("Initializing graphics pipeline with BDA & Dynamic Rendering...");
+		mochi_verb!("Initializing graphics pipeline");
 
 		let vert = rhi::Shader::new(device, rhi::ShaderStage::Vertex, VERT_SPV, "main");
 		let frag = rhi::Shader::new(device, rhi::ShaderStage::Pixel, FRAG_SPV, "main");

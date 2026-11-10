@@ -10,6 +10,9 @@
 */
 
 
+pub type AudioCallback = Box<dyn FnMut(&mut [f32], u32) + Send>;
+
+
 #[derive(Clone, Debug)]
 pub struct AudioData {
 	pub sample_rate: u32,

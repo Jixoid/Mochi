@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.13.2",
  "mochi_ahi",
+ "mochi_ahi_cpal",
  "mochi_except",
  "mochi_math",
  "mochi_rhi",
@@ -754,8 +755,13 @@ dependencies = [
 [[package]]
 name = "mochi_ahi"
 version = "0.1.0"
+
+[[package]]
+name = "mochi_ahi_cpal"
+version = "0.1.0"
 dependencies = [
  "cpal",
+ "mochi_ahi",
  "mochi_except",
  "symphonia",
 ]
@@ -763,6 +769,9 @@ dependencies = [
 [[package]]
 name = "mochi_except"
 version = "0.1.0"
+dependencies = [
+ "owo-colors",
+]
 
 [[package]]
 name = "mochi_math"
@@ -1209,6 +1218,12 @@ checksum = "36820e9051aca1014ddc75770aab4d68bc1e9e632f0f5627c4086bc216fb583b"
 dependencies = [
  "ttf-parser",
 ]
+
+[[package]]
+name = "owo-colors"
+version = "4.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13c45bb4a6ae1280ec0803b1ef9d3455eb50f01efbbe1447ab020f1d54fba9d8"
 
 [[package]]
 name = "percent-encoding"

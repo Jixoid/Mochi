@@ -118,7 +118,7 @@ impl ApplicationHandler for EngineApp {
 					}
 					display.request_redraw();
 					self.display = Some(display);
-					mochi_disp!("Display and Vulkan swapchain attached successfully.");
+					mochi_disp!("Display and Swapchain attached successfully");
 				}
 				Err(err) => {
 					mochi_error!("Failed to initialize display: {err}");
@@ -131,7 +131,7 @@ impl ApplicationHandler for EngineApp {
 	fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
 		match event {
 			WindowEvent::CloseRequested => {
-				mochi_log!("Window close requested, shutting down...");
+				mochi_log!("Window close requested, shutting down");
 				event_loop.exit();
 			}
 			WindowEvent::KeyboardInput {
@@ -143,7 +143,7 @@ impl ApplicationHandler for EngineApp {
 					},
 				..
 			} => {
-				mochi_log!("Escape pressed, shutting down...");
+				mochi_log!("Escape pressed, shutting down");
 				event_loop.exit();
 			}
 			WindowEvent::Resized(physical_size) => {
@@ -191,7 +191,7 @@ impl ApplicationHandler for EngineApp {
 					if let Ok(limit_str) = std::env::var("MOCHI_TEST_EXIT_FRAMES") {
 						if let Ok(limit) = limit_str.parse::<u64>() {
 							if self.frame_count >= limit {
-								mochi_log!("Reached test frame limit ({limit}), exiting...");
+								mochi_log!("Reached test frame limit ({limit}), exiting");
 								event_loop.exit();
 								return;
 							}
@@ -206,7 +206,7 @@ impl ApplicationHandler for EngineApp {
 	}
 
 	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-		mochi_log!("Cleaning up Engine resources...");
+		mochi_log!("Cleaning up Engine resources");
 		self.audio_system = None;
 
 		self.device.as_ref().unwrap().wait_idle();
@@ -219,7 +219,7 @@ impl ApplicationHandler for EngineApp {
 		self.alloca = None;
 		self.device = None;
 
-		mochi_disp!("Cleanup completed cleanly.");
+		mochi_disp!("Cleanup completed cleanly");
 	}
 }
 
