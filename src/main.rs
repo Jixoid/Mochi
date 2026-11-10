@@ -14,8 +14,10 @@ pub mod ahi;
 pub mod audio;
 pub mod core;
 pub mod display;
+pub mod material;
 pub mod rendering;
 pub mod rhi;
+pub mod scene;
 
 pub use mochi_except::*;
 pub use mochi_math as math;
