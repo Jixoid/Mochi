@@ -125,11 +125,70 @@ impl LoadedQwScript {
 	}
 }
 
+static DEFAULT_MOCHI_QW: &str = include_str!("mochi.qw");
+
+
+pub fn ensure_engine_unit() -> Result<PathBuf, String> {
+	let dep_dir = PathBuf::from("target/qw_cache/mochi");
+	let qwu_file = dep_dir.join("out.qwu");
+	let obj_file = dep_dir.join("out.o");
+
+	let source_path = if Path::new("src/script/mochi.qw").exists() {
+		PathBuf::from("src/script/mochi.qw")
+	} else {
+		fs::create_dir_all(&dep_dir)
+			.map_err(|e| format!("Failed to create {}: {e}", dep_dir.display()))?;
+		let fallback = dep_dir.join("mochi.qw");
+		if !fallback.exists() {
+			fs::write(&fallback, DEFAULT_MOCHI_QW)
+				.map_err(|e| format!("Failed to write fallback mochi.qw: {e}"))?;
+		}
+		fallback
+	};
+
+	let needs_compile = !qwu_file.exists() || !obj_file.exists() || {
+		if let (Ok(src_meta), Ok(qwu_meta)) = (fs::metadata(&source_path), fs::metadata(&qwu_file)) {
+			src_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH) > qwu_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH)
+		} else {
+			true
+		}
+	};
+
+	if needs_compile {
+		fs::create_dir_all(&dep_dir)
+			.map_err(|e| format!("Failed to create {}: {e}", dep_dir.display()))?;
+
+		let output = Command::new("qw.debug")
+			.arg("compile")
+			.arg("--path")
+			.arg(&source_path)
+			.arg("--outdir")
+			.arg(&dep_dir)
+			.arg("--link")
+			.arg("shared")
+			.output()
+			.map_err(|e| format!("Failed to execute qw.debug: {e}. Is qw.debug in PATH?"))?;
+
+		if !output.status.success() {
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			let stdout = String::from_utf8_lossy(&output.stdout);
+			return Err(format!("Failed to compile engine mochi unit:\n{stderr}\n{stdout}"));
+		}
+	}
+
+	let canonical = fs::canonicalize(&dep_dir).unwrap_or(dep_dir);
+	Ok(canonical)
+}
+
 fn compile_qw_script(source_path: &Path, output_so_path: &Path) -> Result<(), String> {
+	let mochi_dep_dir = ensure_engine_unit()?;
+
 	let output = Command::new("qw.debug")
 		.arg("compile")
 		.arg("--path")
 		.arg(source_path)
+		.arg("--dep")
+		.arg(format!("mochi={}", mochi_dep_dir.display()))
 		.arg("-o")
 		.arg(output_so_path)
 		.arg("--link")
