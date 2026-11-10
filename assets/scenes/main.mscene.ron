@@ -1,0 +1,52 @@
+SceneAsset(
+	name: "MainPbrScene",
+	entities: [
+		EntityDesc(
+			name: Some("MainCamera"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 1.2, 3.5),
+			)),
+			camera: Some(CameraDesc(
+				fov_deg: 60.0,
+				near: 0.1,
+				far: 1000.0,
+				is_active: true,
+				clear_color: (0.1, 0.15, 0.25, 1.0),
+			)),
+		),
+		EntityDesc(
+			name: Some("SunLight"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 10.0, 0.0),
+			)),
+			directional_light: Some(DirectionalLightDesc(
+				color: (1.0, 0.95, 0.9),
+				intensity: 1.5,
+				direction: (0.5, -1.0, 0.5),
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("WarmPointLight"),
+			transform: Some(TransformDesc(
+				translation: (-1.5, 1.0, 1.0),
+			)),
+			point_light: Some(PointLightDesc(
+				color: (1.0, 0.6, 0.2),
+				intensity: 3.0,
+				radius: 8.0,
+			)),
+		),
+		EntityDesc(
+			name: Some("RotatingPbrCube"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 0.0, 0.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "assets/models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+		),
+	],
+)

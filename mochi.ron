@@ -1,0 +1,16 @@
+ProjectConfig(
+	name: "Mochi Engine",
+	version: "0.1.0",
+	window: WindowConfig(
+		title: "Mochi Engine - 3D PBR World",
+		width: 1280,
+		height: 720,
+		vsync: true,
+	),
+	rendering: RenderingConfig(
+		clear_color: (0.1, 0.15, 0.25, 1.0),
+	),
+	scene: SceneConfig(
+		start_scene: "assets/scenes/main.mscene.ron",
+	),
+)

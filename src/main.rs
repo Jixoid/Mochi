@@ -11,6 +11,7 @@
 
 
 pub mod ahi;
+pub mod asset;
 pub mod audio;
 pub mod core;
 pub mod display;
@@ -27,7 +28,7 @@ use core::Engine;
 
 fn main() {
 	mochi_except::start();
-	let mut engine = Engine::new("Mochi Engine", 1280, 720);
+	let mut engine = Engine::from_config("mochi.ron");
 
 	// Play a procedural startup chime to verify audio subsystem
 	if let Some(audio) = engine.audio_system() {

@@ -10,19 +10,24 @@
 */
 
 
+pub mod config;
+
 use std::time::Instant;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
+use crate::asset::SceneAsset;
 use crate::audio::AudioSystem;
 use crate::display::Display;
 use crate::rendering::RenderingSystem;
 use crate::rhi as rhi;
-use crate::scene::{CameraComponent, DirectionalLightComponent, Mesh, MeshRendererComponent, PointLightComponent, Scene, TransformComponent};
+use crate::scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
 use mochi_except::*;
 use mochi_math::Vec3;
+
+pub use config::*;
 
 
 pub struct EngineApp {
@@ -45,10 +50,11 @@ pub struct EngineApp {
 	audio_system: Option<AudioSystem>,
 	display: Option<Display>,
 	scene: Scene,
+	config: ProjectConfig,
 }
 
 impl EngineApp {
-	pub fn new(title: &str, width: u32, height: u32) -> Self {
+	pub fn from_config(config: ProjectConfig) -> Self {
 		// RHI
 		let device = rhi::Device::new("MochiEngine", 0, 1, 0, 0);
 		let alloca = rhi::Allocator::new(&device);
@@ -61,42 +67,10 @@ impl EngineApp {
 		// SYS
 		let rendering_system = RenderingSystem::new(&cmdmng).expect("failed to create RenderingSystem");
 
-		// Initialize default scene environment
-		let mut scene = Scene::new();
-
-		let mut cam_transform = TransformComponent::default();
-		cam_transform.translation = Vec3::new(0.0, 1.2, 3.5);
-		scene.spawn((
-			cam_transform,
-			CameraComponent::new(60.0, 0.1, 1000.0),
-		));
-
-		let sun_transform = TransformComponent::default();
-		scene.spawn((
-			sun_transform,
-			DirectionalLightComponent {
-				color: Vec3::new(1.0, 0.95, 0.9),
-				intensity: 1.5,
-				direction: Vec3::new(0.5, -1.0, 0.5).normalize(),
-				cast_shadows: true,
-			},
-		));
-
-		let mut pt_transform = TransformComponent::default();
-		pt_transform.translation = Vec3::new(-1.5, 1.0, 1.0);
-		scene.spawn((
-			pt_transform,
-			PointLightComponent {
-				color: Vec3::new(1.0, 0.6, 0.2),
-				intensity: 3.0,
-				radius: 8.0,
-			},
-		));
-
 		Self {
-			title: title.to_string(),
-			width,
-			height,
+			title: config.window.title.clone(),
+			width: config.window.width,
+			height: config.window.height,
 			start_time: Instant::now(),
 			device: Some(device),
 			alloca: Some(alloca),
@@ -106,13 +80,22 @@ impl EngineApp {
 			rendering_system: Some(rendering_system),
 			audio_system: Some(audio_system),
 			display: None,
-			scene,
+			scene: Scene::new(),
+			config,
 			last_frame_time: None,
 			fps_timer: Instant::now(),
 			fps_counter: 0,
 			frame_count: 0,
 			idle_cb: None,
 		}
+	}
+
+	pub fn new(title: &str, width: u32, height: u32) -> Self {
+		let mut config = ProjectConfig::default();
+		config.window.title = title.to_string();
+		config.window.width = width;
+		config.window.height = height;
+		Self::from_config(config)
 	}
 
 	pub fn set_idle<F: FnMut(f32) + 'static>(&mut self, cb: F) {
@@ -142,6 +125,10 @@ impl EngineApp {
 	pub fn scene_mut(&mut self) -> &mut Scene {
 		&mut self.scene
 	}
+
+	pub fn config(&self) -> &ProjectConfig {
+		&self.config
+	}
 }
 
 impl ApplicationHandler for EngineApp {
@@ -160,13 +147,25 @@ impl ApplicationHandler for EngineApp {
 							target.depth_format(),
 						);
 
-						if let Some(mat) = rendering.default_material() {
-							let cube_mesh = Mesh::create_cube(device, alloc, 1.0);
-							let cube_transform = TransformComponent::default();
-							self.scene.spawn((
-								cube_transform,
-								MeshRendererComponent::new(cube_mesh, mat),
-							));
+						let scene_path = &self.config.scene.start_scene;
+						match SceneAsset::load(scene_path) {
+							Ok(scene_asset) => {
+								mochi_disp!("Loaded scene asset '{}' from {}", scene_asset.name, scene_path);
+								if let Err(err) = scene_asset.instantiate(device, alloc, rendering, &mut self.scene) {
+									mochi_error!("Failed to instantiate scene: {err}");
+								}
+							}
+							Err(err) => {
+								mochi_warn!("Could not load scene '{scene_path}': {err}. Spawning fallback cube.");
+								if let Some(mat) = rendering.default_material() {
+									let cube_mesh = Mesh::create_cube(device, alloc, 1.2);
+									let cube_transform = TransformComponent::default();
+									self.scene.spawn((
+										cube_transform,
+										MeshRendererComponent::new(cube_mesh, mat),
+									));
+								}
+							}
 						}
 					}
 					display.request_redraw();
@@ -295,6 +294,13 @@ pub struct Engine {
 }
 
 impl Engine {
+	pub fn from_config(config_path: &str) -> Self {
+		let config = ProjectConfig::load_or_default(config_path);
+		Self {
+			app: EngineApp::from_config(config),
+		}
+	}
+
 	pub fn new(title: &str, width: u32, height: u32) -> Self {
 		Self {
 			app: EngineApp::new(title, width, height),
@@ -315,6 +321,10 @@ impl Engine {
 
 	pub fn scene_mut(&mut self) -> &mut Scene {
 		self.app.scene_mut()
+	}
+
+	pub fn config(&self) -> &ProjectConfig {
+		self.app.config()
 	}
 
 	pub fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
