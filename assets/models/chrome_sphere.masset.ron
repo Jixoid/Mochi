@@ -1,0 +1,16 @@
+ModelAsset(
+	name: "ChromeSphere",
+	source: Some("sphere.glb"),
+	materials: [
+		MaterialAsset(
+			name: "ChromeMaterial",
+			base_color: (0.95, 0.95, 0.95, 1.0),
+			roughness: 0.05,
+			metallic: 1.0,
+			normal_scale: 1.0,
+			occlusion: 1.0,
+			emissive: (0.0, 0.0, 0.0),
+			emissive_intensity: 0.0,
+		),
+	],
+)

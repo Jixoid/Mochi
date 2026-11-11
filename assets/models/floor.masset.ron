@@ -1,0 +1,30 @@
+ModelAsset(
+	name: "Floor",
+	submeshes: [
+		SubmeshAsset(
+			name: "FloorMesh",
+			vertices: [
+				VertexAsset(pos: (-1.0, 0.0, -1.0, 1.0), normal: (0.0, 1.0, 0.0, 0.0), tangent: (1.0, 0.0, 0.0, 1.0), color: (1.0, 1.0, 1.0, 1.0), uv0: (0.0, 0.0), uv1: (0.0, 0.0)),
+				VertexAsset(pos: ( 1.0, 0.0, -1.0, 1.0), normal: (0.0, 1.0, 0.0, 0.0), tangent: (1.0, 0.0, 0.0, 1.0), color: (1.0, 1.0, 1.0, 1.0), uv0: (1.0, 0.0), uv1: (0.0, 0.0)),
+				VertexAsset(pos: ( 1.0, 0.0,  1.0, 1.0), normal: (0.0, 1.0, 0.0, 0.0), tangent: (1.0, 0.0, 0.0, 1.0), color: (1.0, 1.0, 1.0, 1.0), uv0: (1.0, 1.0), uv1: (0.0, 0.0)),
+				VertexAsset(pos: (-1.0, 0.0, -1.0, 1.0), normal: (0.0, 1.0, 0.0, 0.0), tangent: (1.0, 0.0, 0.0, 1.0), color: (1.0, 1.0, 1.0, 1.0), uv0: (0.0, 0.0), uv1: (0.0, 0.0)),
+				VertexAsset(pos: ( 1.0, 0.0,  1.0, 1.0), normal: (0.0, 1.0, 0.0, 0.0), tangent: (1.0, 0.0, 0.0, 1.0), color: (1.0, 1.0, 1.0, 1.0), uv0: (1.0, 1.0), uv1: (0.0, 0.0)),
+				VertexAsset(pos: (-1.0, 0.0,  1.0, 1.0), normal: (0.0, 1.0, 0.0, 0.0), tangent: (1.0, 0.0, 0.0, 1.0), color: (1.0, 1.0, 1.0, 1.0), uv0: (0.0, 1.0), uv1: (0.0, 0.0)),
+			],
+			indices: [],
+			material_index: 0,
+		),
+	],
+	materials: [
+		MaterialAsset(
+			name: "FloorMaterial",
+			base_color: (0.12, 0.13, 0.15, 1.0),
+			roughness: 0.35,
+			metallic: 0.1,
+			normal_scale: 1.0,
+			occlusion: 1.0,
+			emissive: (0.0, 0.0, 0.0),
+			emissive_intensity: 0.0,
+		),
+	],
+)

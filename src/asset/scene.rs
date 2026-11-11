@@ -10,6 +10,7 @@
 */
 
 
+use std::collections::HashMap;
 use std::fs;
 use serde::{Deserialize, Serialize};
 use crate::asset::model::ModelAsset;
@@ -174,6 +175,8 @@ impl SceneAsset {
 			.default_template()
 			.ok_or_else(|| "Default MaterialTemplate not available in RenderingSystem".to_string())?;
 
+		let mut loaded_models: HashMap<String, Vec<(std::sync::Arc<crate::scene::Mesh>, std::sync::Arc<crate::material::MaterialInstance>)>> = HashMap::new();
+
 		for entity_desc in &self.entities {
 			let transform = entity_desc
 				.transform
@@ -222,34 +225,42 @@ impl SceneAsset {
 			}
 
 			if let Some(mr) = &entity_desc.mesh_renderer {
-				match ModelAsset::load(&mr.asset) {
-					Ok(model) => {
-						let cmdmng = rendering.cmdmng().clone();
-						let submeshes = model.build_runtime(
-							device,
-							alloc,
-							&cmdmng,
-							rendering.texture_manager_mut(),
-							&template,
-						);
-						for (mesh, mat) in submeshes {
-							let mut renderer = MeshRendererComponent::new(mesh, mat);
-							renderer.is_visible = mr.is_visible;
-							renderer.cast_shadows = mr.cast_shadows;
-
-							if let Some(sc) = &entity_desc.script {
-								let script_comp = ScriptComponent {
-									path: sc.path.clone(),
-									is_active: sc.is_active,
-								};
-								scene.spawn((transform, renderer, script_comp));
-							} else {
-								scene.spawn((transform, renderer));
-							}
+				let submeshes = if let Some(cached) = loaded_models.get(&mr.asset) {
+					cached.clone()
+				} else {
+					match ModelAsset::load(&mr.asset) {
+						Ok(model) => {
+							let cmdmng = rendering.cmdmng().clone();
+							let built = model.build_runtime(
+								device,
+								alloc,
+								&cmdmng,
+								rendering.texture_manager_mut(),
+								&template,
+							);
+							loaded_models.insert(mr.asset.clone(), built.clone());
+							built
+						}
+						Err(err) => {
+							mochi_error!("Failed to load model asset '{}': {err}", mr.asset);
+							Vec::new()
 						}
 					}
-					Err(err) => {
-						mochi_error!("Failed to load model asset '{}': {err}", mr.asset);
+				};
+
+				for (mesh, mat) in submeshes {
+					let mut renderer = MeshRendererComponent::new(mesh, mat);
+					renderer.is_visible = mr.is_visible;
+					renderer.cast_shadows = mr.cast_shadows;
+
+					if let Some(sc) = &entity_desc.script {
+						let script_comp = ScriptComponent {
+							path: sc.path.clone(),
+							is_active: sc.is_active,
+						};
+						scene.spawn((transform, renderer, script_comp));
+					} else {
+						scene.spawn((transform, renderer));
 					}
 				}
 			} else if let Some(sc) = &entity_desc.script {

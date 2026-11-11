@@ -185,7 +185,13 @@ impl ModelAsset {
 
 		for mat in document.materials() {
 			let pbr = mat.pbr_metallic_roughness();
-			let base_color = pbr.base_color_factor();
+			let mut base_color = pbr.base_color_factor();
+			if let Some(trans) = mat.transmission() {
+				let factor = trans.transmission_factor();
+				if factor > 0.0 {
+					base_color[3] = (base_color[3] * (1.0 - factor * 0.75)).clamp(0.15, 1.0);
+				}
+			}
 			let metallic = pbr.metallic_factor();
 			let roughness = pbr.roughness_factor();
 			let emissive = if mat.emissive_texture().is_some() {
