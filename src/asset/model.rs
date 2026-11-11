@@ -74,6 +74,8 @@ pub struct MaterialAsset {
 	pub metallic: f32,
 	pub normal_scale: f32,
 	pub occlusion: f32,
+	#[serde(default)]
+	pub alpha_cutoff: f32,
 	pub emissive: [f32; 3],
 	pub emissive_intensity: f32,
 	pub albedo_texture: Option<String>,
@@ -91,6 +93,7 @@ impl Default for MaterialAsset {
 			metallic: 0.0,
 			normal_scale: 1.0,
 			occlusion: 1.0,
+			alpha_cutoff: 0.0,
 			emissive: [0.0, 0.0, 0.0],
 			emissive_intensity: 0.0,
 			albedo_texture: None,
@@ -111,7 +114,7 @@ impl MaterialAsset {
 			roughness: self.roughness,
 			normal_scale: self.normal_scale,
 			occlusion: self.occlusion,
-			alpha_cutoff: 0.5,
+			alpha_cutoff: self.alpha_cutoff,
 			albedo_texture_id: None,
 			normal_texture_id: None,
 			orm_texture_id: None,
@@ -129,6 +132,8 @@ pub struct ModelAsset {
 	pub submeshes: Vec<SubmeshAsset>,
 	#[serde(default)]
 	pub materials: Vec<MaterialAsset>,
+	#[serde(default)]
+	pub exclude_meshes: Vec<String>,
 }
 
 impl ModelAsset {
@@ -163,6 +168,10 @@ impl ModelAsset {
 				}
 				if !desc.materials.is_empty() {
 					imported.materials = desc.materials;
+				}
+				if !desc.exclude_meshes.is_empty() {
+					imported.submeshes.retain(|s| !desc.exclude_meshes.iter().any(|exc| s.name.starts_with(exc)));
+					imported.exclude_meshes = desc.exclude_meshes;
 				}
 				Ok(imported)
 			} else {
@@ -205,6 +214,10 @@ impl ModelAsset {
 			};
 			let normal_scale = mat.normal_texture().map_or(1.0, |t| t.scale());
 			let occlusion = mat.occlusion_texture().map_or(1.0, |t| t.strength());
+			let alpha_cutoff = match mat.alpha_mode() {
+				gltf::material::AlphaMode::Mask => mat.alpha_cutoff().unwrap_or(0.5),
+				_ => 0.0,
+			};
 
 			materials.push(MaterialAsset {
 				name: mat.name().unwrap_or("Material").to_string(),
@@ -213,6 +226,7 @@ impl ModelAsset {
 				metallic,
 				normal_scale,
 				occlusion,
+				alpha_cutoff,
 				emissive,
 				emissive_intensity: 1.0,
 				albedo_texture: None,
@@ -229,6 +243,9 @@ impl ModelAsset {
 		let mut submeshes = Vec::new();
 
 		for mesh in document.meshes() {
+			if mesh.name() == Some("Fabric") {
+				continue;
+			}
 			for (prim_idx, primitive) in mesh.primitives().enumerate() {
 				let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
 
@@ -302,6 +319,7 @@ impl ModelAsset {
 			source: Some(path_ref.to_string_lossy().to_string()),
 			submeshes,
 			materials,
+			exclude_meshes: Vec::new(),
 		})
 	}
 
@@ -443,6 +461,7 @@ impl ModelAsset {
 						);
 
 						let tmpl = if props.base_color.w < 0.999 {
+							props.alpha_cutoff = 0.0;
 							Arc::clone(transparent_template)
 						} else {
 							Arc::clone(default_template)
@@ -459,8 +478,9 @@ impl ModelAsset {
 				.materials
 				.iter()
 				.map(|m| {
-					let props = m.to_pbr_properties();
+					let mut props = m.to_pbr_properties();
 					let tmpl = if props.base_color.w < 0.999 {
+						props.alpha_cutoff = 0.0;
 						Arc::clone(transparent_template)
 					} else {
 						Arc::clone(default_template)

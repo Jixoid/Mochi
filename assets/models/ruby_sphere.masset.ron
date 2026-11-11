@@ -4,13 +4,14 @@ ModelAsset(
 	materials: [
 		MaterialAsset(
 			name: "RubyMaterial",
-			base_color: (1.0, 0.1, 0.25, 0.4),
-			roughness: 0.05,
-			metallic: 0.05,
+			base_color: (1.0, 0.08, 0.22, 0.55),
+			roughness: 0.04,
+			metallic: 0.0,
 			normal_scale: 1.0,
 			occlusion: 1.0,
+			alpha_cutoff: 0.0,
 			emissive: (0.1, 0.0, 0.02),
-			emissive_intensity: 0.5,
+			emissive_intensity: 0.3,
 		),
 	],
 )

@@ -138,7 +138,7 @@ void main() {
 		albedo *= tex_albedo;
 	}
 
-	if (albedo.a < mat.alpha_cutoff) {
+	if (mat.alpha_cutoff > 0.001 && albedo.a < mat.alpha_cutoff) {
 		discard;
 	}
 

@@ -1,4 +1,5 @@
 ModelAsset(
 	name: "ToyCar",
 	source: Some("toy_car.glb"),
+	exclude_meshes: ["Fabric"],
 )
