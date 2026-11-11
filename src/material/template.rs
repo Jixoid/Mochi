@@ -49,6 +49,11 @@ impl MaterialTemplate {
 			push_constant_size,
 		);
 
+		let (blend_enable, depth_write) = match blend_mode {
+			BlendMode::Opaque | BlendMode::Masked { .. } => (false, true),
+			BlendMode::Transparent | BlendMode::Additive => (true, false),
+		};
+
 		let forward_pipeline = rhi::Pipeline::new_graphics(
 			device,
 			&meta,
@@ -57,6 +62,8 @@ impl MaterialTemplate {
 			PrimitiveTopology::TriangleList,
 			color_format,
 			depth_format,
+			blend_enable,
+			depth_write,
 		);
 
 		Arc::new(Self {

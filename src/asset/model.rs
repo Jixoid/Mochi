@@ -186,14 +186,18 @@ impl ModelAsset {
 		for mat in document.materials() {
 			let pbr = mat.pbr_metallic_roughness();
 			let mut base_color = pbr.base_color_factor();
+			let mut roughness = pbr.roughness_factor();
 			if let Some(trans) = mat.transmission() {
 				let factor = trans.transmission_factor();
 				if factor > 0.0 {
-					base_color[3] = (base_color[3] * (1.0 - factor * 0.75)).clamp(0.15, 1.0);
+					base_color[3] = (base_color[3] * (1.0 - factor * 0.82)).clamp(0.12, 1.0);
+					roughness = roughness.min(0.08);
 				}
 			}
+			if matches!(mat.alpha_mode(), gltf::material::AlphaMode::Blend) && base_color[3] >= 0.999 {
+				base_color[3] = 0.5;
+			}
 			let metallic = pbr.metallic_factor();
-			let roughness = pbr.roughness_factor();
 			let emissive = if mat.emissive_texture().is_some() {
 				[0.0, 0.0, 0.0]
 			} else {
@@ -320,6 +324,7 @@ impl ModelAsset {
 		cmdmng: &rhi::CommandManager,
 		mut texture_manager: Option<&mut TextureManager>,
 		default_template: &Arc<MaterialTemplate>,
+		transparent_template: &Arc<MaterialTemplate>,
 	) -> Vec<(Arc<Mesh>, Arc<MaterialInstance>)> {
 		let mut material_instances: Vec<Arc<MaterialInstance>> = Vec::new();
 
@@ -437,7 +442,13 @@ impl ModelAsset {
 							emissive_id
 						);
 
-						material_instances.push(MaterialInstance::new(Arc::clone(default_template), props));
+						let tmpl = if props.base_color.w < 0.999 {
+							Arc::clone(transparent_template)
+						} else {
+							Arc::clone(default_template)
+						};
+
+						material_instances.push(MaterialInstance::new(tmpl, props));
 					}
 				}
 			}
@@ -447,7 +458,15 @@ impl ModelAsset {
 			material_instances = self
 				.materials
 				.iter()
-				.map(|m| MaterialInstance::new(Arc::clone(default_template), m.to_pbr_properties()))
+				.map(|m| {
+					let props = m.to_pbr_properties();
+					let tmpl = if props.base_color.w < 0.999 {
+						Arc::clone(transparent_template)
+					} else {
+						Arc::clone(default_template)
+					};
+					MaterialInstance::new(tmpl, props)
+				})
 				.collect();
 		}
 

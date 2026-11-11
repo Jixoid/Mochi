@@ -451,6 +451,8 @@ impl AshDevice {
 		primitive_topology: PrimitiveTopology,
 		color_format: Format,
 		depth_format: Format,
+		blend_enable: bool,
+		depth_write: bool,
 	) -> RhiResult<AshPipeline> {
 		AshPipeline::create_graphics(
 			self.inner.device(),
@@ -461,6 +463,8 @@ impl AshDevice {
 			color_format,
 			depth_format,
 			self.inner.bindless_set(),
+			blend_enable,
+			depth_write,
 		)
 	}
 }
@@ -799,7 +803,9 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		primitive_topology: PrimitiveTopology,
 		color_format: Format,
 		depth_format: Format,
+		blend_enable: bool,
+		depth_write: bool,
 	) -> RhiResult<AshPipeline> {
-		self.create_graphics_pipeline(meta, shaders, polymode, primitive_topology, color_format, depth_format)
+		self.create_graphics_pipeline(meta, shaders, polymode, primitive_topology, color_format, depth_format, blend_enable, depth_write)
 	}
 }

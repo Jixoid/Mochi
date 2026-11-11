@@ -65,6 +65,8 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 		primitive_topology: PrimitiveTopology,
 		color_format: Format,
 		depth_format: Format,
+		blend_enable: bool,
+		depth_write: bool,
 	) -> RhiResult<B::Pipeline>;
 
 	fn init_descriptor_heap(&self, allocator: &B::Allocator) -> RhiResult<()>;

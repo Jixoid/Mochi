@@ -191,9 +191,12 @@ void main() {
 
 		vec3 kS = F;
 		vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+		// For transparent surfaces, diffuse scattering scales with opacity
+		float is_trans = step(albedo.a, 0.999);
+		vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
 
 		float NdotL = max(dot(N, L), 0.0);
-		Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL;
+		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
 	}
 
 	// Evaluate point lights
@@ -224,9 +227,11 @@ void main() {
 
 		vec3 kS = F;
 		vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+		float is_trans = step(albedo.a, 0.999);
+		vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
 
 		float NdotL = max(dot(N, L), 0.0);
-		Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL;
+		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
 	}
 
 	vec3 emissive = mat.emissive.rgb * mat.emissive.w;
@@ -235,12 +240,17 @@ void main() {
 		emissive *= tex_emissive;
 	}
 
-	vec3 ambient = scene.ambient_color.rgb * albedo.rgb * occlusion;
+	float is_trans = step(albedo.a, 0.999);
+	vec3 ambient = scene.ambient_color.rgb * albedo.rgb * occlusion * mix(1.0, albedo.a, is_trans);
 	vec3 color = ambient + Lo + emissive;
 
 	// Tonemapping and gamma correction for sRGB display
 	color = tonemap_aces(color);
 	color = linear_to_srgb(color);
 
-	out_color = vec4(color, albedo.a);
+	float NdotV = max(dot(N, V), 0.0);
+	float fresnel_factor = pow(1.0 - NdotV, 5.0);
+	float final_alpha = mix(albedo.a, clamp(albedo.a + (1.0 - albedo.a) * fresnel_factor * (1.0 - roughness), 0.0, 1.0), is_trans);
+
+	out_color = vec4(color, final_alpha);
 }

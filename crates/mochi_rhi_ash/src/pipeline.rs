@@ -161,6 +161,8 @@ impl AshPipeline {
 		color_format: Format,
 		depth_format: Format,
 		descriptor_set: Option<vk::DescriptorSet>,
+		blend_enable: bool,
+		depth_write: bool,
 	) -> RhiResult<Self> {
 		let mut c_entries = Vec::with_capacity(shaders.len());
 
@@ -208,20 +210,26 @@ impl AshPipeline {
 
 		let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
 			.depth_test_enable(true)
-			.depth_write_enable(true)
+			.depth_write_enable(depth_write)
 			.depth_compare_op(vk::CompareOp::LESS)
 			.depth_bounds_test_enable(false)
 			.stencil_test_enable(false);
 
-		let color_blend_attachment = vk::PipelineColorBlendAttachmentState::default()
-			.color_write_mask(vk::ColorComponentFlags::RGBA)
-			.blend_enable(true)
-			.src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
-			.dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-			.color_blend_op(vk::BlendOp::ADD)
-			.src_alpha_blend_factor(vk::BlendFactor::ONE)
-			.dst_alpha_blend_factor(vk::BlendFactor::ZERO)
-			.alpha_blend_op(vk::BlendOp::ADD);
+		let color_blend_attachment = if blend_enable {
+			vk::PipelineColorBlendAttachmentState::default()
+				.color_write_mask(vk::ColorComponentFlags::RGBA)
+				.blend_enable(true)
+				.src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+				.dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+				.color_blend_op(vk::BlendOp::ADD)
+				.src_alpha_blend_factor(vk::BlendFactor::ONE)
+				.dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+				.alpha_blend_op(vk::BlendOp::ADD)
+		} else {
+			vk::PipelineColorBlendAttachmentState::default()
+				.color_write_mask(vk::ColorComponentFlags::RGBA)
+				.blend_enable(false)
+		};
 
 		let attachments = [color_blend_attachment];
 		let color_blending = vk::PipelineColorBlendStateCreateInfo::default()

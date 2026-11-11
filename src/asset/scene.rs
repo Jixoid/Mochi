@@ -174,6 +174,9 @@ impl SceneAsset {
 		let template = rendering
 			.default_template()
 			.ok_or_else(|| "Default MaterialTemplate not available in RenderingSystem".to_string())?;
+		let transparent_template = rendering
+			.transparent_template()
+			.ok_or_else(|| "Transparent MaterialTemplate not available in RenderingSystem".to_string())?;
 
 		let mut loaded_models: HashMap<String, Vec<(std::sync::Arc<crate::scene::Mesh>, std::sync::Arc<crate::material::MaterialInstance>)>> = HashMap::new();
 
@@ -237,6 +240,7 @@ impl SceneAsset {
 								&cmdmng,
 								rendering.texture_manager_mut(),
 								&template,
+								&transparent_template,
 							);
 							loaded_models.insert(mr.asset.clone(), built.clone());
 							built

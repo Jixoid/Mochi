@@ -43,7 +43,9 @@ pub struct RenderingSystem {
 	render_queue: RenderQueue,
 	texture_manager: Option<TextureManager>,
 	default_template: Option<Arc<MaterialTemplate>>,
+	transparent_template: Option<Arc<MaterialTemplate>>,
 	default_material: Option<Arc<MaterialInstance>>,
+	transparent_material: Option<Arc<MaterialInstance>>,
 }
 
 impl RenderingSystem {
@@ -63,7 +65,9 @@ impl RenderingSystem {
 			render_queue: RenderQueue::new(),
 			texture_manager: None,
 			default_template: None,
+			transparent_template: None,
 			default_material: None,
+			transparent_material: None,
 		})
 	}
 
@@ -89,18 +93,32 @@ impl RenderingSystem {
 			std::mem::size_of::<ObjectPushConstants>() as u32,
 		);
 
+		let transparent_template = MaterialTemplate::new_forward(
+			device,
+			PBR_VERT_SPV,
+			PBR_FRAG_SPV,
+			BlendMode::Transparent,
+			color_format,
+			depth_format,
+			std::mem::size_of::<ObjectPushConstants>() as u32,
+		);
+
 		let default_mat = MaterialInstance::new_default(Arc::clone(&template));
+		let transparent_mat = MaterialInstance::new_default(Arc::clone(&transparent_template));
 		self.material_storage.register(Arc::clone(&default_mat));
+		self.material_storage.register(Arc::clone(&transparent_mat));
 		self.material_storage.update_gpu(device, alloc);
 
 		mochi_disp!(
-			"PBR graphics pipeline initialized. Default Material ID: {}, Template ID: {}",
-			default_mat.id(),
-			template.id()
+			"PBR graphics pipeline initialized. Opaque Template ID: {}, Transparent Template ID: {}",
+			template.id(),
+			transparent_template.id()
 		);
 
 		self.default_template = Some(template);
+		self.transparent_template = Some(transparent_template);
 		self.default_material = Some(default_mat);
+		self.transparent_material = Some(transparent_mat);
 	}
 
 	pub fn cmdmng(&self) -> &rhi::CommandManager {
@@ -121,6 +139,14 @@ impl RenderingSystem {
 
 	pub fn default_template(&self) -> Option<Arc<MaterialTemplate>> {
 		self.default_template.as_ref().map(Arc::clone)
+	}
+
+	pub fn transparent_template(&self) -> Option<Arc<MaterialTemplate>> {
+		self.transparent_template.as_ref().map(Arc::clone)
+	}
+
+	pub fn transparent_material(&self) -> Option<Arc<MaterialInstance>> {
+		self.transparent_material.as_ref().map(Arc::clone)
 	}
 
 	pub fn material_storage_mut(&mut self) -> &mut MaterialStorage {

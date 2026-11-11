@@ -239,6 +239,8 @@ impl<B: RhiBackend> Pipeline<B> {
 		primitive_topology: PrimitiveTopology,
 		color_format: Format,
 		depth_format: Format,
+		blend_enable: bool,
+		depth_write: bool,
 	) -> Self {
 		let raw_meta = meta.get_or_create_raw(device);
 		let raw_shaders: Vec<&B::Shader> = shaders.iter().map(|s| s.raw()).collect();
@@ -252,6 +254,8 @@ impl<B: RhiBackend> Pipeline<B> {
 				primitive_topology,
 				color_format,
 				depth_format,
+				blend_enable,
+				depth_write,
 			)
 			.expect("Failed to create Graphics Pipeline");
 
