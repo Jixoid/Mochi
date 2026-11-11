@@ -41,6 +41,33 @@ pub struct AshRenderTarget {
 unsafe impl Send for AshRenderTarget {}
 unsafe impl Sync for AshRenderTarget {}
 
+impl AshRenderTarget {
+	pub fn new_offscreen(
+		color_image: vk::Image,
+		color_view: vk::ImageView,
+		color_format: Format,
+		depth_image: vk::Image,
+		depth_view: vk::ImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+	) -> Self {
+		Self {
+			color_image,
+			color_view,
+			resolve_image: vk::Image::null(),
+			resolve_view: vk::ImageView::null(),
+			color_format,
+			depth_image,
+			depth_view,
+			depth_format,
+			extent: vk::Extent2D { width, height },
+			final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+			samples: mochi_rhi::MsaaSamples::Off,
+		}
+	}
+}
+
 impl RhiRenderTarget for AshRenderTarget {
 	fn color_format(&self) -> Format {
 		self.color_format
@@ -48,6 +75,22 @@ impl RhiRenderTarget for AshRenderTarget {
 
 	fn depth_format(&self) -> Format {
 		self.depth_format
+	}
+
+	fn without_depth(&self) -> Self {
+		Self {
+			color_image: self.color_image,
+			color_view: self.color_view,
+			resolve_image: self.resolve_image,
+			resolve_view: self.resolve_view,
+			color_format: self.color_format,
+			depth_image: vk::Image::null(),
+			depth_view: vk::ImageView::null(),
+			depth_format: Format::Undefined,
+			extent: self.extent,
+			final_layout: self.final_layout,
+			samples: self.samples,
+		}
 	}
 }
 

@@ -12,6 +12,7 @@
 
 use std::sync::Arc;
 use crate::material::{BlendMode, MaterialInstance, MaterialStorage, MaterialTemplate, PassKind, TextureManager};
+use crate::rendering::aa::AntiAliasingMode;
 use crate::rendering::frame::SceneFrameBuffer;
 use crate::rendering::queue::RenderQueue;
 use crate::rhi;
@@ -21,6 +22,8 @@ use mochi_except::*;
 
 static PBR_VERT_SPV: &[u8] = include_bytes!("../../res/shaders/pbr.vert.spv");
 static PBR_FRAG_SPV: &[u8] = include_bytes!("../../res/shaders/pbr.frag.spv");
+static FULLSCREEN_VERT_SPV: &[u8] = include_bytes!("../../res/shaders/fullscreen.vert.spv");
+static FXAA_FRAG_SPV: &[u8] = include_bytes!("../../res/shaders/fxaa.frag.spv");
 
 
 #[repr(C, align(16))]
@@ -32,6 +35,27 @@ pub struct ObjectPushConstants {
 	pub material_addr: u64,
 	pub material_id: u32,
 	pub flags: u32,
+}
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug, Default)]
+pub struct FxaaPushConstants {
+	pub texture_id: u32,
+	pub texel_w: f32,
+	pub texel_h: f32,
+	pub _pad: f32,
+}
+
+pub struct OffscreenSceneTarget {
+	pub color_image: rhi::Image2,
+	pub color_view: rhi::ImageView2,
+	pub depth_image: rhi::Image2,
+	pub depth_view: rhi::ImageView2,
+	pub descriptor_id: u32,
+	pub width: u32,
+	pub height: u32,
+	pub color_format: rhi::Format,
+	pub depth_format: rhi::Format,
 }
 
 
@@ -46,6 +70,11 @@ pub struct RenderingSystem {
 	transparent_template: Option<Arc<MaterialTemplate>>,
 	default_material: Option<Arc<MaterialInstance>>,
 	transparent_material: Option<Arc<MaterialInstance>>,
+	aa_mode: AntiAliasingMode,
+	offscreen_target: Option<OffscreenSceneTarget>,
+	fxaa_pipeline: Option<rhi::Pipeline>,
+	fxaa_meta: Option<rhi::PipelineMeta>,
+	fxaa_sampler: Option<rhi::Sampler2>,
 }
 
 impl RenderingSystem {
@@ -68,6 +97,11 @@ impl RenderingSystem {
 			transparent_template: None,
 			default_material: None,
 			transparent_material: None,
+			aa_mode: AntiAliasingMode::Off,
+			offscreen_target: None,
+			fxaa_pipeline: None,
+			fxaa_meta: None,
+			fxaa_sampler: None,
 		})
 	}
 
@@ -112,6 +146,45 @@ impl RenderingSystem {
 		self.material_storage.register(Arc::clone(&transparent_mat));
 		self.material_storage.update_gpu(device, alloc);
 
+		let fxaa_vert = rhi::Shader::new(
+			device,
+			rhi::ShaderStage::Vertex,
+			FULLSCREEN_VERT_SPV,
+			"main",
+		);
+		let fxaa_frag = rhi::Shader::new(
+			device,
+			rhi::ShaderStage::Pixel,
+			FXAA_FRAG_SPV,
+			"main",
+		);
+		let fxaa_meta = rhi::PipelineMeta::new_raw(
+			rhi::ShaderStage::Pixel,
+			std::mem::size_of::<FxaaPushConstants>() as u32,
+		);
+		let fxaa_pipeline = rhi::Pipeline::new_graphics(
+			device,
+			&fxaa_meta,
+			&[&fxaa_vert, &fxaa_frag],
+			rhi::PolygonMode::Fill,
+			rhi::PrimitiveTopology::TriangleList,
+			color_format,
+			rhi::Format::Undefined,
+			false,
+			false,
+			rhi::MsaaSamples::Off,
+		);
+		let fxaa_sampler = device
+			.create_sampler(
+				rhi::SamplerFilter::Linear,
+				rhi::SamplerAddressMode::ClampToEdge,
+			)
+			.expect("Failed to create FXAA linear sampler");
+
+		self.fxaa_meta = Some(fxaa_meta);
+		self.fxaa_pipeline = Some(fxaa_pipeline);
+		self.fxaa_sampler = Some(fxaa_sampler);
+
 		mochi_disp!(
 			"PBR graphics pipeline initialized. Opaque Template ID: {}, Transparent Template ID: {}, Samples: {:?}",
 			template.id(),
@@ -123,6 +196,105 @@ impl RenderingSystem {
 		self.transparent_template = Some(transparent_template);
 		self.default_material = Some(default_mat);
 		self.transparent_material = Some(transparent_mat);
+	}
+
+	pub fn aa_mode(&self) -> AntiAliasingMode {
+		self.aa_mode
+	}
+
+	pub fn set_aa_mode(
+		&mut self,
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		display: &mut crate::display::Display,
+		mode: AntiAliasingMode,
+	) {
+		if self.aa_mode == mode {
+			return;
+		}
+
+		self.aa_mode = mode;
+
+		let msaa_samples = mode.msaa_samples();
+		self.set_msaa(device, display, msaa_samples);
+
+		if mode.is_fxaa() {
+			let width = display.width();
+			let height = display.height();
+			if let Some(target) = display.render_target(0) {
+				self.ensure_offscreen_target(
+					device,
+					alloc,
+					width,
+					height,
+					target.color_format(),
+					target.depth_format(),
+				);
+			}
+		}
+
+		mochi_disp!("Anti-Aliasing mode set to: {}", mode.name());
+	}
+
+	pub fn ensure_offscreen_target(
+		&mut self,
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		width: u32,
+		height: u32,
+		color_format: rhi::Format,
+		depth_format: rhi::Format,
+	) {
+		if let Some(target) = &self.offscreen_target {
+			if target.width == width && target.height == height {
+				return;
+			}
+		}
+
+		let ext = mochi_math::Extent::new([width, height]);
+		let color_image = rhi::Image2::new(
+			alloc,
+			ext,
+			color_format,
+			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled,
+			rhi::ImageTiling::Optimal,
+			rhi::AllocationCreate::Dedicated,
+			rhi::AllocationLocation::PreferDevice,
+		);
+		let color_view = device
+			.create_image_view(&color_image, color_format)
+			.expect("Failed to create offscreen color view");
+
+		let depth_image = rhi::Image2::new(
+			alloc,
+			ext,
+			depth_format,
+			rhi::ImageUsage::DepthStencilAttachment,
+			rhi::ImageTiling::Optimal,
+			rhi::AllocationCreate::Dedicated,
+			rhi::AllocationLocation::PreferDevice,
+		);
+		let depth_view = device
+			.create_image_view(&depth_image, depth_format)
+			.expect("Failed to create offscreen depth view");
+
+		let descriptor_id = if let Some(sampler) = &self.fxaa_sampler {
+			device.write_texture_descriptor(&color_view, sampler)
+		} else {
+			0
+		};
+
+		self.offscreen_target = Some(OffscreenSceneTarget {
+			color_image,
+			color_view,
+			depth_image,
+			depth_view,
+			descriptor_id,
+			width,
+			height,
+			color_format,
+			depth_format,
+		});
 	}
 
 	pub fn set_msaa(
@@ -233,56 +405,88 @@ impl RenderingSystem {
 		// Update material storage GPU buffer
 		self.material_storage.update_gpu(device, alloc);
 
-		let target = display.render_target(img_idx);
+		let is_fxaa = self.aa_mode.is_fxaa();
+		if is_fxaa {
+			if let Some(target) = display.render_target(0) {
+				self.ensure_offscreen_target(
+					device,
+					alloc,
+					width,
+					height,
+					target.color_format(),
+					target.depth_format(),
+				);
+			}
+		}
+
 		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
 
-		if let Some(target) = target {
-			cmd.render_pass(&target, clear_color, |pass| {
-				pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-				pass.set_scissor(0, 0, width, height);
+		if is_fxaa {
+			if let Some(offscreen) = &self.offscreen_target {
+				let scene_target = device.create_render_target(
+					&offscreen.color_image,
+					&offscreen.color_view,
+					offscreen.color_format,
+					&offscreen.depth_image,
+					&offscreen.depth_view,
+					offscreen.depth_format,
+					width,
+					height,
+				);
 
-				let mut currently_bound_pipeline_id: Option<u16> = None;
 				let scene_addr = self.frame_buffer.address();
 				let material_addr = self.material_storage.buffer_address();
-
-				for packet in &self.render_queue.packets {
-					let template = packet.material.template();
-					let template_id = template.id();
-
-					if currently_bound_pipeline_id != Some(template_id) {
-						if let Some(pipeline) = template.pipeline(PassKind::ForwardLit) {
-							pass.bind_pipeline(&pipeline);
-							currently_bound_pipeline_id = Some(template_id);
-						}
-					}
-
-					let pc = ObjectPushConstants {
-						model: packet.model_matrix,
+				cmd.render_pass(&scene_target, clear_color, |pass| {
+					Self::record_scene_packets(
+						pass,
+						width,
+						height,
+						&self.render_queue,
 						scene_addr,
-						vertex_addr: packet.vertex_buffer_addr,
 						material_addr,
-						material_id: packet.material_id,
-						flags: 0,
-					};
-
-					pass.push_constant(
-						rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-						0,
-						&pc,
 					);
+				});
 
-					if packet.is_indexed && packet.index_count > 0 {
-						if let Some(index_buf) = packet.mesh.index_buffer() {
-							pass.bind_index_buffer(index_buf, 0, rhi::IndexType::Uint32);
-							pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
-						} else {
-							pass.draw(packet.vertex_count, 1, 0, 0);
-						}
-					} else {
-						pass.draw(packet.vertex_count, 1, 0, 0);
-					}
+				if let (Some(swapchain_target), Some(fxaa_pipeline)) = (
+					display.render_target(img_idx),
+					&self.fxaa_pipeline,
+				) {
+					let target_no_depth = swapchain_target.without_depth();
+					cmd.render_pass(&target_no_depth, clear_color, |pass| {
+						pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+						pass.set_scissor(0, 0, width, height);
+						pass.bind_pipeline(fxaa_pipeline);
+
+						let pc = FxaaPushConstants {
+							texture_id: offscreen.descriptor_id,
+							texel_w: 1.0 / width as f32,
+							texel_h: 1.0 / height as f32,
+							_pad: 0.0,
+						};
+
+						pass.push_constant(
+							rhi::ShaderStage::Pixel,
+							0,
+							&pc,
+						);
+
+						pass.draw(3, 1, 0, 0);
+					});
 				}
+			}
+		} else if let Some(target) = display.render_target(img_idx) {
+			let scene_addr = self.frame_buffer.address();
+			let material_addr = self.material_storage.buffer_address();
+			cmd.render_pass(&target, clear_color, |pass| {
+				Self::record_scene_packets(
+					pass,
+					width,
+					height,
+					&self.render_queue,
+					scene_addr,
+					material_addr,
+				);
 			});
 		}
 
@@ -294,5 +498,57 @@ impl RenderingSystem {
 		sync.end_frame();
 
 		display.present_with_semaphore(img_idx, &sig_sem);
+	}
+
+	fn record_scene_packets(
+		pass: &mut rhi::Command,
+		width: u32,
+		height: u32,
+		render_queue: &RenderQueue,
+		scene_addr: u64,
+		material_addr: u64,
+	) {
+		pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+		pass.set_scissor(0, 0, width, height);
+
+		let mut currently_bound_pipeline_id: Option<u16> = None;
+
+		for packet in &render_queue.packets {
+			let template = packet.material.template();
+			let template_id = template.id();
+
+			if currently_bound_pipeline_id != Some(template_id) {
+				if let Some(pipeline) = template.pipeline(PassKind::ForwardLit) {
+					pass.bind_pipeline(&pipeline);
+					currently_bound_pipeline_id = Some(template_id);
+				}
+			}
+
+			let pc = ObjectPushConstants {
+				model: packet.model_matrix,
+				scene_addr,
+				vertex_addr: packet.vertex_buffer_addr,
+				material_addr,
+				material_id: packet.material_id,
+				flags: 0,
+			};
+
+			pass.push_constant(
+				rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
+				0,
+				&pc,
+			);
+
+			if packet.is_indexed && packet.index_count > 0 {
+				if let Some(index_buf) = packet.mesh.index_buffer() {
+					pass.bind_index_buffer(index_buf, 0, rhi::IndexType::Uint32);
+					pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
+				} else {
+					pass.draw(packet.vertex_count, 1, 0, 0);
+				}
+			} else {
+				pass.draw(packet.vertex_count, 1, 0, 0);
+			}
+		}
 	}
 }

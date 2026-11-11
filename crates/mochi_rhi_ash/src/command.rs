@@ -326,12 +326,18 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			target.color_image
 		};
 
-		// Transition back to target.final_layout (PRESENT_SRC_KHR)
+		let (dst_stage, dst_access) = if target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
+			(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
+		} else {
+			(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::NONE)
+		};
+
+		// Transition back to target.final_layout
 		let color_barrier = vk::ImageMemoryBarrier2::default()
 			.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
 			.src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
-			.dst_stage_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE)
-			.dst_access_mask(vk::AccessFlags2::NONE)
+			.dst_stage_mask(dst_stage)
+			.dst_access_mask(dst_access)
 			.old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
 			.new_layout(target.final_layout)
 			.image(present_image)

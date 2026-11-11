@@ -44,4 +44,8 @@ impl<'a, B: RhiBackend> RenderTarget<'a, B> {
 	pub fn depth_format(&self) -> Format {
 		self.inner.depth_format()
 	}
+
+	pub fn without_depth(&self) -> Self {
+		Self::from_raw(self.inner.without_depth())
+	}
 }

@@ -209,10 +209,11 @@ impl AshPipeline {
 			.sample_shading_enable(false)
 			.rasterization_samples(to_vk_sample_count(samples));
 
+		let has_depth = depth_format != Format::Undefined;
 		let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
-			.depth_test_enable(true)
-			.depth_write_enable(depth_write)
-			.depth_compare_op(vk::CompareOp::LESS)
+			.depth_test_enable(has_depth)
+			.depth_write_enable(has_depth && depth_write)
+			.depth_compare_op(if has_depth { vk::CompareOp::LESS } else { vk::CompareOp::ALWAYS })
 			.depth_bounds_test_enable(false)
 			.stencil_test_enable(false);
 

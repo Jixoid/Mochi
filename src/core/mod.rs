@@ -240,7 +240,18 @@ impl ApplicationHandler for EngineApp {
 				// Execute QW scripts on active entities
 				self.script_system.update(&mut self.scene, &self.input, dt, time);
 
-				if let Some(req_msaa) = crate::script::api::take_requested_msaa() {
+				if let Some(req_aa) = crate::script::api::take_requested_aa_mode() {
+					if let (Some(display), Some(rendering), Some(device), Some(alloc)) = (
+						&mut self.display,
+						&mut self.rendering_system,
+						&self.device,
+						&self.alloca,
+					) {
+						rendering.set_aa_mode(device, alloc, display, req_aa);
+						crate::script::api::set_current_aa_mode(req_aa);
+						crate::script::api::set_current_msaa(req_aa.msaa_samples());
+					}
+				} else if let Some(req_msaa) = crate::script::api::take_requested_msaa() {
 					if let (Some(display), Some(rendering), Some(device)) = (
 						&mut self.display,
 						&mut self.rendering_system,
@@ -256,14 +267,10 @@ impl ApplicationHandler for EngineApp {
 					let fps = self.fps_counter;
 					self.fps_counter = 0;
 					self.fps_timer = Instant::now();
-					if let Some(display) = &self.display {
-						let msaa_str = match display.msaa_samples() {
-							crate::rhi::MsaaSamples::Off => "Off (1x)".to_string(),
-							other => format!("{}x", other.count()),
-						};
+					if let (Some(display), Some(rendering)) = (&self.display, &self.rendering_system) {
 						display.window().set_title(&format!(
-							"{} - [{} FPS] Frame: {} | MSAA: {}",
-							self.title, fps, self.frame_count, msaa_str
+							"{} - [{} FPS] Frame: {} | AA: {}",
+							self.title, fps, self.frame_count, rendering.aa_mode().name()
 						));
 					}
 				}

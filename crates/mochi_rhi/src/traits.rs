@@ -78,6 +78,17 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 
 	fn create_image_view(&self, image: &B::Image, format: Format) -> RhiResult<B::ImageView>;
 	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<B::Sampler>;
+	fn create_render_target(
+		&self,
+		color_image: &B::Image,
+		color_view: &B::ImageView,
+		color_format: Format,
+		depth_image: &B::Image,
+		depth_view: &B::ImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+	) -> B::RenderTarget;
 	fn upload_image_data(
 		&self,
 		alloc: &B::Allocator,
@@ -165,6 +176,7 @@ pub trait RhiPipeline: Send + Sync {
 pub trait RhiRenderTarget: Send + Sync + Clone {
 	fn color_format(&self) -> Format;
 	fn depth_format(&self) -> Format;
+	fn without_depth(&self) -> Self;
 }
 
 

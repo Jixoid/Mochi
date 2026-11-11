@@ -23,6 +23,7 @@ use crate::image::{AshImage, AshImageView};
 use crate::pipeline::{AshPipeline, AshPipelineMeta};
 use crate::sampler::AshSampler;
 use crate::shader::AshShader;
+use crate::swapchain::AshRenderTarget;
 use crate::sync::{AshFence, AshSemaphore};
 use crate::types::{to_vk_address_mode, to_vk_filter, to_vk_format};
 use crate::AshVulkanBackend;
@@ -666,6 +667,29 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		};
 
 		Ok(AshSampler::new(self.inner.device(), sampler))
+	}
+
+	fn create_render_target(
+		&self,
+		color_image: &AshImage,
+		color_view: &AshImageView,
+		color_format: Format,
+		depth_image: &AshImage,
+		depth_view: &AshImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+	) -> AshRenderTarget {
+		AshRenderTarget::new_offscreen(
+			color_image.handle(),
+			color_view.handle(),
+			color_format,
+			depth_image.handle(),
+			depth_view.handle(),
+			depth_format,
+			width,
+			height,
+		)
 	}
 
 	fn upload_image_data(

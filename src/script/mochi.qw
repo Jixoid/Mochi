@@ -52,3 +52,9 @@ pub fun mochi_set_msaa(samples: i32);
 
 ![C, import]
 pub fun mochi_get_msaa() -> i32;
+
+![C, import]
+pub fun mochi_set_aa_mode(mode: i32);
+
+![C, import]
+pub fun mochi_get_aa_mode() -> i32;

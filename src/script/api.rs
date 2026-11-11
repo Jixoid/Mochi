@@ -297,3 +297,29 @@ pub extern "C" fn mochi_set_msaa(samples: i32) {
 pub extern "C" fn mochi_get_msaa() -> i32 {
 	CURRENT_MSAA.load(std::sync::atomic::Ordering::Relaxed) as i32
 }
+
+static REQUESTED_AA_MODE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+static CURRENT_AA_MODE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+pub fn take_requested_aa_mode() -> Option<crate::rendering::aa::AntiAliasingMode> {
+	let val = REQUESTED_AA_MODE.swap(-1, std::sync::atomic::Ordering::Relaxed);
+	if val < 0 {
+		None
+	} else {
+		Some(crate::rendering::aa::AntiAliasingMode::from_i32(val))
+	}
+}
+
+pub fn set_current_aa_mode(mode: crate::rendering::aa::AntiAliasingMode) {
+	CURRENT_AA_MODE.store(mode.to_i32(), std::sync::atomic::Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_aa_mode(mode: i32) {
+	REQUESTED_AA_MODE.store(mode, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_aa_mode() -> i32 {
+	CURRENT_AA_MODE.load(std::sync::atomic::Ordering::Relaxed)
+}
