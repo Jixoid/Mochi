@@ -196,11 +196,17 @@ impl AshPipeline {
 			.viewport_count(1)
 			.scissor_count(1);
 
+		let cull_mode = if depth_format == Format::Undefined {
+			vk::CullModeFlags::NONE
+		} else {
+			vk::CullModeFlags::BACK
+		};
+
 		let rasterizer = vk::PipelineRasterizationStateCreateInfo::default()
 			.depth_clamp_enable(false)
 			.rasterizer_discard_enable(false)
 			.polygon_mode(to_vk_polygon_mode(polymode))
-			.cull_mode(vk::CullModeFlags::BACK)
+			.cull_mode(cull_mode)
 			.front_face(vk::FrontFace::COUNTER_CLOCKWISE)
 			.depth_bias_enable(false)
 			.line_width(1.0);

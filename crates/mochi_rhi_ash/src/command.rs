@@ -191,8 +191,8 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		let mut barriers = Vec::with_capacity(3);
 
 		let color_barrier = vk::ImageMemoryBarrier2::default()
-			.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-			.src_access_mask(vk::AccessFlags2::NONE)
+			.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags2::FRAGMENT_SHADER)
+			.src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
 			.dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
 			.dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
 			.old_layout(vk::ImageLayout::UNDEFINED)
