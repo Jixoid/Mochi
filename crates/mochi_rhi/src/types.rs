@@ -88,3 +88,29 @@ pub enum IndexType {
 	Uint16,
 	Uint32,
 }
+
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[repr(u32)]
+pub enum MsaaSamples {
+	#[default]
+	Off = 1,
+	X2 = 2,
+	X4 = 4,
+	X8 = 8,
+}
+
+impl MsaaSamples {
+	pub fn count(self) -> u32 {
+		self as u32
+	}
+
+	pub fn from_u32(val: u32) -> Self {
+		match val {
+			2 => Self::X2,
+			4 => Self::X4,
+			8 => Self::X8,
+			_ => Self::Off,
+		}
+	}
+}

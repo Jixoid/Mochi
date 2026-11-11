@@ -110,3 +110,13 @@ pub fn to_vk_index_type(it: mochi_rhi::IndexType) -> vk::IndexType {
 		mochi_rhi::IndexType::Uint32 => vk::IndexType::UINT32,
 	}
 }
+
+#[inline]
+pub fn to_vk_sample_count(samples: mochi_rhi::MsaaSamples) -> vk::SampleCountFlags {
+	match samples {
+		mochi_rhi::MsaaSamples::X2 => vk::SampleCountFlags::TYPE_2,
+		mochi_rhi::MsaaSamples::X4 => vk::SampleCountFlags::TYPE_4,
+		mochi_rhi::MsaaSamples::X8 => vk::SampleCountFlags::TYPE_8,
+		_ => vk::SampleCountFlags::TYPE_1,
+	}
+}

@@ -271,3 +271,29 @@ pub extern "C" fn mochi_get_time() -> f32 {
 		ctx.borrow().as_ref().map(|c| c.time).unwrap_or(0.0)
 	})
 }
+
+static REQUESTED_MSAA: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static CURRENT_MSAA: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
+
+pub fn take_requested_msaa() -> Option<crate::rhi::MsaaSamples> {
+	let val = REQUESTED_MSAA.swap(0, std::sync::atomic::Ordering::Relaxed);
+	if val == 0 {
+		None
+	} else {
+		Some(crate::rhi::MsaaSamples::from_u32(val))
+	}
+}
+
+pub fn set_current_msaa(samples: crate::rhi::MsaaSamples) {
+	CURRENT_MSAA.store(samples.count(), std::sync::atomic::Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_msaa(samples: i32) {
+	REQUESTED_MSAA.store((samples.max(1)) as u32, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_msaa() -> i32 {
+	CURRENT_MSAA.load(std::sync::atomic::Ordering::Relaxed) as i32
+}

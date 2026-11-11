@@ -453,6 +453,7 @@ impl AshDevice {
 		depth_format: Format,
 		blend_enable: bool,
 		depth_write: bool,
+		samples: mochi_rhi::MsaaSamples,
 	) -> RhiResult<AshPipeline> {
 		AshPipeline::create_graphics(
 			self.inner.device(),
@@ -465,6 +466,7 @@ impl AshDevice {
 			self.inner.bindless_set(),
 			blend_enable,
 			depth_write,
+			samples,
 		)
 	}
 }
@@ -805,7 +807,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		depth_format: Format,
 		blend_enable: bool,
 		depth_write: bool,
+		samples: mochi_rhi::MsaaSamples,
 	) -> RhiResult<AshPipeline> {
-		self.create_graphics_pipeline(meta, shaders, polymode, primitive_topology, color_format, depth_format, blend_enable, depth_write)
+		self.create_graphics_pipeline(meta, shaders, polymode, primitive_topology, color_format, depth_format, blend_enable, depth_write, samples)
 	}
 }

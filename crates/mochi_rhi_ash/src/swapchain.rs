@@ -15,7 +15,7 @@ use ash::vk;
 use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme, Allocator};
 
 use crate::sync::AshSemaphore;
-use crate::types::from_vk_format;
+use crate::types::{from_vk_format, to_vk_sample_count};
 use crate::AshVulkanBackend;
 use mochi_rhi::error::{RhiError, RhiResult};
 use mochi_rhi::format::Format;
@@ -27,12 +27,15 @@ use mochi_except::*;
 pub struct AshRenderTarget {
 	pub color_image: vk::Image,
 	pub color_view: vk::ImageView,
+	pub resolve_image: vk::Image,
+	pub resolve_view: vk::ImageView,
 	pub color_format: Format,
 	pub depth_image: vk::Image,
 	pub depth_view: vk::ImageView,
 	pub depth_format: Format,
 	pub extent: vk::Extent2D,
 	pub final_layout: vk::ImageLayout,
+	pub samples: mochi_rhi::MsaaSamples,
 }
 
 unsafe impl Send for AshRenderTarget {}
@@ -66,6 +69,10 @@ pub struct SwapchainInner {
 	depth_image: vk::Image,
 	depth_view: vk::ImageView,
 	depth_allocation: Option<Allocation>,
+	msaa_samples: mochi_rhi::MsaaSamples,
+	msaa_color_image: vk::Image,
+	msaa_color_view: vk::ImageView,
+	msaa_color_allocation: Option<Allocation>,
 }
 
 unsafe impl Send for SwapchainInner {}
@@ -85,6 +92,17 @@ impl SwapchainInner {
 			self.depth_image = vk::Image::null();
 		}
 		if let Some(alloc) = self.depth_allocation.take() {
+			let _ = self.allocator.lock().unwrap().free(alloc);
+		}
+		if self.msaa_color_view != vk::ImageView::null() {
+			unsafe { self.device.destroy_image_view(self.msaa_color_view, None); }
+			self.msaa_color_view = vk::ImageView::null();
+		}
+		if self.msaa_color_image != vk::Image::null() {
+			unsafe { self.device.destroy_image(self.msaa_color_image, None); }
+			self.msaa_color_image = vk::Image::null();
+		}
+		if let Some(alloc) = self.msaa_color_allocation.take() {
 			let _ = self.allocator.lock().unwrap().free(alloc);
 		}
 	}
@@ -219,6 +237,10 @@ impl AshSwapchain {
 			depth_image: vk::Image::null(),
 			depth_view: vk::ImageView::null(),
 			depth_allocation: None,
+			msaa_samples: mochi_rhi::MsaaSamples::Off,
+			msaa_color_image: vk::Image::null(),
+			msaa_color_view: vk::ImageView::null(),
+			msaa_color_allocation: None,
 		};
 
 		let (targets, semaphores) = Self::build_targets(&mut inner)?;
@@ -267,13 +289,15 @@ impl AshSwapchain {
 			depth: 1,
 		};
 
+		let sample_count = to_vk_sample_count(inner.msaa_samples);
+
 		let depth_image_info = vk::ImageCreateInfo::default()
 			.image_type(vk::ImageType::TYPE_2D)
 			.format(inner.depth_format)
 			.extent(depth_extent)
 			.mip_levels(1)
 			.array_layers(1)
-			.samples(vk::SampleCountFlags::TYPE_1)
+			.samples(sample_count)
 			.tiling(vk::ImageTiling::OPTIMAL)
 			.usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
 			.sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -333,7 +357,80 @@ impl AshSwapchain {
 		inner.depth_view = depth_view;
 		inner.depth_allocation = Some(allocation);
 
-		// 3. RenderTargets & Semaphores
+		// 3. Optional MSAA Color Image
+		if inner.msaa_samples.count() > 1 {
+			let msaa_color_info = vk::ImageCreateInfo::default()
+				.image_type(vk::ImageType::TYPE_2D)
+				.format(inner.color_format)
+				.extent(depth_extent)
+				.mip_levels(1)
+				.array_layers(1)
+				.samples(sample_count)
+				.tiling(vk::ImageTiling::OPTIMAL)
+				.usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT)
+				.sharing_mode(vk::SharingMode::EXCLUSIVE)
+				.initial_layout(vk::ImageLayout::UNDEFINED);
+
+			let msaa_color_image = unsafe {
+				inner
+					.device
+					.create_image(&msaa_color_info, None)
+					.map_err(|e| RhiError::BackendError(format!("Failed to create MSAA color image: {e}")))?
+			};
+
+			let msaa_reqs = unsafe { inner.device.get_image_memory_requirements(msaa_color_image) };
+			let msaa_alloc_desc = AllocationCreateDesc {
+				name: "Swapchain MSAA Color Buffer",
+				requirements: msaa_reqs,
+				location: gpu_allocator::MemoryLocation::GpuOnly,
+				linear: false,
+				allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+			};
+
+			let msaa_alloc = inner
+				.allocator
+				.lock()
+				.unwrap()
+				.allocate(&msaa_alloc_desc)
+				.map_err(|e| RhiError::BackendError(format!("Failed to allocate MSAA color memory: {e}")))?;
+
+			unsafe {
+				inner
+					.device
+					.bind_image_memory(msaa_color_image, msaa_alloc.memory(), msaa_alloc.offset())
+					.map_err(|e| RhiError::BackendError(format!("Failed to bind MSAA color memory: {e}")))?;
+			}
+
+			let msaa_subresource = vk::ImageSubresourceRange::default()
+				.aspect_mask(vk::ImageAspectFlags::COLOR)
+				.base_mip_level(0)
+				.level_count(1)
+				.base_array_layer(0)
+				.layer_count(1);
+
+			let msaa_view_info = vk::ImageViewCreateInfo::default()
+				.image(msaa_color_image)
+				.view_type(vk::ImageViewType::TYPE_2D)
+				.format(inner.color_format)
+				.subresource_range(msaa_subresource);
+
+			let msaa_color_view = unsafe {
+				inner
+					.device
+					.create_image_view(&msaa_view_info, None)
+					.map_err(|e| RhiError::BackendError(format!("Failed to create MSAA color view: {e}")))?
+			};
+
+			inner.msaa_color_image = msaa_color_image;
+			inner.msaa_color_view = msaa_color_view;
+			inner.msaa_color_allocation = Some(msaa_alloc);
+		} else {
+			inner.msaa_color_image = vk::Image::null();
+			inner.msaa_color_view = vk::ImageView::null();
+			inner.msaa_color_allocation = None;
+		}
+
+		// 4. RenderTargets & Semaphores
 		for i in 0..inner.images.len() {
 			let sem = unsafe {
 				inner
@@ -343,15 +440,24 @@ impl AshSwapchain {
 			};
 			semaphores.push(AshSemaphore::new(&inner.device, sem));
 
+			let (color_image, color_view, resolve_image, resolve_view) = if inner.msaa_samples.count() > 1 {
+				(inner.msaa_color_image, inner.msaa_color_view, inner.images[i], inner.image_views[i])
+			} else {
+				(inner.images[i], inner.image_views[i], vk::Image::null(), vk::ImageView::null())
+			};
+
 			let target = AshRenderTarget {
-				color_image: inner.images[i],
-				color_view: inner.image_views[i],
+				color_image,
+				color_view,
+				resolve_image,
+				resolve_view,
 				color_format: from_vk_format(inner.color_format),
 				depth_image,
 				depth_view,
 				depth_format: from_vk_format(inner.depth_format),
 				extent: inner.extent,
 				final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+				samples: inner.msaa_samples,
 			};
 			targets.push(target);
 		}
@@ -429,6 +535,24 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 		self.render_finished_semaphores = semaphores;
 
 		Ok(())
+	}
+
+	fn set_msaa(&mut self, samples: mochi_rhi::MsaaSamples) -> RhiResult<()> {
+		let mut inner = self.inner.lock().unwrap();
+		if inner.msaa_samples == samples {
+			return Ok(());
+		}
+		unsafe { inner.device.device_wait_idle().unwrap(); }
+		inner.msaa_samples = samples;
+		inner.destroy_resources();
+		let (targets, semaphores) = Self::build_targets(&mut inner)?;
+		self.targets = targets;
+		self.render_finished_semaphores = semaphores;
+		Ok(())
+	}
+
+	fn msaa_samples(&self) -> mochi_rhi::MsaaSamples {
+		self.inner.lock().unwrap().msaa_samples
 	}
 
 	fn acquire_next_image(&mut self, signal_sem: Option<&AshSemaphore>) -> RhiResult<u32> {

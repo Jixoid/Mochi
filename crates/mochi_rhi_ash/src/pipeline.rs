@@ -16,7 +16,7 @@ use ash::vk;
 
 use crate::shader::AshShader;
 use crate::types::{
-	to_vk_format, to_vk_polygon_mode, to_vk_primitive_topology, to_vk_shader_stage,
+	to_vk_format, to_vk_polygon_mode, to_vk_primitive_topology, to_vk_sample_count, to_vk_shader_stage,
 };
 use mochi_rhi::error::{RhiError, RhiResult};
 use mochi_rhi::format::Format;
@@ -163,6 +163,7 @@ impl AshPipeline {
 		descriptor_set: Option<vk::DescriptorSet>,
 		blend_enable: bool,
 		depth_write: bool,
+		samples: mochi_rhi::MsaaSamples,
 	) -> RhiResult<Self> {
 		let mut c_entries = Vec::with_capacity(shaders.len());
 
@@ -206,7 +207,7 @@ impl AshPipeline {
 
 		let multisampling = vk::PipelineMultisampleStateCreateInfo::default()
 			.sample_shading_enable(false)
-			.rasterization_samples(vk::SampleCountFlags::TYPE_1);
+			.rasterization_samples(to_vk_sample_count(samples));
 
 		let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
 			.depth_test_enable(true)

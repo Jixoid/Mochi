@@ -205,6 +205,19 @@ pub fn keycode_to_u32(code: KeyCode) -> u32 {
 		KeyCode::ArrowLeft => 37,
 		KeyCode::ArrowRight => 39,
 
+		KeyCode::F1 => 112,
+		KeyCode::F2 => 113,
+		KeyCode::F3 => 114,
+		KeyCode::F4 => 115,
+		KeyCode::F5 => 116,
+		KeyCode::F6 => 117,
+		KeyCode::F7 => 118,
+		KeyCode::F8 => 119,
+		KeyCode::F9 => 120,
+		KeyCode::F10 => 121,
+		KeyCode::F11 => 122,
+		KeyCode::F12 => 123,
+
 		_ => 0,
 	}
 }

@@ -18,6 +18,7 @@ use crate::format::{Format, VT};
 use crate::manager::device::Device;
 use crate::shader::{Shader, ShaderStage};
 use crate::traits::{RhiBackend, RhiDevice};
+use crate::types::MsaaSamples;
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -241,6 +242,7 @@ impl<B: RhiBackend> Pipeline<B> {
 		depth_format: Format,
 		blend_enable: bool,
 		depth_write: bool,
+		samples: MsaaSamples,
 	) -> Self {
 		let raw_meta = meta.get_or_create_raw(device);
 		let raw_shaders: Vec<&B::Shader> = shaders.iter().map(|s| s.raw()).collect();
@@ -256,6 +258,7 @@ impl<B: RhiBackend> Pipeline<B> {
 				depth_format,
 				blend_enable,
 				depth_write,
+				samples,
 			)
 			.expect("Failed to create Graphics Pipeline");
 

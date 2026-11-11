@@ -77,6 +77,7 @@ impl RenderingSystem {
 		alloc: &rhi::Allocator,
 		color_format: rhi::Format,
 		depth_format: rhi::Format,
+		samples: rhi::MsaaSamples,
 	) {
 		mochi_verb!("Initializing modern PBR graphics pipeline");
 
@@ -91,6 +92,7 @@ impl RenderingSystem {
 			color_format,
 			depth_format,
 			std::mem::size_of::<ObjectPushConstants>() as u32,
+			samples,
 		);
 
 		let transparent_template = MaterialTemplate::new_forward(
@@ -101,6 +103,7 @@ impl RenderingSystem {
 			color_format,
 			depth_format,
 			std::mem::size_of::<ObjectPushConstants>() as u32,
+			samples,
 		);
 
 		let default_mat = MaterialInstance::new_default(Arc::clone(&template));
@@ -110,15 +113,38 @@ impl RenderingSystem {
 		self.material_storage.update_gpu(device, alloc);
 
 		mochi_disp!(
-			"PBR graphics pipeline initialized. Opaque Template ID: {}, Transparent Template ID: {}",
+			"PBR graphics pipeline initialized. Opaque Template ID: {}, Transparent Template ID: {}, Samples: {:?}",
 			template.id(),
-			transparent_template.id()
+			transparent_template.id(),
+			samples
 		);
 
 		self.default_template = Some(template);
 		self.transparent_template = Some(transparent_template);
 		self.default_material = Some(default_mat);
 		self.transparent_material = Some(transparent_mat);
+	}
+
+	pub fn set_msaa(
+		&mut self,
+		device: &rhi::Device,
+		display: &mut crate::display::Display,
+		samples: rhi::MsaaSamples,
+	) {
+		if display.msaa_samples() == samples {
+			return;
+		}
+
+		display.set_msaa(samples);
+
+		if let Some(template) = &self.default_template {
+			template.set_msaa(device, samples);
+		}
+		if let Some(transparent_template) = &self.transparent_template {
+			transparent_template.set_msaa(device, samples);
+		}
+
+		mochi_disp!("MSAA changed to {:?}", samples);
 	}
 
 	pub fn cmdmng(&self) -> &rhi::CommandManager {
@@ -226,7 +252,7 @@ impl RenderingSystem {
 
 					if currently_bound_pipeline_id != Some(template_id) {
 						if let Some(pipeline) = template.pipeline(PassKind::ForwardLit) {
-							pass.bind_pipeline(pipeline);
+							pass.bind_pipeline(&pipeline);
 							currently_bound_pipeline_id = Some(template_id);
 						}
 					}

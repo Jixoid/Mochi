@@ -2,6 +2,7 @@ use mochi::*;
 
 ![C, export]
 pub fun on_start(entity: u64) {
+	mochi_set_msaa(4);
 }
 
 ![C, export]
@@ -44,5 +45,15 @@ pub fun on_update(entity: u64, dt: f32) {
 
 	if forward != 0.0 || right != 0.0 || up != 0.0 {
 		mochi_move_relative(entity, forward, right, up);
+	}
+
+	// 3. MSAA Toggle (M or F4 key)
+	if mochi_is_key_just_pressed(77) || mochi_is_key_just_pressed(115) {
+		var cur = mochi_get_msaa();
+		if cur > 1 {
+			mochi_set_msaa(1);
+		} else {
+			mochi_set_msaa(4);
+		}
 	}
 }

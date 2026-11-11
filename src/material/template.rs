@@ -10,8 +10,8 @@
 */
 
 
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
+use std::sync::{Arc, RwLock};
 use crate::material::types::{BlendMode, PassKind};
 use crate::rhi::{self, Format, PipelineMeta, PolygonMode, PrimitiveTopology, Shader, ShaderStage};
 
@@ -21,12 +21,15 @@ static NEXT_TEMPLATE_ID: AtomicU16 = AtomicU16::new(1);
 pub struct MaterialTemplate {
 	id: u16,
 	blend_mode: BlendMode,
-	forward_pipeline: rhi::Pipeline,
+	forward_pipeline: RwLock<rhi::Pipeline>,
 	shadow_pipeline: Option<rhi::Pipeline>,
 	depth_pipeline: Option<rhi::Pipeline>,
-	_meta: rhi::PipelineMeta,
-	_vert_shader: rhi::Shader,
-	_frag_shader: rhi::Shader,
+	meta: rhi::PipelineMeta,
+	vert_shader: rhi::Shader,
+	frag_shader: rhi::Shader,
+	color_format: Format,
+	depth_format: Format,
+	samples: AtomicU32,
 }
 
 impl MaterialTemplate {
@@ -38,6 +41,7 @@ impl MaterialTemplate {
 		color_format: Format,
 		depth_format: Format,
 		push_constant_size: u32,
+		samples: rhi::MsaaSamples,
 	) -> Arc<Self> {
 		let id = NEXT_TEMPLATE_ID.fetch_add(1, Ordering::Relaxed);
 
@@ -64,17 +68,21 @@ impl MaterialTemplate {
 			depth_format,
 			blend_enable,
 			depth_write,
+			samples,
 		);
 
 		Arc::new(Self {
 			id,
 			blend_mode,
-			forward_pipeline,
+			forward_pipeline: RwLock::new(forward_pipeline),
 			shadow_pipeline: None,
 			depth_pipeline: None,
-			_meta: meta,
-			_vert_shader: vert,
-			_frag_shader: frag,
+			meta,
+			vert_shader: vert,
+			frag_shader: frag,
+			color_format,
+			depth_format,
+			samples: AtomicU32::new(samples.count()),
 		})
 	}
 
@@ -86,11 +94,34 @@ impl MaterialTemplate {
 		self.blend_mode
 	}
 
-	pub fn pipeline(&self, pass: PassKind) -> Option<&rhi::Pipeline> {
+	pub fn set_msaa(&self, device: &rhi::Device, samples: rhi::MsaaSamples) {
+		let (blend_enable, depth_write) = match self.blend_mode {
+			BlendMode::Opaque | BlendMode::Masked { .. } => (false, true),
+			BlendMode::Transparent | BlendMode::Additive => (true, false),
+		};
+
+		let new_pipe = rhi::Pipeline::new_graphics(
+			device,
+			&self.meta,
+			&[&self.vert_shader, &self.frag_shader],
+			PolygonMode::Fill,
+			PrimitiveTopology::TriangleList,
+			self.color_format,
+			self.depth_format,
+			blend_enable,
+			depth_write,
+			samples,
+		);
+
+		*self.forward_pipeline.write().unwrap() = new_pipe;
+		self.samples.store(samples.count(), Ordering::Relaxed);
+	}
+
+	pub fn pipeline(&self, pass: PassKind) -> Option<rhi::Pipeline> {
 		match pass {
-			PassKind::ForwardLit => Some(&self.forward_pipeline),
-			PassKind::ShadowCaster => self.shadow_pipeline.as_ref().or(Some(&self.forward_pipeline)),
-			PassKind::DepthPrepass => self.depth_pipeline.as_ref().or(Some(&self.forward_pipeline)),
+			PassKind::ForwardLit => Some(self.forward_pipeline.read().unwrap().clone()),
+			PassKind::ShadowCaster => self.shadow_pipeline.clone().or_else(|| Some(self.forward_pipeline.read().unwrap().clone())),
+			PassKind::DepthPrepass => self.depth_pipeline.clone().or_else(|| Some(self.forward_pipeline.read().unwrap().clone())),
 		}
 	}
 }

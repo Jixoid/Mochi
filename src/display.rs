@@ -80,6 +80,14 @@ impl Display {
 		self.swapchain.render_target(index)
 	}
 
+	pub fn set_msaa(&mut self, samples: rhi::MsaaSamples) {
+		self.swapchain.set_msaa(samples);
+	}
+
+	pub fn msaa_samples(&self) -> rhi::MsaaSamples {
+		self.swapchain.msaa_samples()
+	}
+
 	pub fn render_finished_semaphore(&self, index: u32) -> rhi::Semaphore {
 		self.swapchain.render_finished_semaphore(index)
 	}

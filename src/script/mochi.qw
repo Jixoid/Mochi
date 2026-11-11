@@ -46,3 +46,9 @@ pub fun mochi_get_mouse_delta(out_dx: &mut f32, out_dy: &mut f32);
 
 ![C, import]
 pub fun mochi_get_time() -> f32;
+
+![C, import]
+pub fun mochi_set_msaa(samples: i32);
+
+![C, import]
+pub fun mochi_get_msaa() -> i32;

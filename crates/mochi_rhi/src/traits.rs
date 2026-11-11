@@ -67,6 +67,7 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 		depth_format: Format,
 		blend_enable: bool,
 		depth_write: bool,
+		samples: MsaaSamples,
 	) -> RhiResult<B::Pipeline>;
 
 	fn init_descriptor_heap(&self, allocator: &B::Allocator) -> RhiResult<()>;
@@ -170,6 +171,8 @@ pub trait RhiRenderTarget: Send + Sync + Clone {
 /// Abstract Swapchain
 pub trait RhiSwapchain<B: RhiBackend>: Send + Sync {
 	fn resize(&mut self, width: u32, height: u32) -> RhiResult<()>;
+	fn set_msaa(&mut self, samples: MsaaSamples) -> RhiResult<()>;
+	fn msaa_samples(&self) -> MsaaSamples;
 	fn acquire_next_image(&mut self, signal_sem: Option<&B::Semaphore>) -> RhiResult<u32>;
 	fn present(&mut self, image_index: u32, wait_sem: Option<&B::Semaphore>) -> RhiResult<()>;
 	fn image_count(&self) -> u32;

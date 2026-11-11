@@ -188,7 +188,7 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 	fn begin_rendering(&mut self, target: &AshRenderTarget, clear_color: ClearColor) {
 		// 1. Image barriers: Color to COLOR_ATTACHMENT_OPTIMAL, Depth to DEPTH_ATTACHMENT_OPTIMAL
-		let mut barriers = Vec::with_capacity(2);
+		let mut barriers = Vec::with_capacity(3);
 
 		let color_barrier = vk::ImageMemoryBarrier2::default()
 			.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
@@ -207,6 +207,26 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 					.layer_count(1),
 			);
 		barriers.push(color_barrier);
+
+		if target.resolve_image != vk::Image::null() {
+			let resolve_barrier = vk::ImageMemoryBarrier2::default()
+				.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+				.src_access_mask(vk::AccessFlags2::NONE)
+				.dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+				.dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
+				.old_layout(vk::ImageLayout::UNDEFINED)
+				.new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+				.image(target.resolve_image)
+				.subresource_range(
+					vk::ImageSubresourceRange::default()
+						.aspect_mask(vk::ImageAspectFlags::COLOR)
+						.base_mip_level(0)
+						.level_count(1)
+						.base_array_layer(0)
+						.layer_count(1),
+				);
+			barriers.push(resolve_barrier);
+		}
 
 		if target.depth_image != vk::Image::null() {
 			let depth_barrier = vk::ImageMemoryBarrier2::default()
@@ -243,12 +263,24 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			},
 		};
 
-		let color_attachment = vk::RenderingAttachmentInfo::default()
+		let has_resolve = target.resolve_view != vk::ImageView::null();
+		let mut color_attachment = vk::RenderingAttachmentInfo::default()
 			.image_view(target.color_view)
 			.image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
 			.load_op(vk::AttachmentLoadOp::CLEAR)
-			.store_op(vk::AttachmentStoreOp::STORE)
+			.store_op(if has_resolve {
+				vk::AttachmentStoreOp::DONT_CARE
+			} else {
+				vk::AttachmentStoreOp::STORE
+			})
 			.clear_value(clear_val);
+
+		if has_resolve {
+			color_attachment = color_attachment
+				.resolve_mode(vk::ResolveModeFlags::AVERAGE)
+				.resolve_image_view(target.resolve_view)
+				.resolve_image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+		}
 
 		let color_attachments = [color_attachment];
 
@@ -288,6 +320,12 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			self.device.cmd_end_rendering(self.handle);
 		}
 
+		let present_image = if target.resolve_image != vk::Image::null() {
+			target.resolve_image
+		} else {
+			target.color_image
+		};
+
 		// Transition back to target.final_layout (PRESENT_SRC_KHR)
 		let color_barrier = vk::ImageMemoryBarrier2::default()
 			.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
@@ -296,7 +334,7 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			.dst_access_mask(vk::AccessFlags2::NONE)
 			.old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
 			.new_layout(target.final_layout)
-			.image(target.color_image)
+			.image(present_image)
 			.subresource_range(
 				vk::ImageSubresourceRange::default()
 					.aspect_mask(vk::ImageAspectFlags::COLOR)

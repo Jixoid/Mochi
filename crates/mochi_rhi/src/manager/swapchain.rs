@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex};
 use crate::manager::device::Device;
 use crate::render_target::RenderTarget;
 use crate::traits::{RhiBackend, RhiDevice, RhiSwapchain};
+use crate::types::MsaaSamples;
 
 
 pub struct Surface<B: RhiBackend> {
@@ -68,6 +69,19 @@ impl<B: RhiBackend> Swapchain<B> {
 			.unwrap()
 			.resize(width, height)
 			.expect("Failed to resize swapchain");
+	}
+
+	pub fn set_msaa(&mut self, samples: MsaaSamples) {
+		self
+			.inner
+			.lock()
+			.unwrap()
+			.set_msaa(samples)
+			.expect("Failed to set swapchain MSAA");
+	}
+
+	pub fn msaa_samples(&self) -> MsaaSamples {
+		self.inner.lock().unwrap().msaa_samples()
 	}
 
 	pub fn acquire_next_image(&mut self) -> u32 {

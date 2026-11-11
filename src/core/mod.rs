@@ -165,6 +165,7 @@ impl ApplicationHandler for EngineApp {
 							alloc,
 							target.color_format(),
 							target.depth_format(),
+							display.msaa_samples(),
 						);
 
 						let scene_path = &self.config.scene.start_scene;
@@ -239,15 +240,30 @@ impl ApplicationHandler for EngineApp {
 				// Execute QW scripts on active entities
 				self.script_system.update(&mut self.scene, &self.input, dt, time);
 
+				if let Some(req_msaa) = crate::script::api::take_requested_msaa() {
+					if let (Some(display), Some(rendering), Some(device)) = (
+						&mut self.display,
+						&mut self.rendering_system,
+						&self.device,
+					) {
+						rendering.set_msaa(device, display, req_msaa);
+						crate::script::api::set_current_msaa(req_msaa);
+					}
+				}
+
 				self.fps_counter += 1;
 				if self.fps_timer.elapsed().as_secs() >= 1 {
 					let fps = self.fps_counter;
 					self.fps_counter = 0;
 					self.fps_timer = Instant::now();
 					if let Some(display) = &self.display {
+						let msaa_str = match display.msaa_samples() {
+							crate::rhi::MsaaSamples::Off => "Off (1x)".to_string(),
+							other => format!("{}x", other.count()),
+						};
 						display.window().set_title(&format!(
-							"{} - [{} FPS] Frame: {}",
-							self.title, fps, self.frame_count
+							"{} - [{} FPS] Frame: {} | MSAA: {}",
+							self.title, fps, self.frame_count, msaa_str
 						));
 					}
 				}
