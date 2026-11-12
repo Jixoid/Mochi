@@ -357,6 +357,33 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
 		}
 	}
+
+	fn dispatch(&mut self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
+		unsafe {
+			self.device.cmd_dispatch(
+				self.handle,
+				group_count_x,
+				group_count_y,
+				group_count_z,
+			);
+		}
+	}
+
+	fn compute_barrier(&mut self) {
+		let memory_barrier = vk::MemoryBarrier2::default()
+			.src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+			.src_access_mask(vk::AccessFlags2::SHADER_WRITE)
+			.dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER | vk::PipelineStageFlags2::FRAGMENT_SHADER)
+			.dst_access_mask(vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE);
+
+		let memory_barriers = [memory_barrier];
+		let dep_info = vk::DependencyInfo::default()
+			.memory_barriers(&memory_barriers);
+
+		unsafe {
+			self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
+		}
+	}
 }
 
 

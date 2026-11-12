@@ -69,6 +69,11 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 		depth_write: bool,
 		samples: MsaaSamples,
 	) -> RhiResult<B::Pipeline>;
+	fn create_compute_pipeline(
+		&self,
+		meta: &B::PipelineMeta,
+		shader: &B::Shader,
+	) -> RhiResult<B::Pipeline>;
 
 	fn init_descriptor_heap(&self, allocator: &B::Allocator) -> RhiResult<()>;
 	fn fini_descriptor_heap(&self);
@@ -209,6 +214,9 @@ pub trait RhiCommandBuffer<B: RhiBackend>: Send + Sync {
 
 	fn begin_rendering(&mut self, target: &B::RenderTarget, clear_color: ClearColor);
 	fn end_rendering(&mut self, target: &B::RenderTarget);
+
+	fn dispatch(&mut self, group_count_x: u32, group_count_y: u32, group_count_z: u32);
+	fn compute_barrier(&mut self);
 }
 
 

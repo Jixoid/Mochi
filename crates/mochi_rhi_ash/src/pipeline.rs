@@ -273,6 +273,31 @@ impl AshPipeline {
 		Ok(Self::new(device, pipelines[0], meta.layout(), descriptor_set, PipelineKind::Graphic))
 	}
 
+	pub fn create_compute(
+		device: &ash::Device,
+		meta: &AshPipelineMeta,
+		shader: &AshShader,
+		descriptor_set: Option<vk::DescriptorSet>,
+	) -> RhiResult<Self> {
+		let entry_point = CString::new(shader.entry()).unwrap_or_else(|_| CString::new("main").unwrap());
+		let stage_info = vk::PipelineShaderStageCreateInfo::default()
+			.stage(vk::ShaderStageFlags::COMPUTE)
+			.module(shader.handle())
+			.name(&entry_point);
+
+		let pipeline_info = vk::ComputePipelineCreateInfo::default()
+			.stage(stage_info)
+			.layout(meta.layout());
+
+		let pipelines = unsafe {
+			device
+				.create_compute_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
+				.map_err(|(_, e)| RhiError::PipelineCreation(format!("Failed to create compute pipeline: {e}")))?
+		};
+
+		Ok(Self::new(device, pipelines[0], meta.layout(), descriptor_set, PipelineKind::Compute))
+	}
+
 	pub fn handle(&self) -> vk::Pipeline {
 		self.inner.handle
 	}

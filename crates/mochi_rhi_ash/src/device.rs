@@ -470,6 +470,19 @@ impl AshDevice {
 			samples,
 		)
 	}
+
+	pub fn create_compute_pipeline(
+		&self,
+		meta: &AshPipelineMeta,
+		shader: &AshShader,
+	) -> RhiResult<AshPipeline> {
+		AshPipeline::create_compute(
+			self.inner.device(),
+			meta,
+			shader,
+			self.inner.bindless_set(),
+		)
+	}
 }
 
 impl RhiDevice<AshVulkanBackend> for AshDevice {
@@ -834,5 +847,13 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		samples: mochi_rhi::MsaaSamples,
 	) -> RhiResult<AshPipeline> {
 		self.create_graphics_pipeline(meta, shaders, polymode, primitive_topology, color_format, depth_format, blend_enable, depth_write, samples)
+	}
+
+	fn create_compute_pipeline(
+		&self,
+		meta: &AshPipelineMeta,
+		shader: &AshShader,
+	) -> RhiResult<AshPipeline> {
+		self.create_compute_pipeline(meta, shader)
 	}
 }

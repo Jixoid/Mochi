@@ -207,4 +207,20 @@ impl<B: RhiBackend> Command<B> {
 		);
 		self.inner.draw_indexed(index_count, instance_count, first_index, vertex_offset, first_instance);
 	}
+
+	pub fn dispatch(&mut self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
+		assert!(
+			self.state == CommandState::Recording,
+			"Cannot dispatch: Command must be recording (outside any dynamic rendering pass)"
+		);
+		self.inner.dispatch(group_count_x, group_count_y, group_count_z);
+	}
+
+	pub fn compute_barrier(&mut self) {
+		assert!(
+			self.state == CommandState::Recording,
+			"Cannot issue compute_barrier: Command must be recording"
+		);
+		self.inner.compute_barrier();
+	}
 }

@@ -268,6 +268,23 @@ impl<B: RhiBackend> Pipeline<B> {
 		}
 	}
 
+	pub fn new_compute(
+		device: &Device<B>,
+		meta: &PipelineMeta<B>,
+		shader: &Shader<B>,
+	) -> Self {
+		let raw_meta = meta.get_or_create_raw(device);
+		let pipe = device
+			.raw()
+			.create_compute_pipeline(&*raw_meta, shader.raw())
+			.expect("Failed to create Compute Pipeline");
+
+		Self {
+			inner: Arc::new(pipe),
+			kind: PipelineKind::Compute,
+		}
+	}
+
 	pub fn raw(&self) -> &B::Pipeline {
 		&self.inner
 	}
