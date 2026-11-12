@@ -84,6 +84,9 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	uint _pad1_0;
 	uint _pad1_1;
 	DirectionalLight dir_lights[4];
+	mat4 cascade_view_proj[4];
+	vec4 cascade_split_depths;
+	uvec4 cascade_shadow_ids;
 };
 
 struct PbrMaterialData {
@@ -166,6 +169,72 @@ vec3 linear_to_srgb(vec3 color) {
 	return pow(color, vec3(1.0 / 2.2));
 }
 
+float sample_shadow_bilinear(uint tex_id, vec2 uv, float current_depth, float bias) {
+	vec2 tex_size = vec2(2048.0);
+	vec2 texel_pos = uv * tex_size - 0.5;
+	vec2 base_coord = floor(texel_pos);
+	vec2 f = fract(texel_pos);
+
+	vec2 inv_size = 1.0 / tex_size;
+	vec2 uv00 = (base_coord + 0.5) * inv_size;
+	vec2 uv10 = uv00 + vec2(inv_size.x, 0.0);
+	vec2 uv01 = uv00 + vec2(0.0, inv_size.y);
+	vec2 uv11 = uv00 + inv_size;
+
+	float d00 = texture(u_textures[nonuniformEXT(tex_id)], uv00).r;
+	float d10 = texture(u_textures[nonuniformEXT(tex_id)], uv10).r;
+	float d01 = texture(u_textures[nonuniformEXT(tex_id)], uv01).r;
+	float d11 = texture(u_textures[nonuniformEXT(tex_id)], uv11).r;
+
+	float s00 = (current_depth - bias > d00) ? 0.0 : 1.0;
+	float s10 = (current_depth - bias > d10) ? 0.0 : 1.0;
+	float s01 = (current_depth - bias > d01) ? 0.0 : 1.0;
+	float s11 = (current_depth - bias > d11) ? 0.0 : 1.0;
+
+	return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
+}
+
+float evaluate_csm_shadow(SceneFrameData scene, vec3 world_pos, vec3 N, float view_z) {
+	int cascade_idx = -1;
+	for (int c = 0; c < 4; ++c) {
+		if (view_z < scene.cascade_split_depths[c]) {
+			cascade_idx = c;
+			break;
+		}
+	}
+	if (cascade_idx < 0) {
+		return 1.0;
+	}
+
+	uint shadow_tex_id = scene.cascade_shadow_ids[cascade_idx];
+
+	// Normal offset bias scaled by cascade index to eliminate shadow acne
+	float normal_bias = 0.005 * float(cascade_idx + 1);
+	vec3 biased_pos = world_pos + N * normal_bias;
+
+	vec4 shadow_clip = scene.cascade_view_proj[cascade_idx] * vec4(biased_pos, 1.0);
+	vec3 proj_coords = shadow_clip.xyz / shadow_clip.w;
+
+	vec2 shadow_uv = proj_coords.xy * 0.5 + 0.5;
+	float current_depth = proj_coords.z;
+
+	if (current_depth > 1.0 || shadow_uv.x < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y < 0.0 || shadow_uv.y > 1.0) {
+		return 1.0;
+	}
+
+	float bias = 0.0004;
+	vec2 inv_size = vec2(1.0 / 2048.0);
+
+	// 4-tap bilinear PCF filter (equivalent to continuous 16-tap filtered shadow)
+	float shadow = 0.0;
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75, -0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75, -0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75,  0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75,  0.75) * inv_size, current_depth, bias);
+
+	return shadow * 0.25;
+}
+
 
 void main() {
 	SceneFrameData scene = SceneFrameData(pc.scene_address);
@@ -207,6 +276,9 @@ void main() {
 		N = normalize(TBN * raw_normal);
 	}
 
+	vec4 view_pos = scene.view * vec4(in_world_pos, 1.0);
+	float view_z = -view_pos.z;
+
 	vec3 V = normalize(scene.camera_position.xyz - in_world_pos);
 
 	vec3 F0 = vec3(0.04);
@@ -235,7 +307,13 @@ void main() {
 		vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
 
 		float NdotL = max(dot(N, L), 0.0);
-		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
+
+		float shadow_factor = 1.0;
+		if (scene.dir_lights[i].direction.w > 0.5 && i == 0u) {
+			shadow_factor = evaluate_csm_shadow(scene, in_world_pos, N, view_z);
+		}
+
+		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL * shadow_factor;
 	}
 
 	// 2. Evaluate Clustered Point & Spot Lights
@@ -249,9 +327,6 @@ void main() {
 		tile_y = min(tile_y, scene.cluster_dims.y - 1u);
 
 		// Calculate slice Z
-		vec4 view_pos = scene.view * vec4(in_world_pos, 1.0);
-		float view_z = -view_pos.z;
-
 		uint slice_z = 0u;
 		if (view_z > scene.z_near && scene.z_far > scene.z_near) {
 			float log_ratio = float(scene.cluster_dims.z) / log(scene.z_far / scene.z_near);

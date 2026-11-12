@@ -94,6 +94,14 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 		width: u32,
 		height: u32,
 	) -> B::RenderTarget;
+	fn create_depth_render_target(
+		&self,
+		depth_image: &B::Image,
+		depth_view: &B::ImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+	) -> B::RenderTarget;
 	fn upload_image_data(
 		&self,
 		alloc: &B::Allocator,

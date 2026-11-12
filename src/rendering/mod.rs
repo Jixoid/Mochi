@@ -14,6 +14,7 @@ pub mod aa;
 pub mod cluster;
 pub mod frame;
 pub mod queue;
+pub mod shadow;
 pub mod system;
 
 
@@ -21,4 +22,5 @@ pub use aa::*;
 pub use cluster::*;
 pub use frame::*;
 pub use queue::*;
+pub use shadow::*;
 pub use system::*;

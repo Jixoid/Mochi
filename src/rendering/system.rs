@@ -16,8 +16,9 @@ use crate::rendering::aa::AntiAliasingMode;
 use crate::rendering::cluster::ClusterManager;
 use crate::rendering::frame::SceneFrameBuffer;
 use crate::rendering::queue::RenderQueue;
+use crate::rendering::shadow::{CASCADE_COUNT, SHADOW_MAP_SIZE, ShadowManager, ShadowPushConstants};
 use crate::rhi;
-use crate::scene::{CameraComponent, Scene, TransformComponent};
+use crate::scene::{CameraComponent, DirectionalLightComponent, Scene, TransformComponent};
 use mochi_except::*;
 
 
@@ -77,6 +78,8 @@ pub struct RenderingSystem {
 	fxaa_meta: Option<rhi::PipelineMeta>,
 	fxaa_sampler: Option<rhi::Sampler2>,
 	cluster_manager: Option<ClusterManager>,
+	shadow_manager: Option<ShadowManager>,
+	shadow_queue: RenderQueue,
 }
 
 impl RenderingSystem {
@@ -105,6 +108,8 @@ impl RenderingSystem {
 			fxaa_meta: None,
 			fxaa_sampler: None,
 			cluster_manager: None,
+			shadow_manager: None,
+			shadow_queue: RenderQueue::new(),
 		})
 	}
 
@@ -195,6 +200,16 @@ impl RenderingSystem {
 			}
 			Err(err) => {
 				mochi_warn!("Failed to initialize Clustered Forward manager: {err}");
+			}
+		}
+
+		match ShadowManager::new(device, alloc) {
+			Ok(sm) => {
+				mochi_disp!("Cascaded Shadow Map manager initialized (4 cascades, 2048x2048)");
+				self.shadow_manager = Some(sm);
+			}
+			Err(err) => {
+				mochi_warn!("Failed to initialize Cascaded Shadow Map manager: {err}");
 			}
 		}
 
@@ -395,13 +410,30 @@ impl RenderingSystem {
 
 		let clear_color = camera.clear_color;
 
+		let mut sun_dir = mochi_math::Vec3::new(0.5, -1.0, 0.3).normalize();
+		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &DirectionalLightComponent)>().iter() {
+			sun_dir = t.rotation * light.direction;
+			break;
+		}
+
+		let (cascade_view_proj, cascade_split_depths, cascade_shadow_ids) = if let Some(sm) = &mut self.shadow_manager {
+			sm.update_cascades(&camera, &cam_transform, aspect, sun_dir);
+			(sm.cascade_view_proj(), sm.cascade_split_depths(), sm.cascade_shadow_ids())
+		} else {
+			(
+				[[[0.0; 16]; 4]; 1][0],
+				[2.5, 8.0, 24.0, 80.0],
+				[0; 4],
+			)
+		};
+
 		let (grid_addr, pt_index_addr, spot_index_addr) = if let Some(cm) = &self.cluster_manager {
 			(cm.grid_address(), cm.point_index_list_address(), cm.spot_index_list_address())
 		} else {
 			(0, 0, 0)
 		};
 
-		// Update frame scene buffer (Camera + Dynamic Lights)
+		// Update frame scene buffer (Camera + Dynamic Lights + Shadows)
 		self.frame_buffer.update(
 			device,
 			alloc,
@@ -416,6 +448,17 @@ impl RenderingSystem {
 			spot_index_addr,
 			width,
 			height,
+			cascade_view_proj,
+			cascade_split_depths,
+			cascade_shadow_ids,
+		);
+
+		// Extract packets for ShadowCaster pass
+		self.shadow_queue.extract_from_scene(
+			scene,
+			PassKind::ShadowCaster,
+			cam_transform.translation,
+			&mut self.material_storage,
 		);
 
 		// Extract packets and sort for ForwardLit pass
@@ -448,6 +491,55 @@ impl RenderingSystem {
 
 		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
+
+		// Cascaded Shadow Map render passes (4 cascades)
+		if let Some(sm) = &self.shadow_manager {
+			for c in 0..CASCADE_COUNT {
+				let cascade = &sm.cascades[c];
+				let cascade_target = device.create_depth_render_target(
+					&cascade.image,
+					&cascade.view,
+					rhi::Format::Depth32f,
+					SHADOW_MAP_SIZE,
+					SHADOW_MAP_SIZE,
+				);
+
+				cmd.render_pass(&cascade_target, clear_color, |pass| {
+					pass.set_viewport(0.0, 0.0, SHADOW_MAP_SIZE as f32, SHADOW_MAP_SIZE as f32, 0.0, 1.0);
+					pass.set_scissor(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+					pass.bind_pipeline(&sm.pipeline);
+
+					let view_proj = mochi_math::Mat4x4::from_array(cascade.view_proj);
+
+					for packet in &self.shadow_queue.packets {
+						let model = mochi_math::Mat4x4::from_array(packet.model_matrix);
+						let mvp = (view_proj * model).to_array();
+
+						let pc = ShadowPushConstants {
+							mvp,
+							vertex_addr: packet.vertex_buffer_addr,
+						};
+
+						pass.push_constant(
+							rhi::ShaderStage::Vertex,
+							0,
+							&pc,
+						);
+
+						if packet.is_indexed && packet.index_count > 0 {
+							if let Some(index_buf) = packet.mesh.index_buffer() {
+								pass.bind_index_buffer(index_buf, 0, rhi::IndexType::Uint32);
+								pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
+							} else {
+								pass.draw(packet.vertex_count, 1, 0, 0);
+							}
+						} else {
+							pass.draw(packet.vertex_count, 1, 0, 0);
+						}
+					}
+				});
+			}
+		}
 
 		// Clustered Forward compute dispatch (Camera AABBs + Light Culling)
 		if let Some(cm) = &mut self.cluster_manager {

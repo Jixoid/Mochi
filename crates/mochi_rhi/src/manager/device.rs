@@ -194,6 +194,24 @@ impl<B: RhiBackend> Device<B> {
 		RenderTarget::from_raw(inner)
 	}
 
+	pub fn create_depth_render_target<'a>(
+		&self,
+		depth_image: &Image2<B>,
+		depth_view: &ImageView2<B>,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+	) -> RenderTarget<'a, B> {
+		let inner = self.inner.create_depth_render_target(
+			depth_image.raw(),
+			depth_view.raw(),
+			depth_format,
+			width,
+			height,
+		);
+		RenderTarget::from_raw(inner)
+	}
+
 	pub fn upload_image_data(
 		&self,
 		alloc: &Allocator<B>,

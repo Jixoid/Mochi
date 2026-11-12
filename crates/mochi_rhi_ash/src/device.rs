@@ -658,15 +658,21 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<AshSampler> {
 		let vk_filter = to_vk_filter(filter);
 		let vk_addr = to_vk_address_mode(address_mode);
+		let is_clamp_to_border = address_mode == SamplerAddressMode::ClampToBorder;
+		let border_color = if is_clamp_to_border {
+			vk::BorderColor::FLOAT_OPAQUE_WHITE
+		} else {
+			vk::BorderColor::INT_OPAQUE_BLACK
+		};
 		let sampler_info = vk::SamplerCreateInfo::default()
 			.mag_filter(vk_filter)
 			.min_filter(vk_filter)
 			.address_mode_u(vk_addr)
 			.address_mode_v(vk_addr)
 			.address_mode_w(vk_addr)
-			.anisotropy_enable(true)
-			.max_anisotropy(16.0)
-			.border_color(vk::BorderColor::INT_OPAQUE_BLACK)
+			.anisotropy_enable(!is_clamp_to_border)
+			.max_anisotropy(if is_clamp_to_border { 1.0 } else { 16.0 })
+			.border_color(border_color)
 			.unnormalized_coordinates(false)
 			.compare_enable(false)
 			.compare_op(vk::CompareOp::ALWAYS)
@@ -697,6 +703,23 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 			color_image.handle(),
 			color_view.handle(),
 			color_format,
+			depth_image.handle(),
+			depth_view.handle(),
+			depth_format,
+			width,
+			height,
+		)
+	}
+
+	fn create_depth_render_target(
+		&self,
+		depth_image: &AshImage,
+		depth_view: &AshImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+	) -> AshRenderTarget {
+		AshRenderTarget::new_depth_only(
 			depth_image.handle(),
 			depth_view.handle(),
 			depth_format,

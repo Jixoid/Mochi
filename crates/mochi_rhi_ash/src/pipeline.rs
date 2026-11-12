@@ -202,13 +202,23 @@ impl AshPipeline {
 			vk::CullModeFlags::BACK
 		};
 
+		let is_depth_only = color_format == Format::Undefined;
+
+		let (depth_bias_enable, depth_bias_constant, depth_bias_slope) = if is_depth_only {
+			(true, 1.25, 1.75)
+		} else {
+			(false, 0.0, 0.0)
+		};
+
 		let rasterizer = vk::PipelineRasterizationStateCreateInfo::default()
 			.depth_clamp_enable(false)
 			.rasterizer_discard_enable(false)
 			.polygon_mode(to_vk_polygon_mode(polymode))
 			.cull_mode(cull_mode)
 			.front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-			.depth_bias_enable(false)
+			.depth_bias_enable(depth_bias_enable)
+			.depth_bias_constant_factor(depth_bias_constant)
+			.depth_bias_slope_factor(depth_bias_slope)
 			.line_width(1.0);
 
 		let multisampling = vk::PipelineMultisampleStateCreateInfo::default()
@@ -219,7 +229,7 @@ impl AshPipeline {
 		let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
 			.depth_test_enable(has_depth)
 			.depth_write_enable(has_depth && depth_write)
-			.depth_compare_op(if has_depth { vk::CompareOp::LESS } else { vk::CompareOp::ALWAYS })
+			.depth_compare_op(if has_depth { vk::CompareOp::LESS_OR_EQUAL } else { vk::CompareOp::ALWAYS })
 			.depth_bounds_test_enable(false)
 			.stencil_test_enable(false);
 
@@ -239,12 +249,22 @@ impl AshPipeline {
 				.blend_enable(false)
 		};
 
-		let attachments = [color_blend_attachment];
+		let color_formats = if !is_depth_only {
+			vec![to_vk_format(color_format)]
+		} else {
+			Vec::new()
+		};
+
+		let color_attachments = if !is_depth_only {
+			vec![color_blend_attachment]
+		} else {
+			Vec::new()
+		};
+
 		let color_blending = vk::PipelineColorBlendStateCreateInfo::default()
 			.logic_op_enable(false)
-			.attachments(&attachments);
+			.attachments(&color_attachments);
 
-		let color_formats = [to_vk_format(color_format)];
 		let vk_depth_fmt = to_vk_format(depth_format);
 
 		let mut rendering_info = vk::PipelineRenderingCreateInfo::default()

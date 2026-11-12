@@ -66,6 +66,28 @@ impl AshRenderTarget {
 			samples: mochi_rhi::MsaaSamples::Off,
 		}
 	}
+
+	pub fn new_depth_only(
+		depth_image: vk::Image,
+		depth_view: vk::ImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+	) -> Self {
+		Self {
+			color_image: vk::Image::null(),
+			color_view: vk::ImageView::null(),
+			resolve_image: vk::Image::null(),
+			resolve_view: vk::ImageView::null(),
+			color_format: Format::Undefined,
+			depth_image,
+			depth_view,
+			depth_format,
+			extent: vk::Extent2D { width, height },
+			final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+			samples: mochi_rhi::MsaaSamples::Off,
+		}
+	}
 }
 
 impl RhiRenderTarget for AshRenderTarget {

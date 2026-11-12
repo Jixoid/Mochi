@@ -58,6 +58,17 @@ impl<T: Number> Mat4x4<T> {
 		}
 	}
 
+	pub const fn from_array(a: [T; 16]) -> Self {
+		Self {
+			rows: [
+				Vec4::new_with(a[0], a[1], a[2], a[3]),
+				Vec4::new_with(a[4], a[5], a[6], a[7]),
+				Vec4::new_with(a[8], a[9], a[10], a[11]),
+				Vec4::new_with(a[12], a[13], a[14], a[15]),
+			],
+		}
+	}
+
 	pub fn to_array(&self) -> [T; 16] {
 		[
 			self.rows[0].x, self.rows[0].y, self.rows[0].z, self.rows[0].w,

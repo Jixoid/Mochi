@@ -190,23 +190,25 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		// 1. Image barriers: Color to COLOR_ATTACHMENT_OPTIMAL, Depth to DEPTH_ATTACHMENT_OPTIMAL
 		let mut barriers = Vec::with_capacity(3);
 
-		let color_barrier = vk::ImageMemoryBarrier2::default()
-			.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags2::FRAGMENT_SHADER)
-			.src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
-			.dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-			.dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
-			.old_layout(vk::ImageLayout::UNDEFINED)
-			.new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-			.image(target.color_image)
-			.subresource_range(
-				vk::ImageSubresourceRange::default()
-					.aspect_mask(vk::ImageAspectFlags::COLOR)
-					.base_mip_level(0)
-					.level_count(1)
-					.base_array_layer(0)
-					.layer_count(1),
-			);
-		barriers.push(color_barrier);
+		if target.color_image != vk::Image::null() {
+			let color_barrier = vk::ImageMemoryBarrier2::default()
+				.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags2::FRAGMENT_SHADER)
+				.src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
+				.dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+				.dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
+				.old_layout(vk::ImageLayout::UNDEFINED)
+				.new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+				.image(target.color_image)
+				.subresource_range(
+					vk::ImageSubresourceRange::default()
+						.aspect_mask(vk::ImageAspectFlags::COLOR)
+						.base_mip_level(0)
+						.level_count(1)
+						.base_array_layer(0)
+						.layer_count(1),
+				);
+			barriers.push(color_barrier);
+		}
 
 		if target.resolve_image != vk::Image::null() {
 			let resolve_barrier = vk::ImageMemoryBarrier2::default()
@@ -230,8 +232,8 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 		if target.depth_image != vk::Image::null() {
 			let depth_barrier = vk::ImageMemoryBarrier2::default()
-				.src_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
-				.src_access_mask(vk::AccessFlags2::NONE)
+				.src_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags2::FRAGMENT_SHADER)
+				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
 				.dst_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
 				.dst_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
 				.old_layout(vk::ImageLayout::UNDEFINED)
@@ -257,38 +259,50 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		}
 
 		// 2. Begin Dynamic Rendering
-		let clear_val = vk::ClearValue {
-			color: vk::ClearColorValue {
-				float32: clear_color.0,
-			},
+		let is_depth_only = target.color_image == vk::Image::null();
+
+		let color_attachments = if !is_depth_only {
+			let clear_val = vk::ClearValue {
+				color: vk::ClearColorValue {
+					float32: clear_color.0,
+				},
+			};
+
+			let has_resolve = target.resolve_view != vk::ImageView::null();
+			let mut color_attachment = vk::RenderingAttachmentInfo::default()
+				.image_view(target.color_view)
+				.image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+				.load_op(vk::AttachmentLoadOp::CLEAR)
+				.store_op(if has_resolve {
+					vk::AttachmentStoreOp::DONT_CARE
+				} else {
+					vk::AttachmentStoreOp::STORE
+				})
+				.clear_value(clear_val);
+
+			if has_resolve {
+				color_attachment = color_attachment
+					.resolve_mode(vk::ResolveModeFlags::AVERAGE)
+					.resolve_image_view(target.resolve_view)
+					.resolve_image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+			}
+
+			vec![color_attachment]
+		} else {
+			Vec::new()
 		};
 
-		let has_resolve = target.resolve_view != vk::ImageView::null();
-		let mut color_attachment = vk::RenderingAttachmentInfo::default()
-			.image_view(target.color_view)
-			.image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-			.load_op(vk::AttachmentLoadOp::CLEAR)
-			.store_op(if has_resolve {
-				vk::AttachmentStoreOp::DONT_CARE
-			} else {
-				vk::AttachmentStoreOp::STORE
-			})
-			.clear_value(clear_val);
-
-		if has_resolve {
-			color_attachment = color_attachment
-				.resolve_mode(vk::ResolveModeFlags::AVERAGE)
-				.resolve_image_view(target.resolve_view)
-				.resolve_image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
-		}
-
-		let color_attachments = [color_attachment];
+		let depth_store_op = if is_depth_only {
+			vk::AttachmentStoreOp::STORE
+		} else {
+			vk::AttachmentStoreOp::DONT_CARE
+		};
 
 		let depth_attachment = vk::RenderingAttachmentInfo::default()
 			.image_view(target.depth_view)
 			.image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
 			.load_op(vk::AttachmentLoadOp::CLEAR)
-			.store_op(vk::AttachmentStoreOp::DONT_CARE)
+			.store_op(depth_store_op)
 			.clear_value(vk::ClearValue {
 				depth_stencil: vk::ClearDepthStencilValue {
 					depth: 1.0,
@@ -320,41 +334,69 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			self.device.cmd_end_rendering(self.handle);
 		}
 
-		let present_image = if target.resolve_image != vk::Image::null() {
-			target.resolve_image
-		} else {
-			target.color_image
-		};
+		let is_depth_only = target.color_image == vk::Image::null();
 
-		let (dst_stage, dst_access) = if target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
-			(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
-		} else {
-			(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::NONE)
-		};
+		if !is_depth_only {
+			let present_image = if target.resolve_image != vk::Image::null() {
+				target.resolve_image
+			} else {
+				target.color_image
+			};
 
-		// Transition back to target.final_layout
-		let color_barrier = vk::ImageMemoryBarrier2::default()
-			.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-			.src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
-			.dst_stage_mask(dst_stage)
-			.dst_access_mask(dst_access)
-			.old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-			.new_layout(target.final_layout)
-			.image(present_image)
-			.subresource_range(
-				vk::ImageSubresourceRange::default()
-					.aspect_mask(vk::ImageAspectFlags::COLOR)
-					.base_mip_level(0)
-					.level_count(1)
-					.base_array_layer(0)
-					.layer_count(1),
-			);
+			let (dst_stage, dst_access) = if target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
+				(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
+			} else {
+				(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::NONE)
+			};
 
-		let barriers = [color_barrier];
-		let dep_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
+			// Transition back to target.final_layout
+			let color_barrier = vk::ImageMemoryBarrier2::default()
+				.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+				.src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
+				.dst_stage_mask(dst_stage)
+				.dst_access_mask(dst_access)
+				.old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+				.new_layout(target.final_layout)
+				.image(present_image)
+				.subresource_range(
+					vk::ImageSubresourceRange::default()
+						.aspect_mask(vk::ImageAspectFlags::COLOR)
+						.base_mip_level(0)
+						.level_count(1)
+						.base_array_layer(0)
+						.layer_count(1),
+				);
 
-		unsafe {
-			self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
+			let barriers = [color_barrier];
+			let dep_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
+
+			unsafe {
+				self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
+			}
+		} else if target.depth_image != vk::Image::null() {
+			let depth_barrier = vk::ImageMemoryBarrier2::default()
+				.src_stage_mask(vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
+				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
+				.dst_stage_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER)
+				.dst_access_mask(vk::AccessFlags2::SHADER_READ)
+				.old_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
+				.new_layout(target.final_layout)
+				.image(target.depth_image)
+				.subresource_range(
+					vk::ImageSubresourceRange::default()
+						.aspect_mask(vk::ImageAspectFlags::DEPTH)
+						.base_mip_level(0)
+						.level_count(1)
+						.base_array_layer(0)
+						.layer_count(1),
+				);
+
+			let barriers = [depth_barrier];
+			let dep_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
+
+			unsafe {
+				self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
+			}
 		}
 	}
 
