@@ -20,7 +20,8 @@ pub const CLUSTER_DIM_X: u32 = 16;
 pub const CLUSTER_DIM_Y: u32 = 9;
 pub const CLUSTER_DIM_Z: u32 = 24;
 pub const TOTAL_CLUSTERS: u32 = CLUSTER_DIM_X * CLUSTER_DIM_Y * CLUSTER_DIM_Z;
-pub const MAX_LIGHTS_PER_CLUSTER: u32 = 128;
+pub const MAX_POINT_LIGHTS_PER_CLUSTER: u32 = 128;
+pub const MAX_SPOT_LIGHTS_PER_CLUSTER: u32 = 64;
 
 
 #[repr(C, align(16))]
@@ -33,8 +34,10 @@ pub struct GpuClusterAABB {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct GpuClusterRecord {
-	pub offset: u32,
-	pub count: u32,
+	pub point_offset: u32,
+	pub point_count: u32,
+	pub spot_offset: u32,
+	pub spot_count: u32,
 }
 
 #[repr(C, align(16))]
@@ -56,16 +59,18 @@ pub struct CullPushConstants {
 	pub scene_address: u64,
 	pub aabb_buffer_address: u64,
 	pub grid_buffer_address: u64,
-	pub index_list_address: u64,
-	pub point_light_count: u32,
-	pub max_lights_per_cluster: u32,
+	pub point_index_list_address: u64,
+	pub spot_index_list_address: u64,
+	pub max_point_lights: u32,
+	pub max_spot_lights: u32,
 }
 
 
 pub struct ClusterManager {
 	aabb_buffer: rhi::Buffer,
 	grid_buffer: rhi::Buffer,
-	index_list_buffer: rhi::Buffer,
+	point_index_list_buffer: rhi::Buffer,
+	spot_index_list_buffer: rhi::Buffer,
 	build_pipeline: rhi::Pipeline,
 	_build_meta: rhi::PipelineMeta,
 	cull_pipeline: rhi::Pipeline,
@@ -78,7 +83,8 @@ impl ClusterManager {
 	pub fn new(device: &rhi::Device, alloc: &rhi::Allocator) -> Result<Self, String> {
 		let aabb_size = (TOTAL_CLUSTERS as usize * std::mem::size_of::<GpuClusterAABB>()) as u64;
 		let grid_size = (TOTAL_CLUSTERS as usize * std::mem::size_of::<GpuClusterRecord>()) as u64;
-		let index_size = (TOTAL_CLUSTERS as usize * MAX_LIGHTS_PER_CLUSTER as usize * std::mem::size_of::<u32>()) as u64;
+		let pt_index_size = (TOTAL_CLUSTERS as usize * MAX_POINT_LIGHTS_PER_CLUSTER as usize * std::mem::size_of::<u32>()) as u64;
+		let spot_index_size = (TOTAL_CLUSTERS as usize * MAX_SPOT_LIGHTS_PER_CLUSTER as usize * std::mem::size_of::<u32>()) as u64;
 
 		let buffer_usage = BufferUsage::StorageBuffer | BufferUsage::DeviceAddress;
 
@@ -96,8 +102,15 @@ impl ClusterManager {
 			AllocationLocation::PreferDevice,
 		);
 
-		let index_list_buffer = alloc.alloc_buffer(
-			index_size,
+		let point_index_list_buffer = alloc.alloc_buffer(
+			pt_index_size,
+			buffer_usage,
+			AllocationCreate::Dedicated,
+			AllocationLocation::PreferDevice,
+		);
+
+		let spot_index_list_buffer = alloc.alloc_buffer(
+			spot_index_size,
 			buffer_usage,
 			AllocationCreate::Dedicated,
 			AllocationLocation::PreferDevice,
@@ -134,7 +147,8 @@ impl ClusterManager {
 		Ok(Self {
 			aabb_buffer,
 			grid_buffer,
-			index_list_buffer,
+			point_index_list_buffer,
+			spot_index_list_buffer,
 			build_pipeline,
 			_build_meta: build_meta,
 			cull_pipeline,
@@ -148,8 +162,12 @@ impl ClusterManager {
 		self.grid_buffer.address()
 	}
 
-	pub fn index_list_address(&self) -> u64 {
-		self.index_list_buffer.address()
+	pub fn point_index_list_address(&self) -> u64 {
+		self.point_index_list_buffer.address()
+	}
+
+	pub fn spot_index_list_address(&self) -> u64 {
+		self.spot_index_list_buffer.address()
 	}
 
 	pub fn update_camera(
@@ -187,15 +205,15 @@ impl ClusterManager {
 		&mut self,
 		cmd: &mut rhi::Command,
 		scene_address: u64,
-		point_light_count: u32,
 	) {
 		let pc = CullPushConstants {
 			scene_address,
 			aabb_buffer_address: self.aabb_buffer.address(),
 			grid_buffer_address: self.grid_buffer.address(),
-			index_list_address: self.index_list_buffer.address(),
-			point_light_count,
-			max_lights_per_cluster: MAX_LIGHTS_PER_CLUSTER,
+			point_index_list_address: self.point_index_list_buffer.address(),
+			spot_index_list_address: self.spot_index_list_buffer.address(),
+			max_point_lights: MAX_POINT_LIGHTS_PER_CLUSTER,
+			max_spot_lights: MAX_SPOT_LIGHTS_PER_CLUSTER,
 		};
 
 		cmd.bind_pipeline(&self.cull_pipeline);
@@ -215,7 +233,7 @@ mod tests {
 		assert_eq!(TOTAL_CLUSTERS, 16 * 9 * 24);
 		assert_eq!(TOTAL_CLUSTERS, 3456);
 		assert_eq!(std::mem::size_of::<GpuClusterAABB>(), 32);
-		assert_eq!(std::mem::size_of::<GpuClusterRecord>(), 8);
+		assert_eq!(std::mem::size_of::<GpuClusterRecord>(), 16);
 		assert!(std::mem::size_of::<BuildPushConstants>() <= 128);
 		assert!(std::mem::size_of::<CullPushConstants>() <= 128);
 	}

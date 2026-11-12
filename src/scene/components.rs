@@ -136,6 +136,29 @@ impl Default for PointLightComponent {
 	}
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct SpotLightComponent {
+	pub color: Vec3<f32>,
+	pub intensity: f32,
+	pub radius: f32,
+	pub inner_cone_angle_deg: f32,
+	pub outer_cone_angle_deg: f32,
+	pub cast_shadows: bool,
+}
+
+impl Default for SpotLightComponent {
+	fn default() -> Self {
+		Self {
+			color: Vec3::ONE,
+			intensity: 1.0,
+			radius: 10.0,
+			inner_cone_angle_deg: 25.0,
+			outer_cone_angle_deg: 35.0,
+			cast_shadows: true,
+		}
+	}
+}
+
 pub struct MeshRendererComponent {
 	pub mesh: Arc<Mesh>,
 	pub material: Arc<MaterialInstance>,

@@ -64,6 +64,21 @@ SceneAsset(
 			)),
 		),
 		EntityDesc(
+			name: Some("HelmetTopSpotLight"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 4.0, 0.5),
+				rotation: (-0.7071, 0.0, 0.0, 0.7071),
+			)),
+			spot_light: Some(SpotLightDesc(
+				color: (1.0, 0.9, 0.8),
+				intensity: 4.0,
+				radius: 8.0,
+				inner_cone_angle_deg: 20.0,
+				outer_cone_angle_deg: 35.0,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
 			name: Some("Floor"),
 			transform: Some(TransformDesc(
 				translation: (0.0, 0.0, 0.0),

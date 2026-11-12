@@ -27,8 +27,10 @@ layout(buffer_reference, scalar) readonly buffer ClusterAABBBuffer {
 };
 
 struct ClusterRecord {
-	uint offset;
-	uint count;
+	uint point_offset;
+	uint point_count;
+	uint spot_offset;
+	uint spot_count;
 };
 
 layout(buffer_reference, scalar) writeonly buffer ClusterGridBuffer {
@@ -49,6 +51,21 @@ struct PointLight {
 	vec4 color;
 };
 
+struct SpotLight {
+	vec4 position_radius;
+	vec4 color_intensity;
+	vec4 direction_cos_inner;
+	vec4 params;
+};
+
+layout(buffer_reference, scalar) readonly buffer PointLightBuffer {
+	PointLight lights[];
+};
+
+layout(buffer_reference, scalar) readonly buffer SpotLightBuffer {
+	SpotLight lights[];
+};
+
 layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	mat4 view;
 	mat4 proj;
@@ -57,26 +74,31 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	vec4 camera_position;
 	vec4 ambient_color;
 	uint64_t cluster_grid_address;
-	uint64_t light_index_list_address;
+	uint64_t point_light_index_list_address;
+	uint64_t spot_light_index_list_address;
+	uint64_t point_lights_address;
+	uint64_t spot_lights_address;
 	vec2 cluster_screen_size;
 	float z_near;
 	float z_far;
 	uvec4 cluster_dims;
 	uint dir_light_count;
 	uint point_light_count;
+	uint spot_light_count;
 	uint _pad0;
-	uint _pad1;
+	uint _pad1_0;
+	uint _pad1_1;
 	DirectionalLight dir_lights[4];
-	PointLight point_lights[256];
 };
 
 layout(push_constant, scalar) uniform CullPushConstants {
 	uint64_t scene_address;
 	uint64_t aabb_buffer_address;
 	uint64_t grid_buffer_address;
-	uint64_t index_list_address;
-	uint point_light_count;
-	uint max_lights_per_cluster;
+	uint64_t point_index_list_address;
+	uint64_t spot_index_list_address;
+	uint max_point_lights;
+	uint max_spot_lights;
 } pc;
 
 layout(local_size_x = 16, local_size_y = 9, local_size_z = 1) in;
@@ -85,6 +107,50 @@ bool test_sphere_aabb(vec3 sphere_center, float radius, vec3 aabb_min, vec3 aabb
 	vec3 closest = clamp(sphere_center, aabb_min, aabb_max);
 	vec3 diff = closest - sphere_center;
 	return dot(diff, diff) <= (radius * radius);
+}
+
+bool test_cone_aabb(vec3 cone_pos, vec3 cone_dir, float cone_radius, float cos_outer, vec3 aabb_min, vec3 aabb_max) {
+	// 1. Stage: Sphere Early-Exit
+	if (!test_sphere_aabb(cone_pos, cone_radius, aabb_min, aabb_max)) {
+		return false;
+	}
+
+	// Half-angle >= 90 deg: bounding sphere is sufficient
+	if (cos_outer <= 0.0) {
+		return true;
+	}
+
+	// 2. Stage: Axis-aligned bounding box vs Cone Axis & Angle
+	vec3 box_center = (aabb_min + aabb_max) * 0.5;
+	vec3 box_half = (aabb_max - aabb_min) * 0.5;
+	vec3 to_box = box_center - cone_pos;
+
+	float dist_along_axis = dot(to_box, cone_dir);
+	float box_axis_proj = dot(box_half, abs(cone_dir));
+
+	if (dist_along_axis + box_axis_proj < 0.0) {
+		return false;
+	}
+
+	if (dist_along_axis - box_axis_proj > cone_radius) {
+		return false;
+	}
+
+	vec3 perp_vec = to_box - cone_dir * dist_along_axis;
+	float perp_dist = length(perp_vec);
+
+	float sin_outer = sqrt(max(0.0, 1.0 - cos_outer * cos_outer));
+	float tan_outer = sin_outer / max(0.0001, cos_outer);
+	float max_dist = max(0.0, dist_along_axis + box_axis_proj);
+	float cone_radius_at_dist = max_dist * tan_outer;
+
+	float box_radius = length(box_half);
+
+	if (perp_dist > cone_radius_at_dist + box_radius) {
+		return false;
+	}
+
+	return true;
 }
 
 void main() {
@@ -108,25 +174,57 @@ void main() {
 	vec3 aabb_max = aabb.max_point.xyz;
 
 	SceneFrameData scene = SceneFrameData(pc.scene_address);
-	LightIndexBuffer idx_buf = LightIndexBuffer(pc.index_list_address);
 
-	uint cluster_offset = cluster_idx * pc.max_lights_per_cluster;
-	uint visible_count = 0;
+	// 1. Cull Point Lights
+	uint pt_cluster_offset = cluster_idx * pc.max_point_lights;
+	uint pt_visible_count = 0;
 
-	for (uint i = 0; i < pc.point_light_count; ++i) {
-		PointLight pl = scene.point_lights[i];
-		vec4 view_pos = scene.view * vec4(pl.position.xyz, 1.0);
-		float radius = pl.position.w;
+	if (scene.point_lights_address != 0 && scene.point_light_count > 0) {
+		PointLightBuffer pl_buf = PointLightBuffer(scene.point_lights_address);
+		LightIndexBuffer pt_idx_buf = LightIndexBuffer(pc.point_index_list_address);
 
-		if (test_sphere_aabb(view_pos.xyz, radius, aabb_min, aabb_max)) {
-			if (visible_count < pc.max_lights_per_cluster) {
-				idx_buf.indices[cluster_offset + visible_count] = i;
-				visible_count++;
+		for (uint i = 0; i < scene.point_light_count; ++i) {
+			PointLight pl = pl_buf.lights[i];
+			vec4 view_pos = scene.view * vec4(pl.position.xyz, 1.0);
+			float radius = pl.position.w;
+
+			if (test_sphere_aabb(view_pos.xyz, radius, aabb_min, aabb_max)) {
+				if (pt_visible_count < pc.max_point_lights) {
+					pt_idx_buf.indices[pt_cluster_offset + pt_visible_count] = i;
+					pt_visible_count++;
+				}
+			}
+		}
+	}
+
+	// 2. Cull Spot Lights with Hierarchical Cone-AABB
+	uint spot_cluster_offset = cluster_idx * pc.max_spot_lights;
+	uint spot_visible_count = 0;
+
+	if (scene.spot_lights_address != 0 && scene.spot_light_count > 0) {
+		SpotLightBuffer sl_buf = SpotLightBuffer(scene.spot_lights_address);
+		LightIndexBuffer spot_idx_buf = LightIndexBuffer(pc.spot_index_list_address);
+		mat3 view_rot = mat3(scene.view);
+
+		for (uint i = 0; i < scene.spot_light_count; ++i) {
+			SpotLight sl = sl_buf.lights[i];
+			vec4 view_pos = scene.view * vec4(sl.position_radius.xyz, 1.0);
+			vec3 view_dir = normalize(view_rot * sl.direction_cos_inner.xyz);
+			float radius = sl.position_radius.w;
+			float cos_outer = sl.params.x;
+
+			if (test_cone_aabb(view_pos.xyz, view_dir, radius, cos_outer, aabb_min, aabb_max)) {
+				if (spot_visible_count < pc.max_spot_lights) {
+					spot_idx_buf.indices[spot_cluster_offset + spot_visible_count] = i;
+					spot_visible_count++;
+				}
 			}
 		}
 	}
 
 	ClusterGridBuffer grid_buf = ClusterGridBuffer(pc.grid_buffer_address);
-	grid_buf.records[cluster_idx].offset = cluster_offset;
-	grid_buf.records[cluster_idx].count = visible_count;
+	grid_buf.records[cluster_idx].point_offset = pt_cluster_offset;
+	grid_buf.records[cluster_idx].point_count = pt_visible_count;
+	grid_buf.records[cluster_idx].spot_offset = spot_cluster_offset;
+	grid_buf.records[cluster_idx].spot_count = spot_visible_count;
 }

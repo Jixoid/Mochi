@@ -31,9 +31,18 @@ struct PointLight {
 	vec4 color;
 };
 
+struct SpotLight {
+	vec4 position_radius;
+	vec4 color_intensity;
+	vec4 direction_cos_inner;
+	vec4 params;
+};
+
 struct ClusterRecord {
-	uint offset;
-	uint count;
+	uint point_offset;
+	uint point_count;
+	uint spot_offset;
+	uint spot_count;
 };
 
 layout(buffer_reference, scalar) readonly buffer ClusterGridBuffer {
@@ -44,6 +53,14 @@ layout(buffer_reference, scalar) readonly buffer LightIndexBuffer {
 	uint indices[];
 };
 
+layout(buffer_reference, scalar) readonly buffer PointLightBuffer {
+	PointLight lights[];
+};
+
+layout(buffer_reference, scalar) readonly buffer SpotLightBuffer {
+	SpotLight lights[];
+};
+
 layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	mat4 view;
 	mat4 proj;
@@ -52,17 +69,21 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	vec4 camera_position;
 	vec4 ambient_color;
 	uint64_t cluster_grid_address;
-	uint64_t light_index_list_address;
+	uint64_t point_light_index_list_address;
+	uint64_t spot_light_index_list_address;
+	uint64_t point_lights_address;
+	uint64_t spot_lights_address;
 	vec2 cluster_screen_size;
 	float z_near;
 	float z_far;
 	uvec4 cluster_dims;
 	uint dir_light_count;
 	uint point_light_count;
+	uint spot_light_count;
 	uint _pad0;
-	uint _pad1;
+	uint _pad1_0;
+	uint _pad1_1;
 	DirectionalLight dir_lights[4];
-	PointLight point_lights[256];
 };
 
 struct PbrMaterialData {
@@ -193,7 +214,7 @@ void main() {
 
 	vec3 Lo = vec3(0.0);
 
-	// Evaluate directional lights
+	// 1. Evaluate Directional Lights
 	uint dir_count = min(scene.dir_light_count, 4u);
 	for (uint i = 0u; i < dir_count; ++i) {
 		vec3 L = normalize(-scene.dir_lights[i].direction.xyz);
@@ -210,7 +231,6 @@ void main() {
 
 		vec3 kS = F;
 		vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
-		// For transparent surfaces, diffuse scattering scales with opacity
 		float is_trans = step(albedo.a, 0.999);
 		vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
 
@@ -218,18 +238,17 @@ void main() {
 		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
 	}
 
-	// Evaluate point lights (Clustered Forward with fallback)
-	if (scene.cluster_grid_address != 0 && scene.light_index_list_address != 0) {
+	// 2. Evaluate Clustered Point & Spot Lights
+	if (scene.cluster_grid_address != 0) {
 		ClusterGridBuffer cluster_grid = ClusterGridBuffer(scene.cluster_grid_address);
-		LightIndexBuffer light_index_list = LightIndexBuffer(scene.light_index_list_address);
 
-		// Calculate tile X and Y from screen coordinates
+		// Calculate tile X and Y
 		uint tile_x = uint(gl_FragCoord.x * float(scene.cluster_dims.x) / scene.cluster_screen_size.x);
 		uint tile_y = uint(gl_FragCoord.y * float(scene.cluster_dims.y) / scene.cluster_screen_size.y);
 		tile_x = min(tile_x, scene.cluster_dims.x - 1u);
 		tile_y = min(tile_y, scene.cluster_dims.y - 1u);
 
-		// Calculate slice Z from view-space depth
+		// Calculate slice Z
 		vec4 view_pos = scene.view * vec4(in_world_pos, 1.0);
 		float view_z = -view_pos.z;
 
@@ -242,79 +261,103 @@ void main() {
 
 		uint cluster_idx = tile_x + tile_y * scene.cluster_dims.x + slice_z * (scene.cluster_dims.x * scene.cluster_dims.y);
 		ClusterRecord record = cluster_grid.records[cluster_idx];
-		uint light_count = min(record.count, scene.cluster_dims.w);
 
-		for (uint i = 0u; i < light_count; ++i) {
-			uint light_idx = light_index_list.indices[record.offset + i];
-			if (light_idx >= scene.point_light_count || light_idx >= 256u) {
-				continue;
+		// A. Clustered Point Lights
+		if (scene.point_lights_address != 0 && scene.point_light_index_list_address != 0 && record.point_count > 0) {
+			PointLightBuffer pt_buf = PointLightBuffer(scene.point_lights_address);
+			LightIndexBuffer pt_idx_list = LightIndexBuffer(scene.point_light_index_list_address);
+			uint pt_count = min(record.point_count, scene.cluster_dims.w);
+
+			for (uint i = 0u; i < pt_count; ++i) {
+				uint light_idx = pt_idx_list.indices[record.point_offset + i];
+				if (light_idx >= scene.point_light_count) continue;
+
+				PointLight pl = pt_buf.lights[light_idx];
+				vec3 light_vec = pl.position.xyz - in_world_pos;
+				float distance = length(light_vec);
+				float radius = pl.position.w;
+
+				if (distance > radius) continue;
+
+				vec3 L = normalize(light_vec);
+				vec3 H = normalize(V + L);
+
+				float atten = clamp(1.0 - pow(distance / radius, 4.0), 0.0, 1.0);
+				atten = (atten * atten) / (distance * distance + 1.0);
+
+				vec3 radiance = pl.color.rgb * pl.color.w * atten;
+
+				float NDF = distribution_ggx(N, H, roughness);
+				float G = geometry_smith(N, V, L, roughness);
+				vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+
+				vec3 numerator = NDF * G * F;
+				float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+				vec3 specular = numerator / denominator;
+
+				vec3 kS = F;
+				vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+				float is_trans = step(albedo.a, 0.999);
+				vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
+
+				float NdotL = max(dot(N, L), 0.0);
+				Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
 			}
-
-			vec3 light_vec = scene.point_lights[light_idx].position.xyz - in_world_pos;
-			float distance = length(light_vec);
-			float radius = scene.point_lights[light_idx].position.w;
-
-			if (distance > radius) continue;
-
-			vec3 L = normalize(light_vec);
-			vec3 H = normalize(V + L);
-
-			// Smooth windowed attenuation
-			float atten = clamp(1.0 - pow(distance / radius, 4.0), 0.0, 1.0);
-			atten = (atten * atten) / (distance * distance + 1.0);
-
-			vec3 radiance = scene.point_lights[light_idx].color.rgb * scene.point_lights[light_idx].color.w * atten;
-
-			float NDF = distribution_ggx(N, H, roughness);
-			float G = geometry_smith(N, V, L, roughness);
-			vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
-
-			vec3 numerator = NDF * G * F;
-			float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-			vec3 specular = numerator / denominator;
-
-			vec3 kS = F;
-			vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
-			float is_trans = step(albedo.a, 0.999);
-			vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
-
-			float NdotL = max(dot(N, L), 0.0);
-			Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
 		}
-	} else {
-		// Fallback unclustered loop
-		uint pt_count = min(scene.point_light_count, 256u);
-		for (uint i = 0u; i < pt_count; ++i) {
-			vec3 light_vec = scene.point_lights[i].position.xyz - in_world_pos;
-			float distance = length(light_vec);
-			float radius = scene.point_lights[i].position.w;
 
-			if (distance > radius) continue;
+		// B. Clustered Spot Lights
+		if (scene.spot_lights_address != 0 && scene.spot_light_index_list_address != 0 && record.spot_count > 0) {
+			SpotLightBuffer spot_buf = SpotLightBuffer(scene.spot_lights_address);
+			LightIndexBuffer spot_idx_list = LightIndexBuffer(scene.spot_light_index_list_address);
+			uint spot_count = min(record.spot_count, 64u);
 
-			vec3 L = normalize(light_vec);
-			vec3 H = normalize(V + L);
+			for (uint i = 0u; i < spot_count; ++i) {
+				uint light_idx = spot_idx_list.indices[record.spot_offset + i];
+				if (light_idx >= scene.spot_light_count) continue;
 
-			// Smooth windowed attenuation
-			float atten = clamp(1.0 - pow(distance / radius, 4.0), 0.0, 1.0);
-			atten = (atten * atten) / (distance * distance + 1.0);
+				SpotLight spot = spot_buf.lights[light_idx];
+				vec3 light_vec = spot.position_radius.xyz - in_world_pos;
+				float distance = length(light_vec);
+				float radius = spot.position_radius.w;
 
-			vec3 radiance = scene.point_lights[i].color.rgb * scene.point_lights[i].color.w * atten;
+				if (distance > radius) continue;
 
-			float NDF = distribution_ggx(N, H, roughness);
-			float G = geometry_smith(N, V, L, roughness);
-			vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+				vec3 L = normalize(light_vec);
 
-			vec3 numerator = NDF * G * F;
-			float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-			vec3 specular = numerator / denominator;
+				// Angular cutoff (light shines in spot.direction_cos_inner.xyz)
+				float cos_theta = dot(-L, spot.direction_cos_inner.xyz);
+				float cos_inner = spot.direction_cos_inner.w;
+				float cos_outer = spot.params.x;
 
-			vec3 kS = F;
-			vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
-			float is_trans = step(albedo.a, 0.999);
-			vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
+				if (cos_theta < cos_outer) continue;
 
-			float NdotL = max(dot(N, L), 0.0);
-			Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
+				float epsilon = max(0.0001, cos_inner - cos_outer);
+				float spot_atten = clamp((cos_theta - cos_outer) / epsilon, 0.0, 1.0);
+				spot_atten = spot_atten * spot_atten;
+
+				// Distance attenuation
+				float dist_atten = clamp(1.0 - pow(distance / radius, 4.0), 0.0, 1.0);
+				dist_atten = (dist_atten * dist_atten) / (distance * distance + 1.0);
+
+				vec3 radiance = spot.color_intensity.rgb * spot.color_intensity.w * dist_atten * spot_atten;
+
+				vec3 H = normalize(V + L);
+				float NDF = distribution_ggx(N, H, roughness);
+				float G = geometry_smith(N, V, L, roughness);
+				vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+
+				vec3 numerator = NDF * G * F;
+				float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+				vec3 specular = numerator / denominator;
+
+				vec3 kS = F;
+				vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+				float is_trans = step(albedo.a, 0.999);
+				vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
+
+				float NdotL = max(dot(N, L), 0.0);
+				Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
+			}
 		}
 	}
 

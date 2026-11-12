@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::asset::model::ModelAsset;
 use crate::rendering::RenderingSystem;
 use crate::rhi;
-use crate::scene::{CameraComponent, DirectionalLightComponent, MeshRendererComponent, PointLightComponent, Scene, TransformComponent};
+use crate::scene::{CameraComponent, DirectionalLightComponent, MeshRendererComponent, PointLightComponent, Scene, SpotLightComponent, TransformComponent};
 use crate::script::ScriptComponent;
 use mochi_except::*;
 use mochi_math::{Quat, Transform, Vec3, Vec4};
@@ -107,6 +107,17 @@ pub struct PointLightDesc {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SpotLightDesc {
+	pub color: [f32; 3],
+	pub intensity: f32,
+	pub radius: f32,
+	pub inner_cone_angle_deg: f32,
+	pub outer_cone_angle_deg: f32,
+	#[serde(default = "default_cast_shadows")]
+	pub cast_shadows: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MeshRendererDesc {
 	pub asset: String,
 	#[serde(default = "default_visible")]
@@ -131,6 +142,7 @@ pub struct EntityDesc {
 	pub camera: Option<CameraDesc>,
 	pub directional_light: Option<DirectionalLightDesc>,
 	pub point_light: Option<PointLightDesc>,
+	pub spot_light: Option<SpotLightDesc>,
 	pub mesh_renderer: Option<MeshRendererDesc>,
 	pub script: Option<ScriptDesc>,
 }
@@ -225,6 +237,18 @@ impl SceneAsset {
 					radius: pl.radius,
 				};
 				scene.spawn((transform, pt_light));
+			}
+
+			if let Some(sl) = &entity_desc.spot_light {
+				let spot_light = SpotLightComponent {
+					color: Vec3::new(sl.color[0], sl.color[1], sl.color[2]),
+					intensity: sl.intensity,
+					radius: sl.radius,
+					inner_cone_angle_deg: sl.inner_cone_angle_deg,
+					outer_cone_angle_deg: sl.outer_cone_angle_deg,
+					cast_shadows: sl.cast_shadows,
+				};
+				scene.spawn((transform, spot_light));
 			}
 
 			if let Some(mr) = &entity_desc.mesh_renderer {

@@ -10,13 +10,12 @@
 */
 
 
-use crate::rendering::cluster::{CLUSTER_DIM_X, CLUSTER_DIM_Y, CLUSTER_DIM_Z, MAX_LIGHTS_PER_CLUSTER};
+use crate::rendering::cluster::{CLUSTER_DIM_X, CLUSTER_DIM_Y, CLUSTER_DIM_Z, MAX_POINT_LIGHTS_PER_CLUSTER};
 use crate::rhi::{self, AllocationCreate, AllocationLocation, BufferUsage, TransferTime};
-use crate::scene::{CameraComponent, DirectionalLightComponent, PointLightComponent, Scene, TransformComponent};
+use crate::scene::{CameraComponent, DirectionalLightComponent, PointLightComponent, Scene, SpotLightComponent, TransformComponent};
 
 
 pub const MAX_DIRECTIONAL_LIGHTS: usize = 4;
-pub const MAX_POINT_LIGHTS: usize = 256;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -33,6 +32,15 @@ pub struct PointLightGpuData {
 }
 
 #[repr(C, align(16))]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+pub struct SpotLightGpuData {
+	pub position_radius: [f32; 4],
+	pub color_intensity: [f32; 4],
+	pub direction_cos_inner: [f32; 4],
+	pub params: [f32; 4],
+}
+
+#[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
 pub struct SceneFrameData {
 	pub view: [f32; 16],
@@ -42,31 +50,37 @@ pub struct SceneFrameData {
 	pub camera_position: [f32; 4],
 	pub ambient_color: [f32; 4],
 	pub cluster_grid_address: u64,
-	pub light_index_list_address: u64,
+	pub point_light_index_list_address: u64,
+	pub spot_light_index_list_address: u64,
+	pub point_lights_address: u64,
+	pub spot_lights_address: u64,
 	pub cluster_screen_size: [f32; 2],
 	pub z_near: f32,
 	pub z_far: f32,
 	pub cluster_dims: [u32; 4],
 	pub dir_light_count: u32,
 	pub point_light_count: u32,
+	pub spot_light_count: u32,
 	pub _pad0: u32,
-	pub _pad1: u32,
+	pub _pad1: [u32; 2],
 	pub dir_lights: [DirectionalLightGpuData; MAX_DIRECTIONAL_LIGHTS],
-	pub point_lights: [PointLightGpuData; MAX_POINT_LIGHTS],
 }
 
 const _: () = {
-	assert!(std::mem::size_of::<SceneFrameData>() == 352 + 128 + 256 * 32);
+	assert!(std::mem::size_of::<SceneFrameData>() == 512);
 	assert!(std::mem::offset_of!(SceneFrameData, cluster_grid_address) == 288);
-	assert!(std::mem::offset_of!(SceneFrameData, light_index_list_address) == 296);
-	assert!(std::mem::offset_of!(SceneFrameData, cluster_screen_size) == 304);
-	assert!(std::mem::offset_of!(SceneFrameData, z_near) == 312);
-	assert!(std::mem::offset_of!(SceneFrameData, z_far) == 316);
-	assert!(std::mem::offset_of!(SceneFrameData, cluster_dims) == 320);
-	assert!(std::mem::offset_of!(SceneFrameData, dir_light_count) == 336);
-	assert!(std::mem::offset_of!(SceneFrameData, point_light_count) == 340);
-	assert!(std::mem::offset_of!(SceneFrameData, dir_lights) == 352);
-	assert!(std::mem::offset_of!(SceneFrameData, point_lights) == 480);
+	assert!(std::mem::offset_of!(SceneFrameData, point_light_index_list_address) == 296);
+	assert!(std::mem::offset_of!(SceneFrameData, spot_light_index_list_address) == 304);
+	assert!(std::mem::offset_of!(SceneFrameData, point_lights_address) == 312);
+	assert!(std::mem::offset_of!(SceneFrameData, spot_lights_address) == 320);
+	assert!(std::mem::offset_of!(SceneFrameData, cluster_screen_size) == 328);
+	assert!(std::mem::offset_of!(SceneFrameData, z_near) == 336);
+	assert!(std::mem::offset_of!(SceneFrameData, z_far) == 340);
+	assert!(std::mem::offset_of!(SceneFrameData, cluster_dims) == 344);
+	assert!(std::mem::offset_of!(SceneFrameData, dir_light_count) == 360);
+	assert!(std::mem::offset_of!(SceneFrameData, point_light_count) == 364);
+	assert!(std::mem::offset_of!(SceneFrameData, spot_light_count) == 368);
+	assert!(std::mem::offset_of!(SceneFrameData, dir_lights) == 384);
 };
 
 impl Default for SceneFrameData {
@@ -85,7 +99,10 @@ impl Default for SceneFrameData {
 			camera_position: [0.0, 0.0, 0.0, 0.0],
 			ambient_color: [0.03, 0.03, 0.03, 0.016],
 			cluster_grid_address: 0,
-			light_index_list_address: 0,
+			point_light_index_list_address: 0,
+			spot_light_index_list_address: 0,
+			point_lights_address: 0,
+			spot_lights_address: 0,
 			cluster_screen_size: [1.0, 1.0],
 			z_near: 0.1,
 			z_far: 1000.0,
@@ -93,28 +110,38 @@ impl Default for SceneFrameData {
 				CLUSTER_DIM_X,
 				CLUSTER_DIM_Y,
 				CLUSTER_DIM_Z,
-				MAX_LIGHTS_PER_CLUSTER,
+				MAX_POINT_LIGHTS_PER_CLUSTER,
 			],
 			dir_light_count: 0,
 			point_light_count: 0,
+			spot_light_count: 0,
 			_pad0: 0,
-			_pad1: 0,
+			_pad1: [0; 2],
 			dir_lights: [DirectionalLightGpuData::default(); MAX_DIRECTIONAL_LIGHTS],
-			point_lights: [PointLightGpuData::default(); MAX_POINT_LIGHTS],
 		}
 	}
 }
 
 pub struct SceneFrameBuffer {
 	gpu_buffer: Option<rhi::Buffer>,
+	point_light_buffer: Option<rhi::Buffer>,
+	point_light_capacity: usize,
+	spot_light_buffer: Option<rhi::Buffer>,
+	spot_light_capacity: usize,
 	point_light_count: u32,
+	spot_light_count: u32,
 }
 
 impl SceneFrameBuffer {
 	pub fn new() -> Self {
 		Self {
 			gpu_buffer: None,
+			point_light_buffer: None,
+			point_light_capacity: 0,
+			spot_light_buffer: None,
+			spot_light_capacity: 0,
 			point_light_count: 0,
+			spot_light_count: 0,
 		}
 	}
 
@@ -129,7 +156,8 @@ impl SceneFrameBuffer {
 		time: f32,
 		delta_time: f32,
 		cluster_grid_address: u64,
-		light_index_list_address: u64,
+		point_light_index_list_address: u64,
+		spot_light_index_list_address: u64,
 		screen_width: u32,
 		screen_height: u32,
 	) {
@@ -140,7 +168,105 @@ impl SceneFrameBuffer {
 
 		let cam_pos = camera_transform.translation;
 
-		let mut frame_data = SceneFrameData {
+		// 1. Query Directional Lights
+		let mut dir_lights = [DirectionalLightGpuData::default(); MAX_DIRECTIONAL_LIGHTS];
+		let mut dir_idx = 0;
+		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &DirectionalLightComponent)>().iter() {
+			if dir_idx >= MAX_DIRECTIONAL_LIGHTS {
+				break;
+			}
+			let dir = t.rotation * light.direction;
+			dir_lights[dir_idx] = DirectionalLightGpuData {
+				direction: [dir.x, dir.y, dir.z, if light.cast_shadows { 1.0 } else { 0.0 }],
+				color: [light.color.x, light.color.y, light.color.z, light.intensity],
+			};
+			dir_idx += 1;
+		}
+
+		// 2. Query Dynamic Point Lights
+		let mut point_lights_vec = Vec::new();
+		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &PointLightComponent)>().iter() {
+			let pos = t.translation;
+			point_lights_vec.push(PointLightGpuData {
+				position: [pos.x, pos.y, pos.z, light.radius],
+				color: [light.color.x, light.color.y, light.color.z, light.intensity],
+			});
+		}
+		self.point_light_count = point_lights_vec.len() as u32;
+
+		if !point_lights_vec.is_empty() {
+			let required_cap = point_lights_vec.len().max(64).next_power_of_two();
+			if self.point_light_buffer.is_none() || self.point_light_capacity < point_lights_vec.len() {
+				let buf_size = (required_cap * std::mem::size_of::<PointLightGpuData>()) as u64;
+				self.point_light_buffer = Some(rhi::Buffer::new(
+					alloc,
+					buf_size,
+					BufferUsage::StorageBuffer | BufferUsage::DeviceAddress,
+					AllocationCreate::Mapped,
+					AllocationLocation::Auto,
+				));
+				self.point_light_capacity = required_cap;
+			}
+
+			if let Some(buf) = &mut self.point_light_buffer {
+				let uploader = rhi::Uploader::new(device);
+				let bytes = unsafe {
+					std::slice::from_raw_parts(
+						point_lights_vec.as_ptr() as *const u8,
+						point_lights_vec.len() * std::mem::size_of::<PointLightGpuData>(),
+					)
+				};
+				uploader.copy_memory_to_buffer(TransferTime::Now, bytes, buf);
+			}
+		}
+
+		// 3. Query Dynamic Spot Lights
+		let mut spot_lights_vec = Vec::new();
+		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &SpotLightComponent)>().iter() {
+			let pos = t.translation;
+			let dir = t.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
+			let inner_cos = (light.inner_cone_angle_deg.to_radians() * 0.5).cos();
+			let outer_cos = (light.outer_cone_angle_deg.to_radians() * 0.5).cos();
+
+			spot_lights_vec.push(SpotLightGpuData {
+				position_radius: [pos.x, pos.y, pos.z, light.radius],
+				color_intensity: [light.color.x, light.color.y, light.color.z, light.intensity],
+				direction_cos_inner: [dir.x, dir.y, dir.z, inner_cos],
+				params: [outer_cos, if light.cast_shadows { 1.0 } else { 0.0 }, 0.0, 0.0],
+			});
+		}
+		self.spot_light_count = spot_lights_vec.len() as u32;
+
+		if !spot_lights_vec.is_empty() {
+			let required_cap = spot_lights_vec.len().max(32).next_power_of_two();
+			if self.spot_light_buffer.is_none() || self.spot_light_capacity < spot_lights_vec.len() {
+				let buf_size = (required_cap * std::mem::size_of::<SpotLightGpuData>()) as u64;
+				self.spot_light_buffer = Some(rhi::Buffer::new(
+					alloc,
+					buf_size,
+					BufferUsage::StorageBuffer | BufferUsage::DeviceAddress,
+					AllocationCreate::Mapped,
+					AllocationLocation::Auto,
+				));
+				self.spot_light_capacity = required_cap;
+			}
+
+			if let Some(buf) = &mut self.spot_light_buffer {
+				let uploader = rhi::Uploader::new(device);
+				let bytes = unsafe {
+					std::slice::from_raw_parts(
+						spot_lights_vec.as_ptr() as *const u8,
+						spot_lights_vec.len() * std::mem::size_of::<SpotLightGpuData>(),
+					)
+				};
+				uploader.copy_memory_to_buffer(TransferTime::Now, bytes, buf);
+			}
+		}
+
+		let point_lights_address = self.point_light_buffer.as_ref().map_or(0, |b| b.address());
+		let spot_lights_address = self.spot_light_buffer.as_ref().map_or(0, |b| b.address());
+
+		let frame_data = SceneFrameData {
 			view: view.to_array(),
 			proj: proj.to_array(),
 			view_proj: view_proj.to_array(),
@@ -148,7 +274,10 @@ impl SceneFrameBuffer {
 			camera_position: [cam_pos.x, cam_pos.y, cam_pos.z, time],
 			ambient_color: [0.15, 0.15, 0.2, delta_time],
 			cluster_grid_address,
-			light_index_list_address,
+			point_light_index_list_address,
+			spot_light_index_list_address,
+			point_lights_address,
+			spot_lights_address,
 			cluster_screen_size: [screen_width as f32, screen_height as f32],
 			z_near: camera.near,
 			z_far: camera.far,
@@ -156,46 +285,15 @@ impl SceneFrameBuffer {
 				CLUSTER_DIM_X,
 				CLUSTER_DIM_Y,
 				CLUSTER_DIM_Z,
-				MAX_LIGHTS_PER_CLUSTER,
+				MAX_POINT_LIGHTS_PER_CLUSTER,
 			],
-			dir_light_count: 0,
-			point_light_count: 0,
+			dir_light_count: dir_idx as u32,
+			point_light_count: self.point_light_count,
+			spot_light_count: self.spot_light_count,
 			_pad0: 0,
-			_pad1: 0,
-			dir_lights: [DirectionalLightGpuData::default(); MAX_DIRECTIONAL_LIGHTS],
-			point_lights: [PointLightGpuData::default(); MAX_POINT_LIGHTS],
+			_pad1: [0; 2],
+			dir_lights,
 		};
-
-		// Query directional lights
-		let mut dir_idx = 0;
-		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &DirectionalLightComponent)>().iter() {
-			if dir_idx >= MAX_DIRECTIONAL_LIGHTS {
-				break;
-			}
-			let dir = t.rotation * light.direction;
-			frame_data.dir_lights[dir_idx] = DirectionalLightGpuData {
-				direction: [dir.x, dir.y, dir.z, if light.cast_shadows { 1.0 } else { 0.0 }],
-				color: [light.color.x, light.color.y, light.color.z, light.intensity],
-			};
-			dir_idx += 1;
-		}
-		frame_data.dir_light_count = dir_idx as u32;
-
-		// Query point lights
-		let mut pt_idx = 0;
-		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &PointLightComponent)>().iter() {
-			if pt_idx >= MAX_POINT_LIGHTS {
-				break;
-			}
-			let pos = t.translation;
-			frame_data.point_lights[pt_idx] = PointLightGpuData {
-				position: [pos.x, pos.y, pos.z, light.radius],
-				color: [light.color.x, light.color.y, light.color.z, light.intensity],
-			};
-			pt_idx += 1;
-		}
-		frame_data.point_light_count = pt_idx as u32;
-		self.point_light_count = pt_idx as u32;
 
 		let buffer_size = std::mem::size_of::<SceneFrameData>() as u64;
 
@@ -228,6 +326,10 @@ impl SceneFrameBuffer {
 
 	pub fn point_light_count(&self) -> u32 {
 		self.point_light_count
+	}
+
+	pub fn spot_light_count(&self) -> u32 {
+		self.spot_light_count
 	}
 }
 

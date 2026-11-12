@@ -395,10 +395,10 @@ impl RenderingSystem {
 
 		let clear_color = camera.clear_color;
 
-		let (grid_addr, index_addr) = if let Some(cm) = &self.cluster_manager {
-			(cm.grid_address(), cm.index_list_address())
+		let (grid_addr, pt_index_addr, spot_index_addr) = if let Some(cm) = &self.cluster_manager {
+			(cm.grid_address(), cm.point_index_list_address(), cm.spot_index_list_address())
 		} else {
-			(0, 0)
+			(0, 0, 0)
 		};
 
 		// Update frame scene buffer (Camera + Dynamic Lights)
@@ -412,7 +412,8 @@ impl RenderingSystem {
 			time,
 			delta_time,
 			grid_addr,
-			index_addr,
+			pt_index_addr,
+			spot_index_addr,
 			width,
 			height,
 		);
@@ -443,7 +444,6 @@ impl RenderingSystem {
 		}
 
 		let scene_addr = self.frame_buffer.address();
-		let pt_count = self.frame_buffer.point_light_count();
 		let material_addr = self.material_storage.buffer_address();
 
 		let cmd = &mut self.cmd_buffers[frame];
@@ -454,7 +454,7 @@ impl RenderingSystem {
 			let proj = camera.projection_matrix(aspect);
 			let inv_proj = proj.inverse();
 			cm.update_camera(cmd, inv_proj.to_array(), camera.near, camera.far);
-			cm.cull_lights(cmd, scene_addr, pt_count);
+			cm.cull_lights(cmd, scene_addr);
 		}
 
 		if is_fxaa {
