@@ -13,6 +13,7 @@
 use std::sync::Arc;
 use crate::material::{BlendMode, MaterialInstance, MaterialStorage, MaterialTemplate, PassKind, TextureManager};
 use crate::rendering::aa::AntiAliasingMode;
+use crate::rendering::cluster::ClusterManager;
 use crate::rendering::frame::SceneFrameBuffer;
 use crate::rendering::queue::RenderQueue;
 use crate::rhi;
@@ -75,6 +76,7 @@ pub struct RenderingSystem {
 	fxaa_pipeline: Option<rhi::Pipeline>,
 	fxaa_meta: Option<rhi::PipelineMeta>,
 	fxaa_sampler: Option<rhi::Sampler2>,
+	cluster_manager: Option<ClusterManager>,
 }
 
 impl RenderingSystem {
@@ -102,6 +104,7 @@ impl RenderingSystem {
 			fxaa_pipeline: None,
 			fxaa_meta: None,
 			fxaa_sampler: None,
+			cluster_manager: None,
 		})
 	}
 
@@ -184,6 +187,16 @@ impl RenderingSystem {
 		self.fxaa_meta = Some(fxaa_meta);
 		self.fxaa_pipeline = Some(fxaa_pipeline);
 		self.fxaa_sampler = Some(fxaa_sampler);
+
+		match ClusterManager::new(device, alloc) {
+			Ok(cm) => {
+				mochi_disp!("Clustered Forward light manager initialized");
+				self.cluster_manager = Some(cm);
+			}
+			Err(err) => {
+				mochi_warn!("Failed to initialize Clustered Forward manager: {err}");
+			}
+		}
 
 		mochi_disp!(
 			"PBR graphics pipeline initialized. Opaque Template ID: {}, Transparent Template ID: {}, Samples: {:?}",
@@ -382,6 +395,12 @@ impl RenderingSystem {
 
 		let clear_color = camera.clear_color;
 
+		let (grid_addr, index_addr) = if let Some(cm) = &self.cluster_manager {
+			(cm.grid_address(), cm.index_list_address())
+		} else {
+			(0, 0)
+		};
+
 		// Update frame scene buffer (Camera + Dynamic Lights)
 		self.frame_buffer.update(
 			device,
@@ -392,6 +411,10 @@ impl RenderingSystem {
 			aspect,
 			time,
 			delta_time,
+			grid_addr,
+			index_addr,
+			width,
+			height,
 		);
 
 		// Extract packets and sort for ForwardLit pass
@@ -419,8 +442,20 @@ impl RenderingSystem {
 			}
 		}
 
+		let scene_addr = self.frame_buffer.address();
+		let pt_count = self.frame_buffer.point_light_count();
+		let material_addr = self.material_storage.buffer_address();
+
 		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
+
+		// Clustered Forward compute dispatch (Camera AABBs + Light Culling)
+		if let Some(cm) = &mut self.cluster_manager {
+			let proj = camera.projection_matrix(aspect);
+			let inv_proj = proj.inverse();
+			cm.update_camera(cmd, inv_proj.to_array(), camera.near, camera.far);
+			cm.cull_lights(cmd, scene_addr, pt_count);
+		}
 
 		if is_fxaa {
 			if let Some(offscreen) = &self.offscreen_target {
@@ -435,8 +470,6 @@ impl RenderingSystem {
 					height,
 				);
 
-				let scene_addr = self.frame_buffer.address();
-				let material_addr = self.material_storage.buffer_address();
 				cmd.render_pass(&scene_target, clear_color, |pass| {
 					Self::record_scene_packets(
 						pass,
@@ -476,8 +509,6 @@ impl RenderingSystem {
 				}
 			}
 		} else if let Some(target) = display.render_target(img_idx) {
-			let scene_addr = self.frame_buffer.address();
-			let material_addr = self.material_storage.buffer_address();
 			cmd.render_pass(&target, clear_color, |pass| {
 				Self::record_scene_packets(
 					pass,

@@ -1,0 +1,92 @@
+/*
+	This file is part of QAOS
+
+	This file is licensed under the GNU General Public License version 3 (GPL3).
+
+	You should have received a copy of the GNU General Public License
+	along with QAOS. If not, see <https://www.gnu.org/licenses/>.
+
+	Copyright (c) 2025-2026 by Kadir Aydın.
+*/
+
+
+#version 450
+
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_scalar_block_layout : require
+
+
+struct ClusterAABB {
+	vec4 min_point;
+	vec4 max_point;
+};
+
+layout(buffer_reference, scalar) writeonly buffer ClusterAABBBuffer {
+	ClusterAABB aabbs[];
+};
+
+layout(push_constant, scalar, row_major) uniform BuildPushConstants {
+	mat4 inv_proj;
+	uint64_t aabb_buffer_address;
+	float z_near;
+	float z_far;
+	uint dim_x;
+	uint dim_y;
+	uint dim_z;
+	uint _pad;
+} pc;
+
+layout(local_size_x = 16, local_size_y = 9, local_size_z = 1) in;
+
+vec3 screen_to_view(vec2 screen_ndc, mat4 inv_proj) {
+	vec4 clip = vec4(screen_ndc, 1.0, 1.0);
+	vec4 view = inv_proj * clip;
+	return view.xyz / view.w;
+}
+
+vec3 line_intersect_z(vec3 dir, float target_z) {
+	return dir * (target_z / dir.z);
+}
+
+void main() {
+	uint tile_x = gl_GlobalInvocationID.x;
+	uint tile_y = gl_GlobalInvocationID.y;
+	uint slice_z = gl_GlobalInvocationID.z;
+
+	if (tile_x >= pc.dim_x || tile_y >= pc.dim_y || slice_z >= pc.dim_z) {
+		return;
+	}
+
+	uint cluster_idx = tile_x + tile_y * pc.dim_x + slice_z * (pc.dim_x * pc.dim_y);
+
+	float x_min = -1.0 + 2.0 * float(tile_x) / float(pc.dim_x);
+	float x_max = -1.0 + 2.0 * float(tile_x + 1) / float(pc.dim_x);
+	float y_min = -1.0 + 2.0 * float(tile_y) / float(pc.dim_y);
+	float y_max = -1.0 + 2.0 * float(tile_y + 1) / float(pc.dim_y);
+
+	vec3 ray_tl = screen_to_view(vec2(x_min, y_min), pc.inv_proj);
+	vec3 ray_tr = screen_to_view(vec2(x_max, y_min), pc.inv_proj);
+	vec3 ray_bl = screen_to_view(vec2(x_min, y_max), pc.inv_proj);
+	vec3 ray_br = screen_to_view(vec2(x_max, y_max), pc.inv_proj);
+
+	float z_near_slice = -pc.z_near * pow(pc.z_far / pc.z_near, float(slice_z) / float(pc.dim_z));
+	float z_far_slice  = -pc.z_near * pow(pc.z_far / pc.z_near, float(slice_z + 1) / float(pc.dim_z));
+
+	vec3 p0 = line_intersect_z(ray_tl, z_near_slice);
+	vec3 p1 = line_intersect_z(ray_tr, z_near_slice);
+	vec3 p2 = line_intersect_z(ray_bl, z_near_slice);
+	vec3 p3 = line_intersect_z(ray_br, z_near_slice);
+
+	vec3 p4 = line_intersect_z(ray_tl, z_far_slice);
+	vec3 p5 = line_intersect_z(ray_tr, z_far_slice);
+	vec3 p6 = line_intersect_z(ray_bl, z_far_slice);
+	vec3 p7 = line_intersect_z(ray_br, z_far_slice);
+
+	vec3 aabb_min = min(min(min(p0, p1), min(p2, p3)), min(min(p4, p5), min(p6, p7)));
+	vec3 aabb_max = max(max(max(p0, p1), max(p2, p3)), max(max(p4, p5), max(p6, p7)));
+
+	ClusterAABBBuffer out_buf = ClusterAABBBuffer(pc.aabb_buffer_address);
+	out_buf.aabbs[cluster_idx].min_point = vec4(aabb_min, 0.0);
+	out_buf.aabbs[cluster_idx].max_point = vec4(aabb_max, 0.0);
+}

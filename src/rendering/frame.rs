@@ -10,12 +10,13 @@
 */
 
 
+use crate::rendering::cluster::{CLUSTER_DIM_X, CLUSTER_DIM_Y, CLUSTER_DIM_Z, MAX_LIGHTS_PER_CLUSTER};
 use crate::rhi::{self, AllocationCreate, AllocationLocation, BufferUsage, TransferTime};
 use crate::scene::{CameraComponent, DirectionalLightComponent, PointLightComponent, Scene, TransformComponent};
 
 
 pub const MAX_DIRECTIONAL_LIGHTS: usize = 4;
-pub const MAX_POINT_LIGHTS: usize = 64;
+pub const MAX_POINT_LIGHTS: usize = 256;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -40,6 +41,12 @@ pub struct SceneFrameData {
 	pub inv_view_proj: [f32; 16],
 	pub camera_position: [f32; 4],
 	pub ambient_color: [f32; 4],
+	pub cluster_grid_address: u64,
+	pub light_index_list_address: u64,
+	pub cluster_screen_size: [f32; 2],
+	pub z_near: f32,
+	pub z_far: f32,
+	pub cluster_dims: [u32; 4],
 	pub dir_light_count: u32,
 	pub point_light_count: u32,
 	pub _pad0: u32,
@@ -47,6 +54,20 @@ pub struct SceneFrameData {
 	pub dir_lights: [DirectionalLightGpuData; MAX_DIRECTIONAL_LIGHTS],
 	pub point_lights: [PointLightGpuData; MAX_POINT_LIGHTS],
 }
+
+const _: () = {
+	assert!(std::mem::size_of::<SceneFrameData>() == 352 + 128 + 256 * 32);
+	assert!(std::mem::offset_of!(SceneFrameData, cluster_grid_address) == 288);
+	assert!(std::mem::offset_of!(SceneFrameData, light_index_list_address) == 296);
+	assert!(std::mem::offset_of!(SceneFrameData, cluster_screen_size) == 304);
+	assert!(std::mem::offset_of!(SceneFrameData, z_near) == 312);
+	assert!(std::mem::offset_of!(SceneFrameData, z_far) == 316);
+	assert!(std::mem::offset_of!(SceneFrameData, cluster_dims) == 320);
+	assert!(std::mem::offset_of!(SceneFrameData, dir_light_count) == 336);
+	assert!(std::mem::offset_of!(SceneFrameData, point_light_count) == 340);
+	assert!(std::mem::offset_of!(SceneFrameData, dir_lights) == 352);
+	assert!(std::mem::offset_of!(SceneFrameData, point_lights) == 480);
+};
 
 impl Default for SceneFrameData {
 	fn default() -> Self {
@@ -63,6 +84,17 @@ impl Default for SceneFrameData {
 			inv_view_proj: identity_mat,
 			camera_position: [0.0, 0.0, 0.0, 0.0],
 			ambient_color: [0.03, 0.03, 0.03, 0.016],
+			cluster_grid_address: 0,
+			light_index_list_address: 0,
+			cluster_screen_size: [1.0, 1.0],
+			z_near: 0.1,
+			z_far: 1000.0,
+			cluster_dims: [
+				CLUSTER_DIM_X,
+				CLUSTER_DIM_Y,
+				CLUSTER_DIM_Z,
+				MAX_LIGHTS_PER_CLUSTER,
+			],
 			dir_light_count: 0,
 			point_light_count: 0,
 			_pad0: 0,
@@ -75,11 +107,15 @@ impl Default for SceneFrameData {
 
 pub struct SceneFrameBuffer {
 	gpu_buffer: Option<rhi::Buffer>,
+	point_light_count: u32,
 }
 
 impl SceneFrameBuffer {
 	pub fn new() -> Self {
-		Self { gpu_buffer: None }
+		Self {
+			gpu_buffer: None,
+			point_light_count: 0,
+		}
 	}
 
 	pub fn update(
@@ -92,6 +128,10 @@ impl SceneFrameBuffer {
 		aspect: f32,
 		time: f32,
 		delta_time: f32,
+		cluster_grid_address: u64,
+		light_index_list_address: u64,
+		screen_width: u32,
+		screen_height: u32,
 	) {
 		let view = camera.view_matrix(camera_transform);
 		let proj = camera.projection_matrix(aspect);
@@ -107,6 +147,17 @@ impl SceneFrameBuffer {
 			inv_view_proj: inv_view_proj.to_array(),
 			camera_position: [cam_pos.x, cam_pos.y, cam_pos.z, time],
 			ambient_color: [0.15, 0.15, 0.2, delta_time],
+			cluster_grid_address,
+			light_index_list_address,
+			cluster_screen_size: [screen_width as f32, screen_height as f32],
+			z_near: camera.near,
+			z_far: camera.far,
+			cluster_dims: [
+				CLUSTER_DIM_X,
+				CLUSTER_DIM_Y,
+				CLUSTER_DIM_Z,
+				MAX_LIGHTS_PER_CLUSTER,
+			],
 			dir_light_count: 0,
 			point_light_count: 0,
 			_pad0: 0,
@@ -144,6 +195,7 @@ impl SceneFrameBuffer {
 			pt_idx += 1;
 		}
 		frame_data.point_light_count = pt_idx as u32;
+		self.point_light_count = pt_idx as u32;
 
 		let buffer_size = std::mem::size_of::<SceneFrameData>() as u64;
 
@@ -172,6 +224,10 @@ impl SceneFrameBuffer {
 
 	pub fn address(&self) -> u64 {
 		self.gpu_buffer.as_ref().map_or(0, |b| b.address())
+	}
+
+	pub fn point_light_count(&self) -> u32 {
+		self.point_light_count
 	}
 }
 

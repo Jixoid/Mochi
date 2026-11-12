@@ -31,6 +31,19 @@ struct PointLight {
 	vec4 color;
 };
 
+struct ClusterRecord {
+	uint offset;
+	uint count;
+};
+
+layout(buffer_reference, scalar) readonly buffer ClusterGridBuffer {
+	ClusterRecord records[];
+};
+
+layout(buffer_reference, scalar) readonly buffer LightIndexBuffer {
+	uint indices[];
+};
+
 layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	mat4 view;
 	mat4 proj;
@@ -38,12 +51,18 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	mat4 inv_view_proj;
 	vec4 camera_position;
 	vec4 ambient_color;
+	uint64_t cluster_grid_address;
+	uint64_t light_index_list_address;
+	vec2 cluster_screen_size;
+	float z_near;
+	float z_far;
+	uvec4 cluster_dims;
 	uint dir_light_count;
 	uint point_light_count;
 	uint _pad0;
 	uint _pad1;
 	DirectionalLight dir_lights[4];
-	PointLight point_lights[64];
+	PointLight point_lights[256];
 };
 
 struct PbrMaterialData {
@@ -199,39 +218,104 @@ void main() {
 		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
 	}
 
-	// Evaluate point lights
-	uint pt_count = min(scene.point_light_count, 64u);
-	for (uint i = 0u; i < pt_count; ++i) {
-		vec3 light_vec = scene.point_lights[i].position.xyz - in_world_pos;
-		float distance = length(light_vec);
-		float radius = scene.point_lights[i].position.w;
+	// Evaluate point lights (Clustered Forward with fallback)
+	if (scene.cluster_grid_address != 0 && scene.light_index_list_address != 0) {
+		ClusterGridBuffer cluster_grid = ClusterGridBuffer(scene.cluster_grid_address);
+		LightIndexBuffer light_index_list = LightIndexBuffer(scene.light_index_list_address);
 
-		if (distance > radius) continue;
+		// Calculate tile X and Y from screen coordinates
+		uint tile_x = uint(gl_FragCoord.x * float(scene.cluster_dims.x) / scene.cluster_screen_size.x);
+		uint tile_y = uint(gl_FragCoord.y * float(scene.cluster_dims.y) / scene.cluster_screen_size.y);
+		tile_x = min(tile_x, scene.cluster_dims.x - 1u);
+		tile_y = min(tile_y, scene.cluster_dims.y - 1u);
 
-		vec3 L = normalize(light_vec);
-		vec3 H = normalize(V + L);
+		// Calculate slice Z from view-space depth
+		vec4 view_pos = scene.view * vec4(in_world_pos, 1.0);
+		float view_z = -view_pos.z;
 
-		// Smooth windowed attenuation
-		float atten = clamp(1.0 - pow(distance / radius, 4.0), 0.0, 1.0);
-		atten = (atten * atten) / (distance * distance + 1.0);
+		uint slice_z = 0u;
+		if (view_z > scene.z_near && scene.z_far > scene.z_near) {
+			float log_ratio = float(scene.cluster_dims.z) / log(scene.z_far / scene.z_near);
+			slice_z = uint(max(0.0, floor(log(view_z / scene.z_near) * log_ratio)));
+			slice_z = min(slice_z, scene.cluster_dims.z - 1u);
+		}
 
-		vec3 radiance = scene.point_lights[i].color.rgb * scene.point_lights[i].color.w * atten;
+		uint cluster_idx = tile_x + tile_y * scene.cluster_dims.x + slice_z * (scene.cluster_dims.x * scene.cluster_dims.y);
+		ClusterRecord record = cluster_grid.records[cluster_idx];
+		uint light_count = min(record.count, scene.cluster_dims.w);
 
-		float NDF = distribution_ggx(N, H, roughness);
-		float G = geometry_smith(N, V, L, roughness);
-		vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+		for (uint i = 0u; i < light_count; ++i) {
+			uint light_idx = light_index_list.indices[record.offset + i];
+			if (light_idx >= scene.point_light_count || light_idx >= 256u) {
+				continue;
+			}
 
-		vec3 numerator = NDF * G * F;
-		float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-		vec3 specular = numerator / denominator;
+			vec3 light_vec = scene.point_lights[light_idx].position.xyz - in_world_pos;
+			float distance = length(light_vec);
+			float radius = scene.point_lights[light_idx].position.w;
 
-		vec3 kS = F;
-		vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
-		float is_trans = step(albedo.a, 0.999);
-		vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
+			if (distance > radius) continue;
 
-		float NdotL = max(dot(N, L), 0.0);
-		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
+			vec3 L = normalize(light_vec);
+			vec3 H = normalize(V + L);
+
+			// Smooth windowed attenuation
+			float atten = clamp(1.0 - pow(distance / radius, 4.0), 0.0, 1.0);
+			atten = (atten * atten) / (distance * distance + 1.0);
+
+			vec3 radiance = scene.point_lights[light_idx].color.rgb * scene.point_lights[light_idx].color.w * atten;
+
+			float NDF = distribution_ggx(N, H, roughness);
+			float G = geometry_smith(N, V, L, roughness);
+			vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+
+			vec3 numerator = NDF * G * F;
+			float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+			vec3 specular = numerator / denominator;
+
+			vec3 kS = F;
+			vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+			float is_trans = step(albedo.a, 0.999);
+			vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
+
+			float NdotL = max(dot(N, L), 0.0);
+			Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
+		}
+	} else {
+		// Fallback unclustered loop
+		uint pt_count = min(scene.point_light_count, 256u);
+		for (uint i = 0u; i < pt_count; ++i) {
+			vec3 light_vec = scene.point_lights[i].position.xyz - in_world_pos;
+			float distance = length(light_vec);
+			float radius = scene.point_lights[i].position.w;
+
+			if (distance > radius) continue;
+
+			vec3 L = normalize(light_vec);
+			vec3 H = normalize(V + L);
+
+			// Smooth windowed attenuation
+			float atten = clamp(1.0 - pow(distance / radius, 4.0), 0.0, 1.0);
+			atten = (atten * atten) / (distance * distance + 1.0);
+
+			vec3 radiance = scene.point_lights[i].color.rgb * scene.point_lights[i].color.w * atten;
+
+			float NDF = distribution_ggx(N, H, roughness);
+			float G = geometry_smith(N, V, L, roughness);
+			vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+
+			vec3 numerator = NDF * G * F;
+			float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+			vec3 specular = numerator / denominator;
+
+			vec3 kS = F;
+			vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+			float is_trans = step(albedo.a, 0.999);
+			vec3 kD_eff = mix(kD, kD * albedo.a, is_trans);
+
+			float NdotL = max(dot(N, L), 0.0);
+			Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL;
+		}
 	}
 
 	vec3 emissive = mat.emissive.rgb * mat.emissive.w;

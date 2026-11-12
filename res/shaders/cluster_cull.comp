@@ -1,0 +1,132 @@
+/*
+	This file is part of QAOS
+
+	This file is licensed under the GNU General Public License version 3 (GPL3).
+
+	You should have received a copy of the GNU General Public License
+	along with QAOS. If not, see <https://www.gnu.org/licenses/>.
+
+	Copyright (c) 2025-2026 by Kadir Aydın.
+*/
+
+
+#version 450
+
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_scalar_block_layout : require
+
+
+struct ClusterAABB {
+	vec4 min_point;
+	vec4 max_point;
+};
+
+layout(buffer_reference, scalar) readonly buffer ClusterAABBBuffer {
+	ClusterAABB aabbs[];
+};
+
+struct ClusterRecord {
+	uint offset;
+	uint count;
+};
+
+layout(buffer_reference, scalar) writeonly buffer ClusterGridBuffer {
+	ClusterRecord records[];
+};
+
+layout(buffer_reference, scalar) writeonly buffer LightIndexBuffer {
+	uint indices[];
+};
+
+struct DirectionalLight {
+	vec4 direction;
+	vec4 color;
+};
+
+struct PointLight {
+	vec4 position;
+	vec4 color;
+};
+
+layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
+	mat4 view;
+	mat4 proj;
+	mat4 view_proj;
+	mat4 inv_view_proj;
+	vec4 camera_position;
+	vec4 ambient_color;
+	uint64_t cluster_grid_address;
+	uint64_t light_index_list_address;
+	vec2 cluster_screen_size;
+	float z_near;
+	float z_far;
+	uvec4 cluster_dims;
+	uint dir_light_count;
+	uint point_light_count;
+	uint _pad0;
+	uint _pad1;
+	DirectionalLight dir_lights[4];
+	PointLight point_lights[256];
+};
+
+layout(push_constant, scalar) uniform CullPushConstants {
+	uint64_t scene_address;
+	uint64_t aabb_buffer_address;
+	uint64_t grid_buffer_address;
+	uint64_t index_list_address;
+	uint point_light_count;
+	uint max_lights_per_cluster;
+} pc;
+
+layout(local_size_x = 16, local_size_y = 9, local_size_z = 1) in;
+
+bool test_sphere_aabb(vec3 sphere_center, float radius, vec3 aabb_min, vec3 aabb_max) {
+	vec3 closest = clamp(sphere_center, aabb_min, aabb_max);
+	vec3 diff = closest - sphere_center;
+	return dot(diff, diff) <= (radius * radius);
+}
+
+void main() {
+	uint tile_x = gl_GlobalInvocationID.x;
+	uint tile_y = gl_GlobalInvocationID.y;
+	uint slice_z = gl_GlobalInvocationID.z;
+
+	uint dim_x = 16;
+	uint dim_y = 9;
+	uint dim_z = 24;
+
+	if (tile_x >= dim_x || tile_y >= dim_y || slice_z >= dim_z) {
+		return;
+	}
+
+	uint cluster_idx = tile_x + tile_y * dim_x + slice_z * (dim_x * dim_y);
+
+	ClusterAABBBuffer aabb_buf = ClusterAABBBuffer(pc.aabb_buffer_address);
+	ClusterAABB aabb = aabb_buf.aabbs[cluster_idx];
+	vec3 aabb_min = aabb.min_point.xyz;
+	vec3 aabb_max = aabb.max_point.xyz;
+
+	SceneFrameData scene = SceneFrameData(pc.scene_address);
+	LightIndexBuffer idx_buf = LightIndexBuffer(pc.index_list_address);
+
+	uint cluster_offset = cluster_idx * pc.max_lights_per_cluster;
+	uint visible_count = 0;
+
+	for (uint i = 0; i < pc.point_light_count; ++i) {
+		PointLight pl = scene.point_lights[i];
+		vec4 view_pos = scene.view * vec4(pl.position.xyz, 1.0);
+		float radius = pl.position.w;
+
+		if (test_sphere_aabb(view_pos.xyz, radius, aabb_min, aabb_max)) {
+			if (visible_count < pc.max_lights_per_cluster) {
+				idx_buf.indices[cluster_offset + visible_count] = i;
+				visible_count++;
+			}
+		}
+	}
+
+	ClusterGridBuffer grid_buf = ClusterGridBuffer(pc.grid_buffer_address);
+	grid_buf.records[cluster_idx].offset = cluster_offset;
+	grid_buf.records[cluster_idx].count = visible_count;
+}

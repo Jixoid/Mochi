@@ -47,12 +47,18 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	mat4 inv_view_proj;
 	vec4 camera_position;
 	vec4 ambient_color;
+	uint64_t cluster_grid_address;
+	uint64_t light_index_list_address;
+	vec2 cluster_screen_size;
+	float z_near;
+	float z_far;
+	uvec4 cluster_dims;
 	uint dir_light_count;
 	uint point_light_count;
 	uint _pad0;
 	uint _pad1;
 	DirectionalLight dir_lights[4];
-	PointLight point_lights[64];
+	PointLight point_lights[256];
 };
 
 layout(push_constant, scalar, row_major) uniform PushConstants {
