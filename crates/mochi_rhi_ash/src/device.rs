@@ -19,7 +19,7 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use crate::allocator::AshAllocator;
 use crate::buffer::AshBuffer;
 use crate::command::AshCommandQueue;
-use crate::image::{AshImage, AshImageView};
+use crate::image::{AshImage2, AshImageView2};
 use crate::pipeline::{AshPipeline, AshPipelineMeta};
 use crate::sampler::AshSampler;
 use crate::shader::AshShader;
@@ -583,7 +583,7 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 
 	fn fini_descriptor_heap(&self) {}
 
-	fn write_texture_descriptor(&self, view: &AshImageView, sampler: &AshSampler) -> u32 {
+	fn write_texture_descriptor(&self, view: &AshImageView2, sampler: &AshSampler) -> u32 {
 		if let Some(heap) = &self.inner.bindless_heap {
 			let mut lock = heap.next_id.lock().unwrap();
 			let id = *lock;
@@ -619,7 +619,7 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		None
 	}
 
-	fn create_image_view(&self, image: &AshImage, format: Format) -> RhiResult<AshImageView> {
+	fn create_image_view(&self, image: &AshImage2, format: Format) -> RhiResult<AshImageView2> {
 		let is_depth = format == Format::Depth32f
 			|| format == Format::Depth24Stencil8
 			|| format == Format::Depth16
@@ -652,7 +652,7 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 				.map_err(|e| RhiError::BackendError(format!("Failed to create image view: {e}")))?
 		};
 
-		Ok(AshImageView::new(self.inner.device(), view))
+		Ok(AshImageView2::new(self.inner.device(), view))
 	}
 
 	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<AshSampler> {
@@ -688,101 +688,15 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		Ok(AshSampler::new(self.inner.device(), sampler))
 	}
 
-	fn create_render_target(
-		&self,
-		color_image: &AshImage,
-		color_view: &AshImageView,
-		color_format: Format,
-		depth_image: &AshImage,
-		depth_view: &AshImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> AshRenderTarget {
-		AshRenderTarget::new_offscreen(
-			color_image.handle(),
-			color_view.handle(),
-			color_format,
-			depth_image.handle(),
-			depth_view.handle(),
-			depth_format,
-			width,
-			height,
-		)
-	}
-
-	fn create_multisample_render_target(
-		&self,
-		color_image: &AshImage,
-		color_view: &AshImageView,
-		resolve_image: &AshImage,
-		resolve_view: &AshImageView,
-		color_format: Format,
-		depth_image: &AshImage,
-		depth_view: &AshImageView,
-		resolve_depth_image: &AshImage,
-		resolve_depth_view: &AshImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-		samples: mochi_rhi::MsaaSamples,
-	) -> AshRenderTarget {
-		AshRenderTarget::new_multisample_offscreen(
-			color_image.handle(),
-			color_view.handle(),
-			resolve_image.handle(),
-			resolve_view.handle(),
-			color_format,
-			depth_image.handle(),
-			depth_view.handle(),
-			resolve_depth_image.handle(),
-			resolve_depth_view.handle(),
-			depth_format,
-			width,
-			height,
-			samples,
-		)
-	}
-
-	fn create_depth_render_target(
-		&self,
-		depth_image: &AshImage,
-		depth_view: &AshImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> AshRenderTarget {
-		AshRenderTarget::new_depth_only(
-			depth_image.handle(),
-			depth_view.handle(),
-			depth_format,
-			width,
-			height,
-		)
-	}
-
-	fn create_color_render_target(
-		&self,
-		color_image: &AshImage,
-		color_view: &AshImageView,
-		color_format: Format,
-		width: u32,
-		height: u32,
-	) -> AshRenderTarget {
-		AshRenderTarget::new_color_only(
-			color_image.handle(),
-			color_view.handle(),
-			color_format,
-			width,
-			height,
-		)
+	fn create_render_target(&self, desc: &mochi_rhi::RenderTargetDesc<AshVulkanBackend>) -> AshRenderTarget {
+		AshRenderTarget::new_from_desc(desc)
 	}
 
 	fn upload_image_data(
 		&self,
 		alloc: &AshAllocator,
 		queue: &AshCommandQueue,
-		image: &AshImage,
+		image: &AshImage2,
 		width: u32,
 		height: u32,
 		data: &[u8],

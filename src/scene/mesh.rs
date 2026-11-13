@@ -11,7 +11,7 @@
 
 
 use std::sync::Arc;
-use crate::rhi::{self, AllocationCreate, AllocationLocation, BufferUsage, TransferTime};
+use crate::rhi::{self, BufferUsage};
 use mochi_math::{Vec3, AABB};
 
 
@@ -48,40 +48,18 @@ pub struct Mesh {
 }
 
 impl Mesh {
-	pub fn new_with_indices(device: &rhi::Device, alloc: &rhi::Allocator, vertices: &[Vertex], indices: &[u32]) -> Arc<Self> {
-		let uploader = rhi::Uploader::new(device);
-
-		let mut vertex_buffer = rhi::Buffer::new(
+	pub fn new_with_indices(_device: &rhi::Device, alloc: &rhi::Allocator, vertices: &[Vertex], indices: &[u32]) -> Arc<Self> {
+		let vertex_buffer = rhi::Buffer::from_slice(
 			alloc,
-			(std::mem::size_of::<Vertex>() * vertices.len()) as u64,
 			BufferUsage::DeviceAddress | BufferUsage::StorageBuffer | BufferUsage::VertexBuffer,
-			AllocationCreate::Mapped,
-			AllocationLocation::Auto,
-		);
+			vertices,
+		).expect("Failed to create vertex buffer");
 
-		let vertex_bytes = unsafe {
-			std::slice::from_raw_parts(
-				vertices.as_ptr() as *const u8,
-				std::mem::size_of_val(vertices),
-			)
-		};
-		uploader.copy_memory_to_buffer(TransferTime::Now, vertex_bytes, &mut vertex_buffer);
-
-		let mut index_buffer = rhi::Buffer::new(
+		let index_buffer = rhi::Buffer::from_slice(
 			alloc,
-			(std::mem::size_of::<u32>() * indices.len()) as u64,
 			BufferUsage::DeviceAddress | BufferUsage::StorageBuffer | BufferUsage::IndexBuffer,
-			AllocationCreate::Mapped,
-			AllocationLocation::Auto,
-		);
-
-		let index_bytes = unsafe {
-			std::slice::from_raw_parts(
-				indices.as_ptr() as *const u8,
-				std::mem::size_of_val(indices),
-			)
-		};
-		uploader.copy_memory_to_buffer(TransferTime::Now, index_bytes, &mut index_buffer);
+			indices,
+		).expect("Failed to create index buffer");
 
 		let aabb = Self::compute_aabb(vertices);
 
@@ -94,24 +72,12 @@ impl Mesh {
 		})
 	}
 
-	pub fn new_unindexed(device: &rhi::Device, alloc: &rhi::Allocator, vertices: &[Vertex]) -> Arc<Self> {
-		let uploader = rhi::Uploader::new(device);
-
-		let mut vertex_buffer = rhi::Buffer::new(
+	pub fn new_unindexed(_device: &rhi::Device, alloc: &rhi::Allocator, vertices: &[Vertex]) -> Arc<Self> {
+		let vertex_buffer = rhi::Buffer::from_slice(
 			alloc,
-			(std::mem::size_of::<Vertex>() * vertices.len()) as u64,
 			BufferUsage::DeviceAddress | BufferUsage::StorageBuffer | BufferUsage::VertexBuffer,
-			AllocationCreate::Mapped,
-			AllocationLocation::Auto,
-		);
-
-		let vertex_bytes = unsafe {
-			std::slice::from_raw_parts(
-				vertices.as_ptr() as *const u8,
-				std::mem::size_of_val(vertices),
-			)
-		};
-		uploader.copy_memory_to_buffer(TransferTime::Now, vertex_bytes, &mut vertex_buffer);
+			vertices,
+		).expect("Failed to create vertex buffer");
 
 		let aabb = Self::compute_aabb(vertices);
 

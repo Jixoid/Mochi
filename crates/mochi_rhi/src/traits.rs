@@ -11,7 +11,6 @@
 
 
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use mochi_math::Extent;
 
 use crate::error::RhiResult;
 use crate::types::*;
@@ -22,8 +21,8 @@ pub trait RhiBackend: 'static + Sized + Send + Sync {
 	type Device: RhiDevice<Self>;
 	type Allocator: RhiAllocator<Self>;
 	type Buffer: RhiBuffer;
-	type Image: RhiImage;
-	type ImageView: RhiImageView;
+	type Image2: RhiImage2;
+	type ImageView2: RhiImageView2;
 	type Sampler: RhiSampler;
 	type Shader: RhiShader;
 	type Pipeline: RhiPipeline;
@@ -77,61 +76,18 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 
 	fn init_descriptor_heap(&self, allocator: &B::Allocator) -> RhiResult<()>;
 	fn fini_descriptor_heap(&self);
-	fn write_texture_descriptor(&self, view: &B::ImageView, sampler: &B::Sampler) -> u32;
+	fn write_texture_descriptor(&self, view: &B::ImageView2, sampler: &B::Sampler) -> u32;
 	fn descriptor_heap(&self) -> Option<B::Buffer>;
 	fn sampler_heap(&self) -> Option<B::Buffer>;
 
-	fn create_image_view(&self, image: &B::Image, format: Format) -> RhiResult<B::ImageView>;
+	fn create_image_view(&self, image: &B::Image2, format: Format) -> RhiResult<B::ImageView2>;
 	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<B::Sampler>;
-	fn create_render_target(
-		&self,
-		color_image: &B::Image,
-		color_view: &B::ImageView,
-		color_format: Format,
-		depth_image: &B::Image,
-		depth_view: &B::ImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> B::RenderTarget;
-
-	fn create_multisample_render_target(
-		&self,
-		color_image: &B::Image,
-		color_view: &B::ImageView,
-		resolve_image: &B::Image,
-		resolve_view: &B::ImageView,
-		color_format: Format,
-		depth_image: &B::Image,
-		depth_view: &B::ImageView,
-		resolve_depth_image: &B::Image,
-		resolve_depth_view: &B::ImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-		samples: MsaaSamples,
-	) -> B::RenderTarget;
-	fn create_depth_render_target(
-		&self,
-		depth_image: &B::Image,
-		depth_view: &B::ImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> B::RenderTarget;
-	fn create_color_render_target(
-		&self,
-		color_image: &B::Image,
-		color_view: &B::ImageView,
-		color_format: Format,
-		width: u32,
-		height: u32,
-	) -> B::RenderTarget;
+	fn create_render_target(&self, desc: &crate::render_target::RenderTargetDesc<B>) -> B::RenderTarget;
 	fn upload_image_data(
 		&self,
 		alloc: &B::Allocator,
 		queue: &B::CommandQueue,
-		image: &B::Image,
+		image: &B::Image2,
 		width: u32,
 		height: u32,
 		data: &[u8],
@@ -149,33 +105,21 @@ pub trait RhiAllocator<B: RhiBackend>: Send + Sync {
 		location: AllocationLocation,
 	) -> RhiResult<B::Buffer>;
 
-	fn alloc_image(
+	fn alloc_image2(
 		&self,
-		ext: Extent<2, u32>,
-		format: Format,
-		usage: ImageUsage,
-		tiling: ImageTiling,
-		create: AllocationCreate,
-		location: AllocationLocation,
-	) -> RhiResult<B::Image>;
-
-	fn alloc_multisample_image(
-		&self,
-		ext: Extent<2, u32>,
+		width: u32,
+		height: u32,
 		format: Format,
 		usage: ImageUsage,
 		tiling: ImageTiling,
 		create: AllocationCreate,
 		location: AllocationLocation,
 		samples: MsaaSamples,
-	) -> RhiResult<B::Image> {
-		let _ = samples;
-		self.alloc_image(ext, format, usage, tiling, create, location)
-	}
+	) -> RhiResult<B::Image2>;
 
 	fn alloc_sampler(
 		&self,
-		address_mode: Extent<3, SamplerAddressMode>,
+		address_mode: [SamplerAddressMode; 3],
 		mag_filter: SamplerFilter,
 		min_filter: SamplerFilter,
 	) -> RhiResult<B::Sampler>;
@@ -193,14 +137,15 @@ pub trait RhiBuffer: Send + Sync {
 
 
 /// Abstract 2D Image
-pub trait RhiImage: Send + Sync {
-	fn ext(&self) -> Extent<2, u32>;
+pub trait RhiImage2: Send + Sync {
+	fn width(&self) -> u32;
+	fn height(&self) -> u32;
 	fn format(&self) -> Format;
 }
 
 
 /// Abstract Image View
-pub trait RhiImageView: Send + Sync {}
+pub trait RhiImageView2: Send + Sync {}
 
 
 /// Abstract Texture Sampler

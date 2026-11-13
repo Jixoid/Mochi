@@ -13,25 +13,25 @@
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use gpu_allocator::vulkan::{Allocation, Allocator};
-use mochi_math::Extent;
 
 use mochi_rhi::format::Format;
-use mochi_rhi::traits::{RhiImage, RhiImageView};
+use mochi_rhi::traits::{RhiImage2, RhiImageView2};
 
 
-pub struct ImageInner {
+pub struct Image2Inner {
 	device: ash::Device,
 	allocator: Option<Arc<Mutex<Allocator>>>,
 	handle: vk::Image,
 	allocation: Option<Allocation>,
-	ext: Extent<2, u32>,
+	width: u32,
+	height: u32,
 	format: Format,
 }
 
-unsafe impl Send for ImageInner {}
-unsafe impl Sync for ImageInner {}
+unsafe impl Send for Image2Inner {}
+unsafe impl Sync for Image2Inner {}
 
-impl Drop for ImageInner {
+impl Drop for Image2Inner {
 	fn drop(&mut self) {
 		if self.handle != vk::Image::null() {
 			unsafe {
@@ -47,42 +47,45 @@ impl Drop for ImageInner {
 }
 
 #[derive(Clone)]
-pub struct AshImage {
-	inner: Arc<Mutex<ImageInner>>,
+pub struct AshImage2 {
+	inner: Arc<Mutex<Image2Inner>>,
 }
 
-unsafe impl Send for AshImage {}
-unsafe impl Sync for AshImage {}
+unsafe impl Send for AshImage2 {}
+unsafe impl Sync for AshImage2 {}
 
-impl AshImage {
+impl AshImage2 {
 	pub fn new(
 		device: &ash::Device,
 		allocator: Arc<Mutex<Allocator>>,
 		handle: vk::Image,
 		allocation: Allocation,
-		ext: Extent<2, u32>,
+		width: u32,
+		height: u32,
 		format: Format,
 	) -> Self {
 		Self {
-			inner: Arc::new(Mutex::new(ImageInner {
+			inner: Arc::new(Mutex::new(Image2Inner {
 				device: device.clone(),
 				allocator: Some(allocator),
 				handle,
 				allocation: Some(allocation),
-				ext,
+				width,
+				height,
 				format,
 			})),
 		}
 	}
 
-	pub fn new_unowned(device: &ash::Device, handle: vk::Image, ext: Extent<2, u32>, format: Format) -> Self {
+	pub fn new_unowned(device: &ash::Device, handle: vk::Image, width: u32, height: u32, format: Format) -> Self {
 		Self {
-			inner: Arc::new(Mutex::new(ImageInner {
+			inner: Arc::new(Mutex::new(Image2Inner {
 				device: device.clone(),
 				allocator: None,
 				handle,
 				allocation: None,
-				ext,
+				width,
+				height,
 				format,
 			})),
 		}
@@ -93,9 +96,13 @@ impl AshImage {
 	}
 }
 
-impl RhiImage for AshImage {
-	fn ext(&self) -> Extent<2, u32> {
-		self.inner.lock().unwrap().ext
+impl RhiImage2 for AshImage2 {
+	fn width(&self) -> u32 {
+		self.inner.lock().unwrap().width
+	}
+
+	fn height(&self) -> u32 {
+		self.inner.lock().unwrap().height
 	}
 
 	fn format(&self) -> Format {
@@ -124,14 +131,14 @@ impl Drop for ImageViewInner {
 }
 
 #[derive(Clone)]
-pub struct AshImageView {
+pub struct AshImageView2 {
 	inner: Arc<ImageViewInner>,
 }
 
-unsafe impl Send for AshImageView {}
-unsafe impl Sync for AshImageView {}
+unsafe impl Send for AshImageView2 {}
+unsafe impl Sync for AshImageView2 {}
 
-impl AshImageView {
+impl AshImageView2 {
 	pub fn new(device: &ash::Device, handle: vk::ImageView) -> Self {
 		Self {
 			inner: Arc::new(ImageViewInner {
@@ -146,4 +153,4 @@ impl AshImageView {
 	}
 }
 
-impl RhiImageView for AshImageView {}
+impl RhiImageView2 for AshImageView2 {}

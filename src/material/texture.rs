@@ -105,16 +105,9 @@ impl TextureManager {
 		format: Format,
 		data: &[u8],
 	) -> u32 {
-		let ext = mochi_math::Extent::new([width, height]);
-		let image = rhi::Image2::new(
-			alloc,
-			ext,
-			format,
-			mochi_rhi::ImageUsage::Sampled | mochi_rhi::ImageUsage::TransferDst,
-			mochi_rhi::ImageTiling::Optimal,
-			mochi_rhi::manager::AllocationCreate::Dedicated,
-			mochi_rhi::manager::AllocationLocation::PreferDevice,
-		);
+		let image = rhi::Image2::builder(width, height, format)
+			.usage(mochi_rhi::ImageUsage::Sampled | mochi_rhi::ImageUsage::TransferDst)
+			.build(alloc);
 
 		device
 			.upload_image_data(alloc, cmdmng.raw(), &image, width, height, data)

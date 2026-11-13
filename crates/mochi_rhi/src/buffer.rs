@@ -54,6 +54,25 @@ impl<B: RhiBackend> Buffer<B> {
 		allocator.alloc_buffer(size, usage, create, location)
 	}
 
+	pub fn from_slice<T: Copy>(
+		allocator: &Allocator<B>,
+		usage: BufferUsage,
+		data: &[T],
+	) -> Result<Self, crate::error::RhiError> {
+		let byte_size = (std::mem::size_of::<T>() * data.len()) as u64;
+		let mut buf = allocator.alloc_buffer(
+			byte_size,
+			usage,
+			AllocationCreate::Mapped,
+			AllocationLocation::Auto,
+		);
+		let slice = unsafe {
+			std::slice::from_raw_parts(data.as_ptr() as *const u8, byte_size as usize)
+		};
+		buf.write_bytes(0, slice)?;
+		Ok(buf)
+	}
+
 	pub fn from_raw(inner: B::Buffer) -> Self {
 		Self { inner }
 	}

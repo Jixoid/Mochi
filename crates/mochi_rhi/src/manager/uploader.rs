@@ -56,14 +56,13 @@ impl<B: RhiBackend> Uploader<B> {
 
 	pub fn copy_memory_to_image(&self, _time: TransferTime, src: &[u8], dst: &mut Image2<B>) {
 		assert!(!src.is_empty(), "Uploader: Cannot copy empty slice to Image2");
-		let ext = dst.ext();
-		assert!(ext[0] > 0 && ext[1] > 0, "Uploader: Cannot copy to 0-sized Image2 (extent: {:?})", ext);
+		assert!(dst.width() > 0 && dst.height() > 0, "Uploader: Cannot copy to 0-sized Image2 (extent: ({},{}))", dst.width(), dst.height());
 		assert!(
-			(src.len() as u64) >= (ext[0] as u64 * ext[1] as u64),
+			(src.len() as u64) >= (dst.width() as u64 * dst.height() as u64),
 			"Uploader: Source slice ({} bytes) is smaller than image dimension pixels ({}x{})",
 			src.len(),
-			ext[0],
-			ext[1]
+			dst.width(),
+			dst.height(),
 		);
 	}
 }

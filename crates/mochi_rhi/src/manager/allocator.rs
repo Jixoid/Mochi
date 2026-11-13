@@ -12,17 +12,16 @@
 
 use std::sync::Arc;
 use bitflags::bitflags;
-use mochi_math::Extent;
 
 use crate::manager::device::Device;
 use crate::traits::{RhiAllocator, RhiBackend};
 use crate::{
-	Buffer, BufferUsage, Format, Image2, ImageTiling, ImageUsage, MsaaSamples, Sampler2,
-	SamplerAddressMode, SamplerFilter,
+	Buffer, BufferUsage, Image2, Image2Desc, Sampler2, SamplerAddressMode, SamplerFilter,
 };
 
 
 bitflags! {
+	#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 	pub struct AllocationCreate: u32 {
 		const Dedicated           = 0x00000001;
 		const Mapped              = 0x00000004;
@@ -32,6 +31,7 @@ bitflags! {
 	}
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AllocationLocation {
 	Auto = 7,
 	PreferDevice = 8,
@@ -74,42 +74,26 @@ impl<B: RhiBackend> Allocator<B> {
 		Buffer::from_raw(buf)
 	}
 
-	pub fn alloc_image2(
-		&self,
-		ext: Extent<2, u32>,
-		format: Format,
-		usage: ImageUsage,
-		tiling: ImageTiling,
-		create: AllocationCreate,
-		location: AllocationLocation,
-	) -> Image2<B> {
+	pub fn alloc_image2(&self, desc: &Image2Desc) -> Image2<B> {
 		let img = self
 			.inner
-			.alloc_image(ext, format, usage, tiling, create, location)
+			.alloc_image2(
+				desc.width,
+				desc.height,
+				desc.format,
+				desc.usage,
+				desc.tiling,
+				desc.create,
+				desc.location,
+				desc.samples,
+			)
 			.expect("Image allocation failed");
-		Image2::from_raw(img, ext)
-	}
-
-	pub fn alloc_multisample_image2(
-		&self,
-		ext: Extent<2, u32>,
-		format: Format,
-		usage: ImageUsage,
-		tiling: ImageTiling,
-		create: AllocationCreate,
-		location: AllocationLocation,
-		samples: MsaaSamples,
-	) -> Image2<B> {
-		let img = self
-			.inner
-			.alloc_multisample_image(ext, format, usage, tiling, create, location, samples)
-			.expect("Multisample image allocation failed");
-		Image2::from_raw(img, ext)
+		Image2::from_raw(img, desc.width, desc.height)
 	}
 
 	pub fn alloc_sampler2(
 		&self,
-		address_mode: Extent<3, SamplerAddressMode>,
+		address_mode: [SamplerAddressMode; 3],
 		mag_filter: SamplerFilter,
 		min_filter: SamplerFilter,
 	) -> Sampler2<B> {

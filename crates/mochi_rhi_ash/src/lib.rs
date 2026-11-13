@@ -46,8 +46,8 @@ impl RhiBackend for AshVulkanBackend {
 	type Device = AshDevice;
 	type Allocator = AshAllocator;
 	type Buffer = AshBuffer;
-	type Image = AshImage;
-	type ImageView = AshImageView;
+	type Image2 = AshImage2;
+	type ImageView2 = AshImageView2;
 	type Sampler = AshSampler;
 	type Shader = AshShader;
 	type Pipeline = AshPipeline;

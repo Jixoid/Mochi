@@ -10,12 +10,12 @@
 */
 
 
-use mochi_math::{Extent, Mat4x4, Vec3, Vec4};
+use mochi_math::{Mat4x4, Vec3, Vec4};
 
 use crate::rendering::frame::MAX_DIRECTIONAL_LIGHTS;
 use crate::rhi::{
-	self, AllocationCreate, AllocationLocation, Format, ImageTiling, ImageUsage, Pipeline,
-	PipelineMeta, SamplerAddressMode, SamplerFilter, Shader, ShaderStage,
+	self, Format, ImageUsage, PipelineMeta, SamplerAddressMode, SamplerFilter, Shader,
+	ShaderStage,
 };
 use crate::scene::{CameraComponent, TransformComponent};
 
@@ -76,18 +76,10 @@ impl ShadowManager {
 			std::mem::size_of::<ShadowPushConstants>() as u32,
 		);
 
-		let pipeline = Pipeline::new_graphics(
-			device,
-			&meta,
-			&[&shadow_vert],
-			rhi::PolygonMode::Fill,
-			rhi::PrimitiveTopology::TriangleList,
-			Format::Undefined,
-			Format::Depth32f,
-			false,
-			true,
-			rhi::MsaaSamples::Off,
-		);
+		let pipeline = rhi::GraphicsPipelineBuilder::new(device, &meta)
+			.shader(&shadow_vert)
+			.depth_format(Format::Depth32f)
+			.build();
 
 		Ok(Self {
 			cascade_sets: [None, None, None, None],
@@ -112,19 +104,12 @@ impl ShadowManager {
 			return Ok(());
 		}
 
-		let ext = Extent::new([SHADOW_MAP_SIZE, SHADOW_MAP_SIZE]);
 		let mut cascade_list = Vec::with_capacity(CASCADE_COUNT);
 
 		for _i in 0..CASCADE_COUNT {
-			let image = rhi::Image2::new(
-				alloc,
-				ext,
-				Format::Depth32f,
-				ImageUsage::DepthStencilAttachment | ImageUsage::Sampled,
-				ImageTiling::Optimal,
-				AllocationCreate::Dedicated,
-				AllocationLocation::PreferDevice,
-			);
+			let image = rhi::Image2::builder(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, Format::Depth32f)
+				.usage(ImageUsage::DepthStencilAttachment | ImageUsage::Sampled)
+				.build(alloc);
 
 			let view = device
 				.create_image_view(&image, Format::Depth32f)

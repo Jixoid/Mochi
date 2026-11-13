@@ -135,6 +135,11 @@ impl<B: RhiBackend> Command<B> {
 		});
 	}
 
+	pub fn set_viewport_and_scissor(&mut self, width: u32, height: u32) {
+		self.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+		self.set_scissor(0, 0, width, height);
+	}
+
 	pub fn bind_pipeline(&mut self, pipeline: &Pipeline<B>) {
 		assert!(
 			self.state == CommandState::Recording || self.state == CommandState::Rendering,

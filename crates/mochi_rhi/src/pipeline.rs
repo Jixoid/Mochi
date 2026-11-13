@@ -232,6 +232,10 @@ unsafe impl<B: RhiBackend> Send for Pipeline<B> {}
 unsafe impl<B: RhiBackend> Sync for Pipeline<B> {}
 
 impl<B: RhiBackend> Pipeline<B> {
+	pub fn builder<'a>(device: &'a Device<B>, meta: &'a PipelineMeta<B>) -> GraphicsPipelineBuilder<'a, B> {
+		GraphicsPipelineBuilder::new(device, meta)
+	}
+
 	pub fn new_graphics(
 		device: &Device<B>,
 		meta: &PipelineMeta<B>,
@@ -291,5 +295,102 @@ impl<B: RhiBackend> Pipeline<B> {
 
 	pub fn kind(&self) -> PipelineKind {
 		self.kind
+	}
+}
+
+
+pub struct GraphicsPipelineBuilder<'a, B: RhiBackend> {
+	device: &'a Device<B>,
+	meta: &'a PipelineMeta<B>,
+	shaders: Vec<&'a Shader<B>>,
+	polymode: PolygonMode,
+	topology: PrimitiveTopology,
+	color_format: Format,
+	depth_format: Format,
+	blend_enable: bool,
+	depth_write: bool,
+	samples: MsaaSamples,
+}
+
+impl<'a, B: RhiBackend> GraphicsPipelineBuilder<'a, B> {
+	pub fn new(device: &'a Device<B>, meta: &'a PipelineMeta<B>) -> Self {
+		Self {
+			device,
+			meta,
+			shaders: Vec::new(),
+			polymode: PolygonMode::Fill,
+			topology: PrimitiveTopology::TriangleList,
+			color_format: Format::Undefined,
+			depth_format: Format::Undefined,
+			blend_enable: false,
+			depth_write: true,
+			samples: MsaaSamples::Off,
+		}
+	}
+
+	pub fn shader(mut self, shader: &'a Shader<B>) -> Self {
+		self.shaders.push(shader);
+		self
+	}
+
+	pub fn shaders(mut self, shaders: &[&'a Shader<B>]) -> Self {
+		self.shaders.extend_from_slice(shaders);
+		self
+	}
+
+	pub fn polygon_mode(mut self, polymode: PolygonMode) -> Self {
+		self.polymode = polymode;
+		self
+	}
+
+	pub fn topology(mut self, topology: PrimitiveTopology) -> Self {
+		self.topology = topology;
+		self
+	}
+
+	pub fn color_format(mut self, format: Format) -> Self {
+		self.color_format = format;
+		self
+	}
+
+	pub fn depth_format(mut self, format: Format) -> Self {
+		self.depth_format = format;
+		self
+	}
+
+	pub fn depth(mut self, format: Format, write: bool) -> Self {
+		self.depth_format = format;
+		self.depth_write = write;
+		self
+	}
+
+	pub fn blend(mut self, enable: bool) -> Self {
+		self.blend_enable = enable;
+		self
+	}
+
+	pub fn depth_write(mut self, write: bool) -> Self {
+		self.depth_write = write;
+		self
+	}
+
+	pub fn samples(mut self, samples: MsaaSamples) -> Self {
+		self.samples = samples;
+		self
+	}
+
+	pub fn build(self) -> Pipeline<B> {
+		Pipeline::new_graphics(
+			self.device,
+			self.meta,
+			&self.shaders,
+			self.polymode,
+			self.topology,
+			self.color_format,
+			self.depth_format,
+			self.blend_enable,
+			self.depth_write,
+			self.samples,
+		)
 	}
 }

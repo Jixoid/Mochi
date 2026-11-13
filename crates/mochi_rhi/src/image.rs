@@ -11,7 +11,6 @@
 
 
 use bitflags::bitflags;
-use mochi_math::Extent;
 
 use crate::format::Format;
 use crate::manager::allocator::{AllocationCreate, AllocationLocation, Allocator};
@@ -26,6 +25,7 @@ pub enum ImageTiling {
 }
 
 bitflags! {
+	#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 	pub struct ImageUsage: u32 {
 		const TransferSrc                   = 0x00000001;
 		const TransferDst                   = 0x00000002;
@@ -49,68 +49,129 @@ bitflags! {
 }
 
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Image2Desc {
+	pub width: u32,
+	pub height: u32,
+	pub format: Format,
+	pub usage: ImageUsage,
+	pub tiling: ImageTiling,
+	pub create: AllocationCreate,
+	pub location: AllocationLocation,
+	pub samples: MsaaSamples,
+}
+
+impl Image2Desc {
+	pub fn new(width: u32, height: u32, format: Format) -> Self {
+		Self {
+			width,
+			height,
+			format,
+			usage: ImageUsage::empty(),
+			tiling: ImageTiling::Optimal,
+			create: AllocationCreate::Dedicated,
+			location: AllocationLocation::PreferDevice,
+			samples: MsaaSamples::Off,
+		}
+	}
+}
+
+pub struct Image2Builder {
+	desc: Image2Desc,
+}
+
+impl Image2Builder {
+	fn new(width: u32, height: u32, format: Format) -> Self {
+		Self {
+			desc: Image2Desc::new(width, height, format),
+		}
+	}
+
+	pub fn usage(mut self, usage: ImageUsage) -> Self {
+		self.desc.usage = usage;
+		self
+	}
+
+	pub fn tiling(mut self, tiling: ImageTiling) -> Self {
+		self.desc.tiling = tiling;
+		self
+	}
+
+	pub fn create(mut self, create: AllocationCreate) -> Self {
+		self.desc.create = create;
+		self
+	}
+
+	pub fn location(mut self, location: AllocationLocation) -> Self {
+		self.desc.location = location;
+		self
+	}
+
+	pub fn samples(mut self, samples: MsaaSamples) -> Self {
+		self.desc.samples = samples;
+		self
+	}
+
+	pub fn desc(&self) -> &Image2Desc {
+		&self.desc
+	}
+
+	pub fn build<B: RhiBackend>(self, allocator: &Allocator<B>) -> Image2<B> {
+		allocator.alloc_image2(&self.desc)
+	}
+}
+
+
 #[derive(Clone)]
 pub struct ImageView2<B: RhiBackend> {
-	inner: B::ImageView,
+	inner: B::ImageView2,
 }
 
 unsafe impl<B: RhiBackend> Send for ImageView2<B> {}
 unsafe impl<B: RhiBackend> Sync for ImageView2<B> {}
 
 impl<B: RhiBackend> ImageView2<B> {
-	pub fn from_raw(inner: B::ImageView) -> Self {
+	pub fn from_raw(inner: B::ImageView2) -> Self {
 		Self { inner }
 	}
 
-	pub fn raw(&self) -> &B::ImageView {
+	pub fn raw(&self) -> &B::ImageView2 {
 		&self.inner
 	}
 }
 
 
 pub struct Image2<B: RhiBackend> {
-	inner: B::Image,
-	ext: Extent<2, u32>,
+	inner: B::Image2,
+	width: u32,
+	height: u32,
 }
 
 unsafe impl<B: RhiBackend> Send for Image2<B> {}
 unsafe impl<B: RhiBackend> Sync for Image2<B> {}
 
 impl<B: RhiBackend> Image2<B> {
-	pub fn new(
-		allocator: &Allocator<B>,
-		ext: Extent<2, u32>,
-		format: Format,
-		usage: ImageUsage,
-		tiling: ImageTiling,
-		create: AllocationCreate,
-		location: AllocationLocation,
-	) -> Self {
-		allocator.alloc_image2(ext, format, usage, tiling, create, location)
+	pub fn builder(width: u32, height: u32, format: Format) -> Image2Builder {
+		Image2Builder::new(width, height, format)
 	}
 
-	pub fn new_multisample(
-		allocator: &Allocator<B>,
-		ext: Extent<2, u32>,
-		format: Format,
-		usage: ImageUsage,
-		tiling: ImageTiling,
-		create: AllocationCreate,
-		location: AllocationLocation,
-		samples: MsaaSamples,
-	) -> Self {
-		allocator.alloc_multisample_image2(ext, format, usage, tiling, create, location, samples)
+	pub fn from_desc(allocator: &Allocator<B>, desc: &Image2Desc) -> Self {
+		allocator.alloc_image2(desc)
 	}
 
-	pub fn from_raw(inner: B::Image, ext: Extent<2, u32>) -> Self {
-		Self { inner, ext }
+	pub fn from_raw(inner: B::Image2, width: u32, height: u32) -> Self {
+		Self { inner, width, height }
 	}
 
-	pub fn raw(&self) -> &B::Image {
+	pub fn raw(&self) -> &B::Image2 {
 		&self.inner
 	}
 
-	pub fn ext(&self) -> Extent<2, u32> {
-		self.ext
+	pub fn width(&self) -> u32 {
+		self.width
+	}
+	
+	pub fn height(&self) -> u32 {
+		self.height
 	}
 }

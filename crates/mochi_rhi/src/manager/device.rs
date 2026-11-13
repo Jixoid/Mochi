@@ -19,7 +19,7 @@ use crate::manager::allocator::Allocator;
 use crate::manager::swapchain::Surface;
 use crate::sampler::{SamplerAddressMode, SamplerFilter};
 use crate::traits::{RhiBackend, RhiDevice};
-use crate::{Buffer, Image2, ImageView2, MsaaSamples, RenderTarget, Sampler2};
+use crate::{Buffer, Image2, ImageView2, Sampler2};
 
 
 #[derive(Clone, Debug)]
@@ -168,100 +168,6 @@ impl<B: RhiBackend> Device<B> {
 			.create_sampler(filter, address_mode)
 			.map_err(|e| format!("Failed to create sampler: {e}"))?;
 		Ok(Sampler2::from_raw(sampler))
-	}
-
-	pub fn create_render_target<'a>(
-		&self,
-		color_image: &Image2<B>,
-		color_view: &ImageView2<B>,
-		color_format: Format,
-		depth_image: &Image2<B>,
-		depth_view: &ImageView2<B>,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> RenderTarget<'a, B> {
-		let inner = self.inner.create_render_target(
-			color_image.raw(),
-			color_view.raw(),
-			color_format,
-			depth_image.raw(),
-			depth_view.raw(),
-			depth_format,
-			width,
-			height,
-		);
-		RenderTarget::from_raw(inner)
-	}
-
-	pub fn create_multisample_render_target<'a>(
-		&self,
-		color_image: &Image2<B>,
-		color_view: &ImageView2<B>,
-		resolve_image: &Image2<B>,
-		resolve_view: &ImageView2<B>,
-		color_format: Format,
-		depth_image: &Image2<B>,
-		depth_view: &ImageView2<B>,
-		resolve_depth_image: &Image2<B>,
-		resolve_depth_view: &ImageView2<B>,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-		samples: MsaaSamples,
-	) -> RenderTarget<'a, B> {
-		let inner = self.inner.create_multisample_render_target(
-			color_image.raw(),
-			color_view.raw(),
-			resolve_image.raw(),
-			resolve_view.raw(),
-			color_format,
-			depth_image.raw(),
-			depth_view.raw(),
-			resolve_depth_image.raw(),
-			resolve_depth_view.raw(),
-			depth_format,
-			width,
-			height,
-			samples,
-		);
-		RenderTarget::from_raw(inner)
-	}
-
-	pub fn create_depth_render_target<'a>(
-		&self,
-		depth_image: &Image2<B>,
-		depth_view: &ImageView2<B>,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> RenderTarget<'a, B> {
-		let inner = self.inner.create_depth_render_target(
-			depth_image.raw(),
-			depth_view.raw(),
-			depth_format,
-			width,
-			height,
-		);
-		RenderTarget::from_raw(inner)
-	}
-
-	pub fn create_color_render_target<'a>(
-		&self,
-		color_image: &Image2<B>,
-		color_view: &ImageView2<B>,
-		color_format: Format,
-		width: u32,
-		height: u32,
-	) -> RenderTarget<'a, B> {
-		let inner = self.inner.create_color_render_target(
-			color_image.raw(),
-			color_view.raw(),
-			color_format,
-			width,
-			height,
-		);
-		RenderTarget::from_raw(inner)
 	}
 
 	pub fn upload_image_data(

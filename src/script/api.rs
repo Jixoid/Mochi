@@ -60,11 +60,22 @@ impl Drop for ContextGuard {
 }
 
 
-#[unsafe(no_mangle)]
-pub extern "C" fn mochi_get_position(entity_id: u64, out_pos: *mut CVec3) {
-	if out_pos.is_null() {
-		return;
-	}
+fn with_transform_mut<F: FnOnce(&mut TransformComponent)>(entity_id: u64, f: F) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
+				f(&mut transform);
+			}
+		}
+	});
+}
+
+fn with_transform<F: FnOnce(&TransformComponent)>(entity_id: u64, f: F) {
 	let entity = match hecs::Entity::from_bits(entity_id) {
 		Some(e) => e,
 		None => return,
@@ -73,13 +84,22 @@ pub extern "C" fn mochi_get_position(entity_id: u64, out_pos: *mut CVec3) {
 		if let Some(ctx) = ctx.borrow().as_ref() {
 			let world = unsafe { &*ctx.world.as_ptr() };
 			if let Ok(transform) = world.get::<&TransformComponent>(entity) {
-				unsafe {
-					(*out_pos).x = transform.translation.x;
-					(*out_pos).y = transform.translation.y;
-					(*out_pos).z = transform.translation.z;
-				}
+				f(&transform);
 			}
 		}
+	});
+}
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_position(entity_id: u64, out_pos: *mut CVec3) {
+	if out_pos.is_null() {
+		return;
+	}
+	with_transform(entity_id, |t| unsafe {
+		(*out_pos).x = t.translation.x;
+		(*out_pos).y = t.translation.y;
+		(*out_pos).z = t.translation.z;
 	});
 }
 
@@ -88,85 +108,47 @@ pub extern "C" fn mochi_set_position(entity_id: u64, in_pos: *const CVec3) {
 	if in_pos.is_null() {
 		return;
 	}
-	let entity = match hecs::Entity::from_bits(entity_id) {
-		Some(e) => e,
-		None => return,
-	};
-	CURRENT_CONTEXT.with(|ctx| {
-		if let Some(ctx) = ctx.borrow().as_ref() {
-			let world = unsafe { &mut *ctx.world.as_ptr() };
-			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
-				let pos = unsafe { *in_pos };
-				transform.translation = mochi_math::Vec3::new(pos.x, pos.y, pos.z);
-			}
-		}
+	let pos = unsafe { *in_pos };
+	with_transform_mut(entity_id, |t| {
+		t.translation = mochi_math::Vec3::new(pos.x, pos.y, pos.z);
 	});
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_rotate(entity_id: u64, dx: f32, dy: f32, dz: f32) {
-	let entity = match hecs::Entity::from_bits(entity_id) {
-		Some(e) => e,
-		None => return,
-	};
-	CURRENT_CONTEXT.with(|ctx| {
-		if let Some(ctx) = ctx.borrow().as_ref() {
-			let world = unsafe { &mut *ctx.world.as_ptr() };
-			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
-				let rx = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(1.0, 0.0, 0.0), mochi_math::Rad::new(dx));
-				let ry = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(0.0, 1.0, 0.0), mochi_math::Rad::new(dy));
-				let rz = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(0.0, 0.0, 1.0), mochi_math::Rad::new(dz));
-				let delta = (ry * rx * rz).normalize();
-				transform.rotation = (transform.rotation * delta).normalize();
-			}
-		}
+	with_transform_mut(entity_id, |t| {
+		let rx = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(1.0, 0.0, 0.0), mochi_math::Rad::new(dx));
+		let ry = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(0.0, 1.0, 0.0), mochi_math::Rad::new(dy));
+		let rz = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(0.0, 0.0, 1.0), mochi_math::Rad::new(dz));
+		let delta = (ry * rx * rz).normalize();
+		t.rotation = (t.rotation * delta).normalize();
 	});
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_move_relative(entity_id: u64, forward_delta: f32, right_delta: f32, up_delta: f32) {
-	let entity = match hecs::Entity::from_bits(entity_id) {
-		Some(e) => e,
-		None => return,
-	};
-	CURRENT_CONTEXT.with(|ctx| {
-		if let Some(ctx) = ctx.borrow().as_ref() {
-			let world = unsafe { &mut *ctx.world.as_ptr() };
-			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
-				let forward = transform.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
-				let right = transform.rotation * mochi_math::Vec3::new(1.0, 0.0, 0.0);
-				let up = mochi_math::Vec3::new(0.0, 1.0, 0.0);
-
-				transform.translation += forward * forward_delta + right * right_delta + up * up_delta;
-			}
-		}
+	with_transform_mut(entity_id, |t| {
+		let forward = t.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
+		let right = t.rotation * mochi_math::Vec3::new(1.0, 0.0, 0.0);
+		let up = mochi_math::Vec3::new(0.0, 1.0, 0.0);
+		t.translation += forward * forward_delta + right * right_delta + up * up_delta;
 	});
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_camera_look(entity_id: u64, pitch_delta: f32, yaw_delta: f32) {
-	let entity = match hecs::Entity::from_bits(entity_id) {
-		Some(e) => e,
-		None => return,
-	};
-	CURRENT_CONTEXT.with(|ctx| {
-		if let Some(ctx) = ctx.borrow().as_ref() {
-			let world = unsafe { &mut *ctx.world.as_ptr() };
-			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
-				let yaw_rot = mochi_math::Quat::from_axis_angle(
-					mochi_math::Vec3::new(0.0, 1.0, 0.0),
-					mochi_math::Rad::new(yaw_delta),
-				);
-				let r1 = (yaw_rot * transform.rotation).normalize();
-				let local_right = r1 * mochi_math::Vec3::new(1.0, 0.0, 0.0);
-				let pitch_rot = mochi_math::Quat::from_axis_angle(
-					local_right,
-					mochi_math::Rad::new(pitch_delta),
-				);
-
-				transform.rotation = (pitch_rot * r1).normalize();
-			}
-		}
+	with_transform_mut(entity_id, |t| {
+		let yaw_rot = mochi_math::Quat::from_axis_angle(
+			mochi_math::Vec3::new(0.0, 1.0, 0.0),
+			mochi_math::Rad::new(yaw_delta),
+		);
+		let r1 = (yaw_rot * t.rotation).normalize();
+		let local_right = r1 * mochi_math::Vec3::new(1.0, 0.0, 0.0);
+		let pitch_rot = mochi_math::Quat::from_axis_angle(
+			local_right,
+			mochi_math::Rad::new(pitch_delta),
+		);
+		t.rotation = (pitch_rot * r1).normalize();
 	});
 }
 
@@ -175,21 +157,10 @@ pub extern "C" fn mochi_get_scale(entity_id: u64, out_scale: *mut CVec3) {
 	if out_scale.is_null() {
 		return;
 	}
-	let entity = match hecs::Entity::from_bits(entity_id) {
-		Some(e) => e,
-		None => return,
-	};
-	CURRENT_CONTEXT.with(|ctx| {
-		if let Some(ctx) = ctx.borrow().as_ref() {
-			let world = unsafe { &*ctx.world.as_ptr() };
-			if let Ok(transform) = world.get::<&TransformComponent>(entity) {
-				unsafe {
-					(*out_scale).x = transform.scale.x;
-					(*out_scale).y = transform.scale.y;
-					(*out_scale).z = transform.scale.z;
-				}
-			}
-		}
+	with_transform(entity_id, |t| unsafe {
+		(*out_scale).x = t.scale.x;
+		(*out_scale).y = t.scale.y;
+		(*out_scale).z = t.scale.z;
 	});
 }
 
@@ -198,18 +169,9 @@ pub extern "C" fn mochi_set_scale(entity_id: u64, in_scale: *const CVec3) {
 	if in_scale.is_null() {
 		return;
 	}
-	let entity = match hecs::Entity::from_bits(entity_id) {
-		Some(e) => e,
-		None => return,
-	};
-	CURRENT_CONTEXT.with(|ctx| {
-		if let Some(ctx) = ctx.borrow().as_ref() {
-			let world = unsafe { &mut *ctx.world.as_ptr() };
-			if let Ok(mut transform) = world.get::<&mut TransformComponent>(entity) {
-				let s = unsafe { *in_scale };
-				transform.scale = mochi_math::Vec3::new(s.x, s.y, s.z);
-			}
-		}
+	let s = unsafe { *in_scale };
+	with_transform_mut(entity_id, |t| {
+		t.scale = mochi_math::Vec3::new(s.x, s.y, s.z);
 	});
 }
 

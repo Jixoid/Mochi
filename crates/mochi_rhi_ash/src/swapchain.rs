@@ -44,110 +44,34 @@ unsafe impl Send for AshRenderTarget {}
 unsafe impl Sync for AshRenderTarget {}
 
 impl AshRenderTarget {
-	pub fn new_offscreen(
-		color_image: vk::Image,
-		color_view: vk::ImageView,
-		color_format: Format,
-		depth_image: vk::Image,
-		depth_view: vk::ImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> Self {
-		Self {
-			color_image,
-			color_view,
-			resolve_image: vk::Image::null(),
-			resolve_view: vk::ImageView::null(),
-			color_format,
-			depth_image,
-			depth_view,
-			resolve_depth_image: vk::Image::null(),
-			resolve_depth_view: vk::ImageView::null(),
-			depth_format,
-			extent: vk::Extent2D { width, height },
-			final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-			samples: mochi_rhi::MsaaSamples::Off,
-		}
-	}
+	pub fn new_from_desc(desc: &mochi_rhi::RenderTargetDesc<crate::AshVulkanBackend>) -> Self {
+		let color_image = desc.color_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
+		let color_view = desc.color_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
+		let resolve_image = desc.resolve_color_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
+		let resolve_view = desc.resolve_color_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
 
-	pub fn new_multisample_offscreen(
-		color_image: vk::Image,
-		color_view: vk::ImageView,
-		resolve_image: vk::Image,
-		resolve_view: vk::ImageView,
-		color_format: Format,
-		depth_image: vk::Image,
-		depth_view: vk::ImageView,
-		resolve_depth_image: vk::Image,
-		resolve_depth_view: vk::ImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-		samples: mochi_rhi::MsaaSamples,
-	) -> Self {
+		let depth_image = desc.depth_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
+		let depth_view = desc.depth_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
+		let resolve_depth_image = desc.resolve_depth_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
+		let resolve_depth_view = desc.resolve_depth_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
+
 		Self {
 			color_image,
 			color_view,
 			resolve_image,
 			resolve_view,
-			color_format,
+			color_format: desc.color_format,
 			depth_image,
 			depth_view,
 			resolve_depth_image,
 			resolve_depth_view,
-			depth_format,
-			extent: vk::Extent2D { width, height },
+			depth_format: desc.depth_format,
+			extent: vk::Extent2D {
+				width: desc.width,
+				height: desc.height,
+			},
 			final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-			samples,
-		}
-	}
-
-	pub fn new_depth_only(
-		depth_image: vk::Image,
-		depth_view: vk::ImageView,
-		depth_format: Format,
-		width: u32,
-		height: u32,
-	) -> Self {
-		Self {
-			color_image: vk::Image::null(),
-			color_view: vk::ImageView::null(),
-			resolve_image: vk::Image::null(),
-			resolve_view: vk::ImageView::null(),
-			color_format: Format::Undefined,
-			depth_image,
-			depth_view,
-			resolve_depth_image: vk::Image::null(),
-			resolve_depth_view: vk::ImageView::null(),
-			depth_format,
-			extent: vk::Extent2D { width, height },
-			final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-			samples: mochi_rhi::MsaaSamples::Off,
-		}
-	}
-
-	pub fn new_color_only(
-		color_image: vk::Image,
-		color_view: vk::ImageView,
-		color_format: Format,
-		width: u32,
-		height: u32,
-	) -> Self {
-		Self {
-			color_image,
-			color_view,
-			resolve_image: vk::Image::null(),
-			resolve_view: vk::ImageView::null(),
-			color_format,
-			depth_image: vk::Image::null(),
-			depth_view: vk::ImageView::null(),
-			resolve_depth_image: vk::Image::null(),
-			resolve_depth_view: vk::ImageView::null(),
-			depth_format: Format::Undefined,
-			extent: vk::Extent2D { width, height },
-			final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-			samples: mochi_rhi::MsaaSamples::Off,
+			samples: desc.samples,
 		}
 	}
 }

@@ -58,18 +58,11 @@ impl VelocityManager {
 			rhi::ShaderStage::Pixel,
 			std::mem::size_of::<VelocityPushConstants>() as u32,
 		);
-		let pipeline = rhi::Pipeline::new_graphics(
-			device,
-			&meta,
-			&[&vert, &frag],
-			rhi::PolygonMode::Fill,
-			rhi::PrimitiveTopology::TriangleList,
-			rhi::Format::V2Float16,
-			rhi::Format::Undefined,
-			false,
-			false,
-			rhi::MsaaSamples::Off,
-		);
+		let pipeline = rhi::GraphicsPipelineBuilder::new(device, &meta)
+			.shaders(&[&vert, &frag])
+			.color_format(rhi::Format::V2Float16)
+			.depth_write(false)
+			.build();
 
 		let sampler = device
 			.create_sampler(
@@ -99,16 +92,9 @@ impl VelocityManager {
 			}
 		}
 
-		let ext = mochi_math::Extent::new([width, height]);
-		let image = rhi::Image2::new(
-			alloc,
-			ext,
-			rhi::Format::V2Float16,
-			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let image = rhi::Image2::builder(width, height, rhi::Format::V2Float16)
+			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
+			.build(alloc);
 		let view = device
 			.create_image_view(&image, rhi::Format::V2Float16)
 			.expect("Failed to create velocity image view");

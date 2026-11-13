@@ -10,8 +10,6 @@
 */
 
 
-use mochi_math::Extent;
-
 use crate::manager::allocator::Allocator;
 use crate::traits::RhiBackend;
 
@@ -44,7 +42,7 @@ unsafe impl<B: RhiBackend> Sync for Sampler2<B> {}
 impl<B: RhiBackend> Sampler2<B> {
 	pub fn new(
 		allocator: &Allocator<B>,
-		address_mode: Extent<3, SamplerAddressMode>,
+		address_mode: [SamplerAddressMode; 3],
 		mag_filter: SamplerFilter,
 		min_filter: SamplerFilter,
 	) -> Self {

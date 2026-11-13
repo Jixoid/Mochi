@@ -15,7 +15,6 @@
 #![feature(f128)]
 
 
-mod extent;
 mod degree;
 mod traits;
 mod vec2;
@@ -34,7 +33,6 @@ mod rect;
 mod frustum;
 mod color;
 
-pub use extent::*;
 pub use degree::*;
 pub use traits::*;
 pub use vec2::*;

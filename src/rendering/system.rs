@@ -204,18 +204,11 @@ impl RenderingSystem {
 			rhi::ShaderStage::Pixel,
 			std::mem::size_of::<FxaaPushConstants>() as u32,
 		);
-		let fxaa_pipeline = rhi::Pipeline::new_graphics(
-			device,
-			&fxaa_meta,
-			&[&fxaa_vert, &fxaa_frag],
-			rhi::PolygonMode::Fill,
-			rhi::PrimitiveTopology::TriangleList,
-			color_format,
-			rhi::Format::Undefined,
-			false,
-			false,
-			rhi::MsaaSamples::Off,
-		);
+		let fxaa_pipeline = rhi::GraphicsPipelineBuilder::new(device, &fxaa_meta)
+			.shaders(&[&fxaa_vert, &fxaa_frag])
+			.color_format(color_format)
+			.depth_write(false)
+			.build();
 		let fxaa_sampler = device
 			.create_sampler(
 				rhi::SamplerFilter::Linear,
@@ -350,7 +343,6 @@ impl RenderingSystem {
 		depth_format: rhi::Format,
 		msaa_samples: rhi::MsaaSamples,
 	) {
-		let ext = mochi_math::Extent::new([width, height]);
 		let needs_msaa = msaa_samples.count() > 1;
 
 		if let Some(target) = &mut self.offscreen_target {
@@ -366,7 +358,7 @@ impl RenderingSystem {
 				target.msaa_samples = msaa_samples;
 				if needs_msaa {
 					let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
-						Self::create_msaa_attachments(device, alloc, ext, color_format, depth_format, msaa_samples);
+						Self::create_msaa_attachments(device, alloc, width, height, color_format, depth_format, msaa_samples);
 					target.msaa_attachments = Some(MsaaOffscreenAttachments {
 						color_image: msaa_col_img,
 						color_view: msaa_col_view,
@@ -380,28 +372,16 @@ impl RenderingSystem {
 			}
 		}
 
-		let color_image = rhi::Image2::new(
-			alloc,
-			ext,
-			color_format,
-			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let color_image = rhi::Image2::builder(width, height, color_format)
+			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
+			.build(alloc);
 		let color_view = device
 			.create_image_view(&color_image, color_format)
 			.expect("Failed to create offscreen color view");
 
-		let depth_image = rhi::Image2::new(
-			alloc,
-			ext,
-			depth_format,
-			rhi::ImageUsage::DepthStencilAttachment | rhi::ImageUsage::Sampled,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let depth_image = rhi::Image2::builder(width, height, depth_format)
+			.usage(rhi::ImageUsage::DepthStencilAttachment | rhi::ImageUsage::Sampled)
+			.build(alloc);
 		let depth_view = device
 			.create_image_view(&depth_image, depth_format)
 			.expect("Failed to create offscreen depth view");
@@ -420,7 +400,7 @@ impl RenderingSystem {
 
 		let msaa_attachments = if needs_msaa {
 			let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
-				Self::create_msaa_attachments(device, alloc, ext, color_format, depth_format, msaa_samples);
+				Self::create_msaa_attachments(device, alloc, width, height, color_format, depth_format, msaa_samples);
 			Some(MsaaOffscreenAttachments {
 				color_image: msaa_col_img,
 				color_view: msaa_col_view,
@@ -450,35 +430,24 @@ impl RenderingSystem {
 	fn create_msaa_attachments(
 		device: &rhi::Device,
 		alloc: &rhi::Allocator,
-		ext: mochi_math::Extent<2, u32>,
+		width: u32,
+		height: u32,
 		color_format: rhi::Format,
 		depth_format: rhi::Format,
 		samples: rhi::MsaaSamples,
 	) -> (rhi::Image2, rhi::ImageView2, rhi::Image2, rhi::ImageView2) {
-		let col_img = rhi::Image2::new_multisample(
-			alloc,
-			ext,
-			color_format,
-			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::TransientAttachment,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-			samples,
-		);
+		let col_img = rhi::Image2::builder(width, height, color_format)
+			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::TransientAttachment)
+			.samples(samples)
+			.build(alloc);
 		let col_view = device
 			.create_image_view(&col_img, color_format)
 			.expect("Failed to create MSAA offscreen color view");
 
-		let depth_img = rhi::Image2::new_multisample(
-			alloc,
-			ext,
-			depth_format,
-			rhi::ImageUsage::DepthStencilAttachment | rhi::ImageUsage::TransientAttachment,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-			samples,
-		);
+		let depth_img = rhi::Image2::builder(width, height, depth_format)
+			.usage(rhi::ImageUsage::DepthStencilAttachment | rhi::ImageUsage::TransientAttachment)
+			.samples(samples)
+			.build(alloc);
 		let depth_view = device
 			.create_image_view(&depth_img, depth_format)
 			.expect("Failed to create MSAA offscreen depth view");
@@ -673,17 +642,12 @@ impl RenderingSystem {
 				if let Some(set) = &sm.cascade_sets[light_idx] {
 					for c in 0..CASCADE_COUNT {
 						let cascade = &set.cascades[c];
-						let cascade_target = device.create_depth_render_target(
-							&cascade.image,
-							&cascade.view,
-							rhi::Format::Depth32f,
-							SHADOW_MAP_SIZE,
-							SHADOW_MAP_SIZE,
-						);
+						let cascade_target = rhi::RenderTarget::builder(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
+							.depth(&cascade.image, &cascade.view, rhi::Format::Depth32f)
+							.build(device);
 
 						cmd.render_pass(&cascade_target, clear_color, |pass| {
-							pass.set_viewport(0.0, 0.0, SHADOW_MAP_SIZE as f32, SHADOW_MAP_SIZE as f32, 0.0, 1.0);
-							pass.set_scissor(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+							pass.set_viewport_and_scissor(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
 							pass.bind_pipeline(&sm.pipeline);
 
 							let view_proj = mochi_math::Mat4x4::from_array(cascade.view_proj);
@@ -730,34 +694,18 @@ impl RenderingSystem {
 
 		if is_post_process {
 			if let Some(offscreen) = &self.offscreen_target {
-				let scene_target = if let Some(msaa) = &offscreen.msaa_attachments {
-					device.create_multisample_render_target(
-						&msaa.color_image,
-						&msaa.color_view,
-						&offscreen.color_image,
-						&offscreen.color_view,
-						offscreen.color_format,
-						&msaa.depth_image,
-						&msaa.depth_view,
-						&offscreen.depth_image,
-						&offscreen.depth_view,
-						offscreen.depth_format,
-						width,
-						height,
-						offscreen.msaa_samples,
-					)
-				} else {
-					device.create_render_target(
-						&offscreen.color_image,
-						&offscreen.color_view,
-						offscreen.color_format,
-						&offscreen.depth_image,
-						&offscreen.depth_view,
-						offscreen.depth_format,
-						width,
-						height,
-					)
-				};
+				let mut target_builder = rhi::RenderTarget::builder(width, height)
+					.color(&offscreen.color_image, &offscreen.color_view, offscreen.color_format)
+					.depth(&offscreen.depth_image, &offscreen.depth_view, offscreen.depth_format);
+
+				if let Some(msaa) = &offscreen.msaa_attachments {
+					target_builder = target_builder
+						.multisample_color(&msaa.color_image, &msaa.color_view)
+						.multisample_depth(&msaa.depth_image, &msaa.depth_view)
+						.samples(offscreen.msaa_samples);
+				}
+
+				let scene_target = target_builder.build(device);
 
 				cmd.render_pass(&scene_target, clear_color, |pass| {
 					Self::record_scene_packets(
@@ -775,17 +723,12 @@ impl RenderingSystem {
 					if let Some(vm) = &mut self.velocity_manager {
 						vm.ensure_target(device, alloc, width, height);
 						if let Some(vt) = &vm.target {
-							let velocity_rt = device.create_color_render_target(
-								&vt.image,
-								&vt.view,
-								rhi::Format::V2Float16,
-								width,
-								height,
-							);
+							let velocity_rt = rhi::RenderTarget::builder(width, height)
+								.color(&vt.image, &vt.view, rhi::Format::V2Float16)
+								.build(device);
 							let vel_clear = [0.0, 0.0, 0.0, 0.0];
 							cmd.render_pass(&velocity_rt, vel_clear, |pass| {
-								pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-								pass.set_scissor(0, 0, width, height);
+								pass.set_viewport_and_scissor(width, height);
 								pass.bind_pipeline(&vm.pipeline);
 
 								let pc = VelocityPushConstants {
@@ -813,8 +756,7 @@ impl RenderingSystem {
 					) {
 						let target_no_depth = swapchain_target.without_depth();
 						cmd.render_pass(&target_no_depth, clear_color, |pass| {
-							pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-							pass.set_scissor(0, 0, width, height);
+							pass.set_viewport_and_scissor(width, height);
 							pass.bind_pipeline(fxaa_pipeline);
 
 							let pc = FxaaPushConstants {
@@ -846,17 +788,12 @@ impl RenderingSystem {
 							];
 
 							// 1. Pass 1: SMAA Edge Detection (Color)
-							let edges_rt = device.create_color_render_target(
-								&targets.edges_image,
-								&targets.edges_view,
-								rhi::Format::V2Norm8U,
-								width,
-								height,
-							);
+							let edges_rt = rhi::RenderTarget::builder(width, height)
+								.color(&targets.edges_image, &targets.edges_view, rhi::Format::V2Norm8U)
+								.build(device);
 							let edge_clear = [0.0, 0.0, 0.0, 0.0];
 							cmd.render_pass(&edges_rt, edge_clear, |pass| {
-								pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-								pass.set_scissor(0, 0, width, height);
+								pass.set_viewport_and_scissor(width, height);
 								pass.bind_pipeline(&smaa.edge_pipeline);
 
 								let pc = SmaaEdgePushConstants {
@@ -875,17 +812,12 @@ impl RenderingSystem {
 							});
 
 							// 2. Pass 2: SMAA Blending Weight Calculation
-							let blend_rt = device.create_color_render_target(
-								&targets.blend_image,
-								&targets.blend_view,
-								rhi::Format::V4Norm8U,
-								width,
-								height,
-							);
+							let blend_rt = rhi::RenderTarget::builder(width, height)
+								.color(&targets.blend_image, &targets.blend_view, rhi::Format::V4Norm8U)
+								.build(device);
 							let blend_clear = [0.0, 0.0, 0.0, 0.0];
 							cmd.render_pass(&blend_rt, blend_clear, |pass| {
-								pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-								pass.set_scissor(0, 0, width, height);
+								pass.set_viewport_and_scissor(width, height);
 								pass.bind_pipeline(&smaa.blend_pipeline);
 
 								let subsample_indices = match self.aa_mode {
@@ -936,17 +868,12 @@ impl RenderingSystem {
 									let prev_idx = 1 - curr_idx;
 
 									// 3. Pass 3: SMAA Neighborhood Blending (Reprojected with Velocity in Alpha)
-									let history_rt = device.create_color_render_target(
-										&history_images[curr_idx],
-										&history_views[curr_idx],
-										smaa.swapchain_color_format,
-										width,
-										height,
-									);
+									let history_rt = rhi::RenderTarget::builder(width, height)
+										.color(&history_images[curr_idx], &history_views[curr_idx], smaa.swapchain_color_format)
+										.build(device);
 									let hist_clear = [0.0, 0.0, 0.0, 0.0];
 									cmd.render_pass(&history_rt, hist_clear, |pass| {
-										pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-										pass.set_scissor(0, 0, width, height);
+										pass.set_viewport_and_scissor(width, height);
 										pass.bind_pipeline(&smaa.neighbor_reproject_pipeline);
 
 										let pc = SmaaNeighborPushConstants {
@@ -968,8 +895,7 @@ impl RenderingSystem {
 									if let Some(swapchain_target) = display.render_target(img_idx) {
 										let target_no_depth = swapchain_target.without_depth();
 										cmd.render_pass(&target_no_depth, clear_color, |pass| {
-											pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-											pass.set_scissor(0, 0, width, height);
+											pass.set_viewport_and_scissor(width, height);
 											pass.bind_pipeline(&smaa.resolve_pipeline);
 
 											let pc = SmaaResolvePushConstants {
@@ -994,8 +920,7 @@ impl RenderingSystem {
 								if let Some(swapchain_target) = display.render_target(img_idx) {
 									let target_no_depth = swapchain_target.without_depth();
 									cmd.render_pass(&target_no_depth, clear_color, |pass| {
-										pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-										pass.set_scissor(0, 0, width, height);
+										pass.set_viewport_and_scissor(width, height);
 										pass.bind_pipeline(&smaa.neighbor_pipeline);
 
 										let pc = SmaaNeighborPushConstants {
@@ -1049,8 +974,7 @@ impl RenderingSystem {
 		scene_addr: u64,
 		material_addr: u64,
 	) {
-		pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-		pass.set_scissor(0, 0, width, height);
+		pass.set_viewport_and_scissor(width, height);
 
 		let mut currently_bound_pipeline_id: Option<u16> = None;
 

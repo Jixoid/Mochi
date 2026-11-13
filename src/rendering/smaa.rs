@@ -159,16 +159,10 @@ impl SmaaManager {
 			.expect("Failed to create SMAA point sampler");
 
 		// 1. Upload precomputed AreaTex (160x560 R8G8_UNORM)
-		let area_ext = mochi_math::Extent::new([AREATEX_WIDTH, AREATEX_HEIGHT]);
-		let area_image = rhi::Image2::new(
-			alloc,
-			area_ext,
-			rhi::Format::V2Norm8U,
-			rhi::ImageUsage::Sampled | rhi::ImageUsage::TransferDst,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let area_image = rhi::Image2::builder(AREATEX_WIDTH, AREATEX_HEIGHT, rhi::Format::V2Norm8U)
+			.usage(rhi::ImageUsage::Sampled | rhi::ImageUsage::TransferDst)
+			.build(alloc);
+		
 		device
 			.upload_image_data(
 				alloc,
@@ -185,16 +179,10 @@ impl SmaaManager {
 		let area_descriptor_id = device.write_texture_descriptor(&area_view, &linear_sampler);
 
 		// 2. Upload precomputed SearchTex (64x16 R8_UNORM)
-		let search_ext = mochi_math::Extent::new([SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT]);
-		let search_image = rhi::Image2::new(
-			alloc,
-			search_ext,
-			rhi::Format::Norm8U,
-			rhi::ImageUsage::Sampled | rhi::ImageUsage::TransferDst,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let search_image = rhi::Image2::builder(SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT, rhi::Format::Norm8U)
+			.usage(rhi::ImageUsage::Sampled | rhi::ImageUsage::TransferDst)
+			.build(alloc);
+
 		device
 			.upload_image_data(
 				alloc,
@@ -392,11 +380,11 @@ impl SmaaManager {
 		if let Some(targets) = &mut self.targets {
 			if targets.width == width && targets.height == height {
 				if needs_history && targets.history_images.is_none() {
-					let ext = mochi_math::Extent::new([width, height]);
 					let (imgs, views, descs) = Self::create_history_targets(
 						device,
 						alloc,
-						ext,
+						width,
+						height,
 						self.swapchain_color_format,
 						&self.linear_sampler,
 					);
@@ -414,33 +402,21 @@ impl SmaaManager {
 			}
 		}
 
-		let ext = mochi_math::Extent::new([width, height]);
-
 		// Pass 1 target: Edges (R8G8_UNORM)
-		let edges_image = rhi::Image2::new(
-			alloc,
-			ext,
-			rhi::Format::V2Norm8U,
-			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let edges_image = rhi::Image2::builder(width, height, rhi::Format::V2Norm8U)
+			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
+			.build(alloc);
+		
 		let edges_view = device
 			.create_image_view(&edges_image, rhi::Format::V2Norm8U)
 			.expect("Failed to create SMAA edges image view");
 		let edges_descriptor_id = device.write_texture_descriptor(&edges_view, &self.linear_sampler);
 
 		// Pass 2 target: Blending Weights (RGBA8_UNORM)
-		let blend_image = rhi::Image2::new(
-			alloc,
-			ext,
-			rhi::Format::V4Norm8U,
-			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let blend_image = rhi::Image2::builder(width, height, rhi::Format::V4Norm8U)
+			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
+			.build(alloc);
+		
 		let blend_view = device
 			.create_image_view(&blend_image, rhi::Format::V4Norm8U)
 			.expect("Failed to create SMAA blend image view");
@@ -450,7 +426,8 @@ impl SmaaManager {
 			let (imgs, views, descs) = Self::create_history_targets(
 				device,
 				alloc,
-				ext,
+				width,
+				height,
 				self.swapchain_color_format,
 				&self.linear_sampler,
 			);
@@ -478,33 +455,22 @@ impl SmaaManager {
 	fn create_history_targets(
 		device: &rhi::Device,
 		alloc: &rhi::Allocator,
-		ext: mochi_math::Extent<2, u32>,
+		width: u32,
+		height: u32,
 		format: rhi::Format,
 		sampler: &rhi::Sampler2,
 	) -> ([rhi::Image2; 2], [rhi::ImageView2; 2], [u32; 2]) {
-		let img0 = rhi::Image2::new(
-			alloc,
-			ext,
-			format,
-			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let img0 = rhi::Image2::builder(width, height, format)
+			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
+			.build(alloc);
 		let view0 = device
 			.create_image_view(&img0, format)
 			.expect("Failed to create SMAA history image view 0");
 		let desc0 = device.write_texture_descriptor(&view0, sampler);
 
-		let img1 = rhi::Image2::new(
-			alloc,
-			ext,
-			format,
-			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled,
-			rhi::ImageTiling::Optimal,
-			rhi::AllocationCreate::Dedicated,
-			rhi::AllocationLocation::PreferDevice,
-		);
+		let img1 = rhi::Image2::builder(width, height, format)
+			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
+			.build(alloc);
 		let view1 = device
 			.create_image_view(&img1, format)
 			.expect("Failed to create SMAA history image view 1");
