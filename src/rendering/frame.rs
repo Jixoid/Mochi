@@ -64,13 +64,13 @@ pub struct SceneFrameData {
 	pub _pad0: u32,
 	pub _pad1: [u32; 2],
 	pub dir_lights: [DirectionalLightGpuData; MAX_DIRECTIONAL_LIGHTS],
-	pub cascade_view_proj: [[f32; 16]; 4],
+	pub cascade_view_proj: [[[f32; 16]; 4]; MAX_DIRECTIONAL_LIGHTS],
 	pub cascade_split_depths: [f32; 4],
-	pub cascade_shadow_ids: [u32; 4],
+	pub cascade_shadow_ids: [[u32; 4]; MAX_DIRECTIONAL_LIGHTS],
 }
 
 const _: () = {
-	assert!(std::mem::size_of::<SceneFrameData>() == 800);
+	assert!(std::mem::size_of::<SceneFrameData>() == 1616);
 	assert!(std::mem::offset_of!(SceneFrameData, cluster_grid_address) == 288);
 	assert!(std::mem::offset_of!(SceneFrameData, point_light_index_list_address) == 296);
 	assert!(std::mem::offset_of!(SceneFrameData, spot_light_index_list_address) == 304);
@@ -85,8 +85,8 @@ const _: () = {
 	assert!(std::mem::offset_of!(SceneFrameData, spot_light_count) == 368);
 	assert!(std::mem::offset_of!(SceneFrameData, dir_lights) == 384);
 	assert!(std::mem::offset_of!(SceneFrameData, cascade_view_proj) == 512);
-	assert!(std::mem::offset_of!(SceneFrameData, cascade_split_depths) == 768);
-	assert!(std::mem::offset_of!(SceneFrameData, cascade_shadow_ids) == 784);
+	assert!(std::mem::offset_of!(SceneFrameData, cascade_split_depths) == 1536);
+	assert!(std::mem::offset_of!(SceneFrameData, cascade_shadow_ids) == 1552);
 };
 
 impl Default for SceneFrameData {
@@ -124,9 +124,9 @@ impl Default for SceneFrameData {
 			_pad0: 0,
 			_pad1: [0; 2],
 			dir_lights: [DirectionalLightGpuData::default(); MAX_DIRECTIONAL_LIGHTS],
-			cascade_view_proj: [identity_mat; 4],
+			cascade_view_proj: [[identity_mat; 4]; MAX_DIRECTIONAL_LIGHTS],
 			cascade_split_depths: [2.5, 8.0, 24.0, 80.0],
-			cascade_shadow_ids: [0; 4],
+			cascade_shadow_ids: [[0; 4]; MAX_DIRECTIONAL_LIGHTS],
 		}
 	}
 }
@@ -171,9 +171,9 @@ impl SceneFrameBuffer {
 		spot_light_index_list_address: u64,
 		screen_width: u32,
 		screen_height: u32,
-		cascade_view_proj: [[f32; 16]; 4],
+		cascade_view_proj: [[[f32; 16]; 4]; MAX_DIRECTIONAL_LIGHTS],
 		cascade_split_depths: [f32; 4],
-		cascade_shadow_ids: [u32; 4],
+		cascade_shadow_ids: [[u32; 4]; MAX_DIRECTIONAL_LIGHTS],
 	) {
 		let view = camera.view_matrix(camera_transform);
 		let proj = camera.projection_matrix(aspect);

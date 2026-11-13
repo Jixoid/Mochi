@@ -89,9 +89,9 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	uint _pad1_0;
 	uint _pad1_1;
 	DirectionalLight dir_lights[4];
-	mat4 cascade_view_proj[4];
+	mat4 cascade_view_proj[4][4];
 	vec4 cascade_split_depths;
-	uvec4 cascade_shadow_ids;
+	uvec4 cascade_shadow_ids[4];
 };
 
 layout(push_constant, scalar) uniform CullPushConstants {

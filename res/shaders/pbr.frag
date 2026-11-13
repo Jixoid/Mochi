@@ -84,9 +84,9 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	uint _pad1_0;
 	uint _pad1_1;
 	DirectionalLight dir_lights[4];
-	mat4 cascade_view_proj[4];
+	mat4 cascade_view_proj[4][4];
 	vec4 cascade_split_depths;
-	uvec4 cascade_shadow_ids;
+	uvec4 cascade_shadow_ids[4];
 };
 
 struct PbrMaterialData {
@@ -194,7 +194,7 @@ float sample_shadow_bilinear(uint tex_id, vec2 uv, float current_depth, float bi
 	return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
 }
 
-float evaluate_csm_shadow(SceneFrameData scene, vec3 world_pos, vec3 N, float view_z) {
+float evaluate_csm_shadow(SceneFrameData scene, uint light_idx, vec3 world_pos, vec3 N, float view_z) {
 	int cascade_idx = -1;
 	for (int c = 0; c < 4; ++c) {
 		if (view_z < scene.cascade_split_depths[c]) {
@@ -206,13 +206,16 @@ float evaluate_csm_shadow(SceneFrameData scene, vec3 world_pos, vec3 N, float vi
 		return 1.0;
 	}
 
-	uint shadow_tex_id = scene.cascade_shadow_ids[cascade_idx];
+	uint shadow_tex_id = scene.cascade_shadow_ids[light_idx][cascade_idx];
+	if (shadow_tex_id == 0u) {
+		return 1.0;
+	}
 
 	// Normal offset bias scaled by cascade index to eliminate shadow acne
 	float normal_bias = 0.005 * float(cascade_idx + 1);
 	vec3 biased_pos = world_pos + N * normal_bias;
 
-	vec4 shadow_clip = scene.cascade_view_proj[cascade_idx] * vec4(biased_pos, 1.0);
+	vec4 shadow_clip = scene.cascade_view_proj[light_idx][cascade_idx] * vec4(biased_pos, 1.0);
 	vec3 proj_coords = shadow_clip.xyz / shadow_clip.w;
 
 	vec2 shadow_uv = proj_coords.xy * 0.5 + 0.5;
@@ -309,8 +312,8 @@ void main() {
 		float NdotL = max(dot(N, L), 0.0);
 
 		float shadow_factor = 1.0;
-		if (scene.dir_lights[i].direction.w > 0.5 && i == 0u) {
-			shadow_factor = evaluate_csm_shadow(scene, in_world_pos, N, view_z);
+		if (scene.dir_lights[i].direction.w > 0.5) {
+			shadow_factor = evaluate_csm_shadow(scene, i, in_world_pos, N, view_z);
 		}
 
 		Lo += (kD_eff * albedo.rgb / PI + specular) * radiance * NdotL * shadow_factor;

@@ -14,7 +14,7 @@ use std::sync::Arc;
 use crate::material::{BlendMode, MaterialInstance, MaterialStorage, MaterialTemplate, PassKind, TextureManager};
 use crate::rendering::aa::AntiAliasingMode;
 use crate::rendering::cluster::ClusterManager;
-use crate::rendering::frame::SceneFrameBuffer;
+use crate::rendering::frame::{MAX_DIRECTIONAL_LIGHTS, SceneFrameBuffer};
 use crate::rendering::queue::RenderQueue;
 use crate::rendering::shadow::{CASCADE_COUNT, SHADOW_MAP_SIZE, ShadowManager, ShadowPushConstants};
 use crate::rhi;
@@ -410,22 +410,26 @@ impl RenderingSystem {
 
 		let clear_color = camera.clear_color;
 
-		let mut sun_dir = mochi_math::Vec3::new(0.5, -1.0, 0.3).normalize();
-		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &DirectionalLightComponent)>().iter() {
-			sun_dir = t.rotation * light.direction;
-			break;
-		}
+		let mut cascade_view_proj = [[[mochi_math::Mat4x4::IDENTITY.to_array(); 4]; MAX_DIRECTIONAL_LIGHTS]; 1][0];
+		let mut cascade_shadow_ids = [[0u32; 4]; MAX_DIRECTIONAL_LIGHTS];
+		let cascade_split_depths = [2.5, 8.0, 24.0, 80.0];
 
-		let (cascade_view_proj, cascade_split_depths, cascade_shadow_ids) = if let Some(sm) = &mut self.shadow_manager {
-			sm.update_cascades(&camera, &cam_transform, aspect, sun_dir);
-			(sm.cascade_view_proj(), sm.cascade_split_depths(), sm.cascade_shadow_ids())
-		} else {
-			(
-				[[[0.0; 16]; 4]; 1][0],
-				[2.5, 8.0, 24.0, 80.0],
-				[0; 4],
-			)
-		};
+		if let Some(sm) = &mut self.shadow_manager {
+			let mut light_idx = 0;
+			for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &DirectionalLightComponent)>().iter() {
+				if light_idx >= MAX_DIRECTIONAL_LIGHTS {
+					break;
+				}
+				if light.cast_shadows {
+					let dir = t.rotation * light.direction;
+					sm.ensure_cascade_set(device, alloc, light_idx).ok();
+					sm.update_cascades(light_idx, &camera, &cam_transform, aspect, dir);
+					cascade_view_proj[light_idx] = sm.cascade_view_proj(light_idx);
+					cascade_shadow_ids[light_idx] = sm.cascade_shadow_ids(light_idx);
+				}
+				light_idx += 1;
+			}
+		}
 
 		let (grid_addr, pt_index_addr, spot_index_addr) = if let Some(cm) = &self.cluster_manager {
 			(cm.grid_address(), cm.point_index_list_address(), cm.spot_index_list_address())
@@ -492,52 +496,56 @@ impl RenderingSystem {
 		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
 
-		// Cascaded Shadow Map render passes (4 cascades)
+		// Cascaded Shadow Map render passes for all active shadow-casting directional lights
 		if let Some(sm) = &self.shadow_manager {
-			for c in 0..CASCADE_COUNT {
-				let cascade = &sm.cascades[c];
-				let cascade_target = device.create_depth_render_target(
-					&cascade.image,
-					&cascade.view,
-					rhi::Format::Depth32f,
-					SHADOW_MAP_SIZE,
-					SHADOW_MAP_SIZE,
-				);
-
-				cmd.render_pass(&cascade_target, clear_color, |pass| {
-					pass.set_viewport(0.0, 0.0, SHADOW_MAP_SIZE as f32, SHADOW_MAP_SIZE as f32, 0.0, 1.0);
-					pass.set_scissor(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-					pass.bind_pipeline(&sm.pipeline);
-
-					let view_proj = mochi_math::Mat4x4::from_array(cascade.view_proj);
-
-					for packet in &self.shadow_queue.packets {
-						let model = mochi_math::Mat4x4::from_array(packet.model_matrix);
-						let mvp = (view_proj * model).to_array();
-
-						let pc = ShadowPushConstants {
-							mvp,
-							vertex_addr: packet.vertex_buffer_addr,
-						};
-
-						pass.push_constant(
-							rhi::ShaderStage::Vertex,
-							0,
-							&pc,
+			for light_idx in 0..MAX_DIRECTIONAL_LIGHTS {
+				if let Some(set) = &sm.cascade_sets[light_idx] {
+					for c in 0..CASCADE_COUNT {
+						let cascade = &set.cascades[c];
+						let cascade_target = device.create_depth_render_target(
+							&cascade.image,
+							&cascade.view,
+							rhi::Format::Depth32f,
+							SHADOW_MAP_SIZE,
+							SHADOW_MAP_SIZE,
 						);
 
-						if packet.is_indexed && packet.index_count > 0 {
-							if let Some(index_buf) = packet.mesh.index_buffer() {
-								pass.bind_index_buffer(index_buf, 0, rhi::IndexType::Uint32);
-								pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
-							} else {
-								pass.draw(packet.vertex_count, 1, 0, 0);
+						cmd.render_pass(&cascade_target, clear_color, |pass| {
+							pass.set_viewport(0.0, 0.0, SHADOW_MAP_SIZE as f32, SHADOW_MAP_SIZE as f32, 0.0, 1.0);
+							pass.set_scissor(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+							pass.bind_pipeline(&sm.pipeline);
+
+							let view_proj = mochi_math::Mat4x4::from_array(cascade.view_proj);
+
+							for packet in &self.shadow_queue.packets {
+								let model = mochi_math::Mat4x4::from_array(packet.model_matrix);
+								let mvp = (view_proj * model).to_array();
+
+								let pc = ShadowPushConstants {
+									mvp,
+									vertex_addr: packet.vertex_buffer_addr,
+								};
+
+								pass.push_constant(
+									rhi::ShaderStage::Vertex,
+									0,
+									&pc,
+								);
+
+								if packet.is_indexed && packet.index_count > 0 {
+									if let Some(index_buf) = packet.mesh.index_buffer() {
+										pass.bind_index_buffer(index_buf, 0, rhi::IndexType::Uint32);
+										pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
+									} else {
+										pass.draw(packet.vertex_count, 1, 0, 0);
+									}
+								} else {
+									pass.draw(packet.vertex_count, 1, 0, 0);
+								}
 							}
-						} else {
-							pass.draw(packet.vertex_count, 1, 0, 0);
-						}
+						});
 					}
-				});
+				}
 			}
 		}
 

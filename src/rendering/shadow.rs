@@ -12,6 +12,7 @@
 
 use mochi_math::{Extent, Mat4x4, Vec3, Vec4};
 
+use crate::rendering::frame::MAX_DIRECTIONAL_LIGHTS;
 use crate::rhi::{
 	self, AllocationCreate, AllocationLocation, Format, ImageTiling, ImageUsage, Pipeline,
 	PipelineMeta, SamplerAddressMode, SamplerFilter, Shader, ShaderStage,
@@ -42,8 +43,12 @@ pub struct CascadeData {
 	pub view_proj: [f32; 16],
 }
 
-pub struct ShadowManager {
+pub struct CascadeSet {
 	pub cascades: [CascadeData; CASCADE_COUNT],
+}
+
+pub struct ShadowManager {
+	pub cascade_sets: [Option<CascadeSet>; MAX_DIRECTIONAL_LIGHTS],
 	pub sampler: rhi::Sampler2,
 	pub pipeline: rhi::Pipeline,
 	pub meta: rhi::PipelineMeta,
@@ -51,7 +56,7 @@ pub struct ShadowManager {
 }
 
 impl ShadowManager {
-	pub fn new(device: &rhi::Device, alloc: &rhi::Allocator) -> Result<Self, String> {
+	pub fn new(device: &rhi::Device, _alloc: &rhi::Allocator) -> Result<Self, String> {
 		let sampler = device
 			.create_sampler(
 				SamplerFilter::Linear,
@@ -84,6 +89,29 @@ impl ShadowManager {
 			rhi::MsaaSamples::Off,
 		);
 
+		Ok(Self {
+			cascade_sets: [None, None, None, None],
+			sampler,
+			pipeline,
+			meta,
+			split_depths: CASCADE_SPLITS,
+		})
+	}
+
+	pub fn ensure_cascade_set(
+		&mut self,
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		light_idx: usize,
+	) -> Result<(), String> {
+		if light_idx >= MAX_DIRECTIONAL_LIGHTS {
+			return Err(format!("Light index {light_idx} exceeds MAX_DIRECTIONAL_LIGHTS"));
+		}
+
+		if self.cascade_sets[light_idx].is_some() {
+			return Ok(());
+		}
+
 		let ext = Extent::new([SHADOW_MAP_SIZE, SHADOW_MAP_SIZE]);
 		let mut cascade_list = Vec::with_capacity(CASCADE_COUNT);
 
@@ -102,7 +130,7 @@ impl ShadowManager {
 				.create_image_view(&image, Format::Depth32f)
 				.map_err(|e| format!("Failed to create cascade depth image view: {e}"))?;
 
-			let descriptor_id = device.write_texture_descriptor(&view, &sampler);
+			let descriptor_id = device.write_texture_descriptor(&view, &self.sampler);
 
 			cascade_list.push(CascadeData {
 				image,
@@ -116,22 +144,27 @@ impl ShadowManager {
 			.try_into()
 			.map_err(|_| "Failed to collect 4 cascades".to_string())?;
 
-		Ok(Self {
-			cascades,
-			sampler,
-			pipeline,
-			meta,
-			split_depths: CASCADE_SPLITS,
-		})
+		self.cascade_sets[light_idx] = Some(CascadeSet { cascades });
+		Ok(())
 	}
 
 	pub fn update_cascades(
 		&mut self,
+		light_idx: usize,
 		camera: &CameraComponent,
 		camera_transform: &TransformComponent,
 		aspect: f32,
 		sun_dir: Vec3<f32>,
 	) {
+		if light_idx >= MAX_DIRECTIONAL_LIGHTS {
+			return;
+		}
+
+		let set = match &mut self.cascade_sets[light_idx] {
+			Some(s) => s,
+			None => return,
+		};
+
 		let dir = if sun_dir.dot(&sun_dir) < 1e-4 {
 			Vec3::new(0.5, -1.0, 0.3).normalize()
 		} else {
@@ -220,29 +253,39 @@ impl ShadowManager {
 			let light_proj = Mat4x4::orthographic(min_x, max_x, min_y, max_y, near_z, far_z);
 			let view_proj = light_proj * light_view;
 
-			self.cascades[c].view_proj = view_proj.to_array();
+			set.cascades[c].view_proj = view_proj.to_array();
 		}
 	}
 
-	pub fn cascade_view_proj(&self) -> [[f32; 16]; CASCADE_COUNT] {
-		[
-			self.cascades[0].view_proj,
-			self.cascades[1].view_proj,
-			self.cascades[2].view_proj,
-			self.cascades[3].view_proj,
-		]
+	pub fn cascade_view_proj(&self, light_idx: usize) -> [[f32; 16]; CASCADE_COUNT] {
+		if light_idx < MAX_DIRECTIONAL_LIGHTS {
+			if let Some(set) = &self.cascade_sets[light_idx] {
+				return [
+					set.cascades[0].view_proj,
+					set.cascades[1].view_proj,
+					set.cascades[2].view_proj,
+					set.cascades[3].view_proj,
+				];
+			}
+		}
+		[Mat4x4::IDENTITY.to_array(); CASCADE_COUNT]
 	}
 
 	pub fn cascade_split_depths(&self) -> [f32; CASCADE_COUNT] {
 		self.split_depths
 	}
 
-	pub fn cascade_shadow_ids(&self) -> [u32; CASCADE_COUNT] {
-		[
-			self.cascades[0].descriptor_id,
-			self.cascades[1].descriptor_id,
-			self.cascades[2].descriptor_id,
-			self.cascades[3].descriptor_id,
-		]
+	pub fn cascade_shadow_ids(&self, light_idx: usize) -> [u32; CASCADE_COUNT] {
+		if light_idx < MAX_DIRECTIONAL_LIGHTS {
+			if let Some(set) = &self.cascade_sets[light_idx] {
+				return [
+					set.cascades[0].descriptor_id,
+					set.cascades[1].descriptor_id,
+					set.cascades[2].descriptor_id,
+					set.cascades[3].descriptor_id,
+				];
+			}
+		}
+		[0; CASCADE_COUNT]
 	}
 }
