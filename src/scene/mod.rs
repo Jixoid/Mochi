@@ -46,7 +46,11 @@ impl Scene {
 	}
 
 	pub fn active_camera(&self) -> Option<(Entity, TransformComponent, CameraComponent)> {
-		for (entity, (transform, camera)) in self.world.query::<(&TransformComponent, &CameraComponent)>().iter() {
+		for (entity, (transform, camera)) in self
+			.world
+			.query::<(&TransformComponent, &CameraComponent)>()
+			.iter()
+		{
 			if camera.is_active {
 				return Some((entity, *transform, *camera));
 			}

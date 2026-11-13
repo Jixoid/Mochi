@@ -59,19 +59,33 @@ impl RhiBackend for AshVulkanBackend {
 	type Semaphore = AshSemaphore;
 	type Fence = AshFence;
 
-	fn create_device(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> RhiResult<Self::Device> {
+	fn create_device(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		build: u16,
+	) -> RhiResult<Self::Device> {
 		AshDevice::new(app_name, major, minor, patch, build)
 	}
 
 	fn create_allocator(device: &Self::Device) -> RhiResult<Self::Allocator> {
-		Ok(AshAllocator::new(device.device(), device.allocator().clone()))
+		Ok(AshAllocator::new(
+			device.device(),
+			device.allocator().clone(),
+		))
 	}
 
 	fn create_command_queue(device: &Self::Device) -> RhiResult<Self::CommandQueue> {
 		AshCommandQueue::new(device.device(), device.main_queue_family(), device.queue())
 	}
 
-	fn create_swapchain(device: &Self::Device, surface: u64, width: u32, height: u32) -> RhiResult<Self::Swapchain> {
+	fn create_swapchain(
+		device: &Self::Device,
+		surface: u64,
+		width: u32,
+		height: u32,
+	) -> RhiResult<Self::Swapchain> {
 		let surface_khr = ash::vk::SurfaceKHR::from_raw(surface);
 		AshSwapchain::new(
 			device.instance(),

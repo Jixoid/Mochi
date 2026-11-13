@@ -41,7 +41,13 @@ unsafe impl Send for CpalAudioDevice {}
 unsafe impl Sync for CpalAudioDevice {}
 
 impl CpalAudioDevice {
-	pub fn new(app_name: &str, _major: u16, _minor: u16, _patch: u16, _build: u16) -> AhiResult<Self> {
+	pub fn new(
+		app_name: &str,
+		_major: u16,
+		_minor: u16,
+		_patch: u16,
+		_build: u16,
+	) -> AhiResult<Self> {
 		let host = cpal::default_host();
 		let device = host.default_output_device();
 
@@ -215,7 +221,8 @@ impl AhiDevice for CpalAudioDevice {
 	}
 
 	fn decode_file(&self, path: &str) -> AhiResult<AudioData> {
-		let file = File::open(path).map_err(|e| AhiError::IoError(format!("Failed to open audio file {path}: {e}")))?;
+		let file = File::open(path)
+			.map_err(|e| AhiError::IoError(format!("Failed to open audio file {path}: {e}")))?;
 		decode_media_source(file, Some(path))
 	}
 
@@ -267,7 +274,9 @@ fn decode_media_source<R: MediaSource + 'static>(
 		.codec_params
 		.as_ref()
 		.and_then(|p| p.audio())
-		.ok_or_else(|| AhiError::DecodeError("Track does not contain audio codec parameters".to_string()))?;
+		.ok_or_else(|| {
+			AhiError::DecodeError("Track does not contain audio codec parameters".to_string())
+		})?;
 
 	let mut decoder = symphonia::default::get_codecs()
 		.make_audio_decoder(codec_params, &AudioDecoderOptions::default())
@@ -283,66 +292,64 @@ fn decode_media_source<R: MediaSource + 'static>(
 		}
 
 		match decoder.decode(&packet) {
-			Ok(decoded) => {
-				match decoded {
-					GenericAudioBufferRef::F32(buf) => {
-						sample_rate = buf.spec().rate();
-						channels = buf.spec().channels().count() as u8;
-						for frame in 0..buf.frames() {
-							for ch in 0..channels as usize {
-								if let Some(plane) = buf.plane(ch) {
-									pcm_data.push(plane[frame]);
-								}
+			Ok(decoded) => match decoded {
+				GenericAudioBufferRef::F32(buf) => {
+					sample_rate = buf.spec().rate();
+					channels = buf.spec().channels().count() as u8;
+					for frame in 0..buf.frames() {
+						for ch in 0..channels as usize {
+							if let Some(plane) = buf.plane(ch) {
+								pcm_data.push(plane[frame]);
 							}
 						}
 					}
-					GenericAudioBufferRef::S16(buf) => {
-						sample_rate = buf.spec().rate();
-						channels = buf.spec().channels().count() as u8;
-						for frame in 0..buf.frames() {
-							for ch in 0..channels as usize {
-								if let Some(plane) = buf.plane(ch) {
-									pcm_data.push(plane[frame] as f32 / 32768.0);
-								}
-							}
-						}
-					}
-					GenericAudioBufferRef::U8(buf) => {
-						sample_rate = buf.spec().rate();
-						channels = buf.spec().channels().count() as u8;
-						for frame in 0..buf.frames() {
-							for ch in 0..channels as usize {
-								if let Some(plane) = buf.plane(ch) {
-									pcm_data.push((plane[frame] as f32 - 128.0) / 128.0);
-								}
-							}
-						}
-					}
-					GenericAudioBufferRef::S32(buf) => {
-						sample_rate = buf.spec().rate();
-						channels = buf.spec().channels().count() as u8;
-						for frame in 0..buf.frames() {
-							for ch in 0..channels as usize {
-								if let Some(plane) = buf.plane(ch) {
-									pcm_data.push(plane[frame] as f32 / 2147483648.0);
-								}
-							}
-						}
-					}
-					GenericAudioBufferRef::F64(buf) => {
-						sample_rate = buf.spec().rate();
-						channels = buf.spec().channels().count() as u8;
-						for frame in 0..buf.frames() {
-							for ch in 0..channels as usize {
-								if let Some(plane) = buf.plane(ch) {
-									pcm_data.push(plane[frame] as f32);
-								}
-							}
-						}
-					}
-					_ => {}
 				}
-			}
+				GenericAudioBufferRef::S16(buf) => {
+					sample_rate = buf.spec().rate();
+					channels = buf.spec().channels().count() as u8;
+					for frame in 0..buf.frames() {
+						for ch in 0..channels as usize {
+							if let Some(plane) = buf.plane(ch) {
+								pcm_data.push(plane[frame] as f32 / 32768.0);
+							}
+						}
+					}
+				}
+				GenericAudioBufferRef::U8(buf) => {
+					sample_rate = buf.spec().rate();
+					channels = buf.spec().channels().count() as u8;
+					for frame in 0..buf.frames() {
+						for ch in 0..channels as usize {
+							if let Some(plane) = buf.plane(ch) {
+								pcm_data.push((plane[frame] as f32 - 128.0) / 128.0);
+							}
+						}
+					}
+				}
+				GenericAudioBufferRef::S32(buf) => {
+					sample_rate = buf.spec().rate();
+					channels = buf.spec().channels().count() as u8;
+					for frame in 0..buf.frames() {
+						for ch in 0..channels as usize {
+							if let Some(plane) = buf.plane(ch) {
+								pcm_data.push(plane[frame] as f32 / 2147483648.0);
+							}
+						}
+					}
+				}
+				GenericAudioBufferRef::F64(buf) => {
+					sample_rate = buf.spec().rate();
+					channels = buf.spec().channels().count() as u8;
+					for frame in 0..buf.frames() {
+						for ch in 0..channels as usize {
+							if let Some(plane) = buf.plane(ch) {
+								pcm_data.push(plane[frame] as f32);
+							}
+						}
+					}
+				}
+				_ => {}
+			},
 			Err(symphonia::core::errors::Error::IoError(err)) => {
 				if err.kind() == std::io::ErrorKind::UnexpectedEof {
 					break;

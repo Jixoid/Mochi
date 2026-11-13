@@ -22,7 +22,10 @@ pub struct Rect<T: Number = f32> {
 
 
 impl<T: Number> Rect<T> {
-	pub const ZERO: Self = Self {min: Vec2::ZERO, max: Vec2::ZERO};
+	pub const ZERO: Self = Self {
+		min: Vec2::ZERO,
+		max: Vec2::ZERO,
+	};
 
 
 	pub fn new(x: T, y: T, width: T, height: T) -> Self {
@@ -31,7 +34,7 @@ impl<T: Number> Rect<T> {
 			max: Vec2::new(x + width, y + height),
 		}
 	}
-	
+
 	pub fn from_min_max(min: Vec2<T>, max: Vec2<T>) -> Self {
 		Self { min, max }
 	}
@@ -78,8 +81,10 @@ impl<T: Number> Rect<T> {
 	}
 
 	pub fn intersects(&self, other: &Self) -> bool {
-		self.min.x <= other.max.x && self.max.x >= other.min.x
-			&& self.min.y <= other.max.y && self.max.y >= other.min.y
+		self.min.x <= other.max.x
+			&& self.max.x >= other.min.x
+			&& self.min.y <= other.max.y
+			&& self.max.y >= other.min.y
 	}
 
 	pub fn intersection(&self, other: &Self) -> Option<Self> {

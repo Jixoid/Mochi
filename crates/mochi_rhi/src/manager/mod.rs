@@ -24,4 +24,3 @@ pub use device::*;
 pub use swapchain::*;
 pub use synchronizer::*;
 pub use uploader::*;
-

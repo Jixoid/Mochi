@@ -45,15 +45,39 @@ unsafe impl Sync for AshRenderTarget {}
 
 impl AshRenderTarget {
 	pub fn new_from_desc(desc: &mochi_rhi::RenderTargetDesc<crate::AshVulkanBackend>) -> Self {
-		let color_image = desc.color_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
-		let color_view = desc.color_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
-		let resolve_image = desc.resolve_color_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
-		let resolve_view = desc.resolve_color_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
+		let color_image = desc
+			.color_image
+			.map(|i| i.handle())
+			.unwrap_or(vk::Image::null());
+		let color_view = desc
+			.color_view
+			.map(|v| v.handle())
+			.unwrap_or(vk::ImageView::null());
+		let resolve_image = desc
+			.resolve_color_image
+			.map(|i| i.handle())
+			.unwrap_or(vk::Image::null());
+		let resolve_view = desc
+			.resolve_color_view
+			.map(|v| v.handle())
+			.unwrap_or(vk::ImageView::null());
 
-		let depth_image = desc.depth_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
-		let depth_view = desc.depth_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
-		let resolve_depth_image = desc.resolve_depth_image.map(|i| i.handle()).unwrap_or(vk::Image::null());
-		let resolve_depth_view = desc.resolve_depth_view.map(|v| v.handle()).unwrap_or(vk::ImageView::null());
+		let depth_image = desc
+			.depth_image
+			.map(|i| i.handle())
+			.unwrap_or(vk::Image::null());
+		let depth_view = desc
+			.depth_view
+			.map(|v| v.handle())
+			.unwrap_or(vk::ImageView::null());
+		let resolve_depth_image = desc
+			.resolve_depth_image
+			.map(|i| i.handle())
+			.unwrap_or(vk::Image::null());
+		let resolve_depth_view = desc
+			.resolve_depth_view
+			.map(|v| v.handle())
+			.unwrap_or(vk::ImageView::null());
 
 		Self {
 			color_image,
@@ -134,25 +158,35 @@ unsafe impl Sync for SwapchainInner {}
 impl SwapchainInner {
 	fn destroy_resources(&mut self) {
 		for view in self.image_views.drain(..) {
-			unsafe { self.device.destroy_image_view(view, None); }
+			unsafe {
+				self.device.destroy_image_view(view, None);
+			}
 		}
 		if self.depth_view != vk::ImageView::null() {
-			unsafe { self.device.destroy_image_view(self.depth_view, None); }
+			unsafe {
+				self.device.destroy_image_view(self.depth_view, None);
+			}
 			self.depth_view = vk::ImageView::null();
 		}
 		if self.depth_image != vk::Image::null() {
-			unsafe { self.device.destroy_image(self.depth_image, None); }
+			unsafe {
+				self.device.destroy_image(self.depth_image, None);
+			}
 			self.depth_image = vk::Image::null();
 		}
 		if let Some(alloc) = self.depth_allocation.take() {
 			let _ = self.allocator.lock().unwrap().free(alloc);
 		}
 		if self.msaa_color_view != vk::ImageView::null() {
-			unsafe { self.device.destroy_image_view(self.msaa_color_view, None); }
+			unsafe {
+				self.device.destroy_image_view(self.msaa_color_view, None);
+			}
 			self.msaa_color_view = vk::ImageView::null();
 		}
 		if self.msaa_color_image != vk::Image::null() {
-			unsafe { self.device.destroy_image(self.msaa_color_image, None); }
+			unsafe {
+				self.device.destroy_image(self.msaa_color_image, None);
+			}
 			self.msaa_color_image = vk::Image::null();
 		}
 		if let Some(alloc) = self.msaa_color_allocation.take() {
@@ -166,7 +200,9 @@ impl Drop for SwapchainInner {
 		self.destroy_resources();
 		if self.swapchain != vk::SwapchainKHR::null() {
 			unsafe {
-				self.swapchain_loader.destroy_swapchain(self.swapchain, None);
+				self
+					.swapchain_loader
+					.destroy_swapchain(self.swapchain, None);
 			}
 			self.swapchain = vk::SwapchainKHR::null();
 		}
@@ -298,7 +334,12 @@ impl AshSwapchain {
 
 		let (targets, semaphores) = Self::build_targets(&mut inner)?;
 
-		mochi_disp!("Swapchain created: {}x{}, {} images", inner.extent.width, inner.extent.height, targets.len());
+		mochi_disp!(
+			"Swapchain created: {}x{}, {} images",
+			inner.extent.width,
+			inner.extent.height,
+			targets.len()
+		);
 
 		Ok(Self {
 			inner: Arc::new(Mutex::new(inner)),
@@ -307,7 +348,9 @@ impl AshSwapchain {
 		})
 	}
 
-	fn build_targets(inner: &mut SwapchainInner) -> RhiResult<(Vec<AshRenderTarget>, Vec<AshSemaphore>)> {
+	fn build_targets(
+		inner: &mut SwapchainInner,
+	) -> RhiResult<(Vec<AshRenderTarget>, Vec<AshSemaphore>)> {
 		let mut targets = Vec::new();
 		let mut semaphores = Vec::new();
 
@@ -445,7 +488,9 @@ impl AshSwapchain {
 				.lock()
 				.unwrap()
 				.allocate(&msaa_alloc_desc)
-				.map_err(|e| RhiError::BackendError(format!("Failed to allocate MSAA color memory: {e}")))?;
+				.map_err(|e| {
+					RhiError::BackendError(format!("Failed to allocate MSAA color memory: {e}"))
+				})?;
 
 			unsafe {
 				inner
@@ -493,10 +538,21 @@ impl AshSwapchain {
 			};
 			semaphores.push(AshSemaphore::new(&inner.device, sem));
 
-			let (color_image, color_view, resolve_image, resolve_view) = if inner.msaa_samples.count() > 1 {
-				(inner.msaa_color_image, inner.msaa_color_view, inner.images[i], inner.image_views[i])
+			let (color_image, color_view, resolve_image, resolve_view) = if inner.msaa_samples.count() > 1
+			{
+				(
+					inner.msaa_color_image,
+					inner.msaa_color_view,
+					inner.images[i],
+					inner.image_views[i],
+				)
 			} else {
-				(inner.images[i], inner.image_views[i], vk::Image::null(), vk::ImageView::null())
+				(
+					inner.images[i],
+					inner.image_views[i],
+					vk::Image::null(),
+					vk::ImageView::null(),
+				)
 			};
 
 			let target = AshRenderTarget {
@@ -524,7 +580,9 @@ impl AshSwapchain {
 impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 	fn resize(&mut self, width: u32, height: u32) -> RhiResult<()> {
 		let mut inner = self.inner.lock().unwrap();
-		unsafe { inner.device.device_wait_idle().unwrap(); }
+		unsafe {
+			inner.device.device_wait_idle().unwrap();
+		}
 
 		inner.destroy_resources();
 
@@ -574,7 +632,9 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 		};
 
 		unsafe {
-			inner.swapchain_loader.destroy_swapchain(old_swapchain, None);
+			inner
+				.swapchain_loader
+				.destroy_swapchain(old_swapchain, None);
 		}
 		inner.swapchain = new_swapchain;
 
@@ -597,7 +657,9 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 		if inner.msaa_samples == samples {
 			return Ok(());
 		}
-		unsafe { inner.device.device_wait_idle().unwrap(); }
+		unsafe {
+			inner.device.device_wait_idle().unwrap();
+		}
 		inner.msaa_samples = samples;
 		inner.destroy_resources();
 		let (targets, semaphores) = Self::build_targets(&mut inner)?;
@@ -612,7 +674,9 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 
 	fn acquire_next_image(&mut self, signal_sem: Option<&AshSemaphore>) -> RhiResult<u32> {
 		let inner = self.inner.lock().unwrap();
-		let sem = signal_sem.map(|s| s.handle()).unwrap_or(vk::Semaphore::null());
+		let sem = signal_sem
+			.map(|s| s.handle())
+			.unwrap_or(vk::Semaphore::null());
 		let (index, _is_suboptimal) = unsafe {
 			inner
 				.swapchain_loader

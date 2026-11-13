@@ -24,7 +24,11 @@ pub struct Transform<T: Float = f32> {
 
 
 impl<T: Float> Transform<T> {
-	pub const IDENTITY: Self = Self {translation: Vec3::ZERO, rotation: Quat::IDENTITY, scale: Vec3::ONE};
+	pub const IDENTITY: Self = Self {
+		translation: Vec3::ZERO,
+		rotation: Quat::IDENTITY,
+		scale: Vec3::ONE,
+	};
 
 	pub const fn new(translation: Vec3<T>, rotation: Quat<T>, scale: Vec3<T>) -> Self {
 		Self {

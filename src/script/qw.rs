@@ -45,31 +45,35 @@ impl LoadedQwScript {
 	pub fn load(source_path: &Path) -> Result<Self, String> {
 		let metadata = fs::metadata(source_path)
 			.map_err(|e| format!("Failed to read metadata for {}: {e}", source_path.display()))?;
-		let mtime = metadata.modified()
+		let mtime = metadata
+			.modified()
 			.map_err(|e| format!("Failed to get mtime for {}: {e}", source_path.display()))?;
 
 		let cache_dir = PathBuf::from("target/qw_cache");
 		fs::create_dir_all(&cache_dir)
 			.map_err(|e| format!("Failed to create cache dir {}: {e}", cache_dir.display()))?;
 
-		let stem = source_path.file_stem().and_then(|s| s.to_str()).unwrap_or("script");
+		let stem = source_path
+			.file_stem()
+			.and_then(|s| s.to_str())
+			.unwrap_or("script");
 		let rev = REVISION_COUNTER.fetch_add(1, Ordering::SeqCst);
 		let target_so = cache_dir.join(format!("{stem}_v{rev}.so"));
 
 		compile_qw_script(source_path, &target_so)?;
 
 		let lib = unsafe {
-			Library::new(&target_so)
-				.map_err(|e| format!("Failed to load dynamic library {}: {e}", target_so.display()))?
+			Library::new(&target_so).map_err(|e| {
+				format!(
+					"Failed to load dynamic library {}: {e}",
+					target_so.display()
+				)
+			})?
 		};
 
-		let on_start = unsafe {
-			lib.get::<OnStartFn>(b"on_start").ok().map(|s| *s)
-		};
+		let on_start = unsafe { lib.get::<OnStartFn>(b"on_start").ok().map(|s| *s) };
 
-		let on_update = unsafe {
-			lib.get::<OnUpdateFn>(b"on_update").ok().map(|s| *s)
-		};
+		let on_update = unsafe { lib.get::<OnUpdateFn>(b"on_update").ok().map(|s| *s) };
 
 		mochi_disp!(
 			"Loaded QW script '{}' (on_start: {}, on_update: {})",
@@ -102,7 +106,10 @@ impl LoadedQwScript {
 			return Ok(false);
 		}
 
-		mochi_log!("Detected change in '{}', recompiling...", self.source_path.display());
+		mochi_log!(
+			"Detected change in '{}', recompiling...",
+			self.source_path.display()
+		);
 		let reloaded = Self::load(&self.source_path)?;
 		*self = reloaded;
 		Ok(true)
@@ -148,7 +155,8 @@ pub fn ensure_engine_unit() -> Result<PathBuf, String> {
 
 	let needs_compile = !qwu_file.exists() || !obj_file.exists() || {
 		if let (Ok(src_meta), Ok(qwu_meta)) = (fs::metadata(&source_path), fs::metadata(&qwu_file)) {
-			src_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH) > qwu_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH)
+			src_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH)
+				> qwu_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH)
 		} else {
 			true
 		}
@@ -172,7 +180,9 @@ pub fn ensure_engine_unit() -> Result<PathBuf, String> {
 		if !output.status.success() {
 			let stderr = String::from_utf8_lossy(&output.stderr);
 			let stdout = String::from_utf8_lossy(&output.stdout);
-			return Err(format!("Failed to compile engine mochi unit:\n{stderr}\n{stdout}"));
+			return Err(format!(
+				"Failed to compile engine mochi unit:\n{stderr}\n{stdout}"
+			));
 		}
 	}
 
@@ -199,11 +209,17 @@ fn compile_qw_script(source_path: &Path, output_so_path: &Path) -> Result<(), St
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr);
 		let stdout = String::from_utf8_lossy(&output.stdout);
-		return Err(format!("QW compilation failed for {}:\n{stderr}\n{stdout}", source_path.display()));
+		return Err(format!(
+			"QW compilation failed for {}:\n{stderr}\n{stdout}",
+			source_path.display()
+		));
 	}
 
 	if !output_so_path.exists() {
-		return Err(format!("QW compilation finished but {} was not created", output_so_path.display()));
+		return Err(format!(
+			"QW compilation finished but {} was not created",
+			output_so_path.display()
+		));
 	}
 
 	Ok(())

@@ -25,18 +25,63 @@ pub struct Color<T: Number = f32> {
 
 
 impl<T: Number> Color<T> {
-	pub const TRANSPARENT: Self = Self {r: T::ZERO, g: T::ZERO, b: T::ZERO, a: T::ZERO};
+	pub const TRANSPARENT: Self = Self {
+		r: T::ZERO,
+		g: T::ZERO,
+		b: T::ZERO,
+		a: T::ZERO,
+	};
 
-	pub const BLACK: Self = Self {r: T::ZERO, g: T::ZERO, b: T::ZERO, a: T::ONE};
-	pub const WHITE: Self = Self {r: T::ONE, g: T::ONE, b: T::ONE, a: T::ONE};
+	pub const BLACK: Self = Self {
+		r: T::ZERO,
+		g: T::ZERO,
+		b: T::ZERO,
+		a: T::ONE,
+	};
+	pub const WHITE: Self = Self {
+		r: T::ONE,
+		g: T::ONE,
+		b: T::ONE,
+		a: T::ONE,
+	};
 
-	pub const RED: Self = Self {r: T::ONE, g: T::ZERO, b: T::ZERO, a: T::ONE};
-	pub const GREEN: Self = Self {r: T::ZERO, g: T::ONE, b: T::ZERO, a: T::ONE};
-	pub const BLUE: Self = Self {r: T::ZERO, g: T::ZERO, b: T::ONE, a: T::ONE};
+	pub const RED: Self = Self {
+		r: T::ONE,
+		g: T::ZERO,
+		b: T::ZERO,
+		a: T::ONE,
+	};
+	pub const GREEN: Self = Self {
+		r: T::ZERO,
+		g: T::ONE,
+		b: T::ZERO,
+		a: T::ONE,
+	};
+	pub const BLUE: Self = Self {
+		r: T::ZERO,
+		g: T::ZERO,
+		b: T::ONE,
+		a: T::ONE,
+	};
 
-	pub const YELLOW: Self = Self {r: T::ONE, g: T::ONE, b: T::ZERO, a: T::ONE};
-	pub const CYAN: Self = Self {r: T::ZERO, g: T::ONE, b: T::ONE, a: T::ONE};
-	pub const MAGENTA: Self = Self {r: T::ONE, g: T::ZERO, b: T::ONE, a: T::ONE};
+	pub const YELLOW: Self = Self {
+		r: T::ONE,
+		g: T::ONE,
+		b: T::ZERO,
+		a: T::ONE,
+	};
+	pub const CYAN: Self = Self {
+		r: T::ZERO,
+		g: T::ONE,
+		b: T::ONE,
+		a: T::ONE,
+	};
+	pub const MAGENTA: Self = Self {
+		r: T::ONE,
+		g: T::ZERO,
+		b: T::ONE,
+		a: T::ONE,
+	};
 
 
 	pub const fn new(r: T, g: T, b: T, a: T) -> Self {

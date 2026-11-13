@@ -37,9 +37,7 @@ impl<T: Number> Mat3x4<T> {
 	};
 
 	pub const fn new(r0: Vec4<T>, r1: Vec4<T>, r2: Vec4<T>) -> Self {
-		Self {
-			rows: [r0, r1, r2],
-		}
+		Self { rows: [r0, r1, r2] }
 	}
 
 	pub const fn new_with(r0: Vec4<T>, r1: Vec4<T>, r2: Vec4<T>) -> Self {
@@ -58,9 +56,18 @@ impl<T: Number> Mat3x4<T> {
 
 	pub fn to_array(&self) -> [T; 12] {
 		[
-			self.rows[0].x, self.rows[0].y, self.rows[0].z, self.rows[0].w,
-			self.rows[1].x, self.rows[1].y, self.rows[1].z, self.rows[1].w,
-			self.rows[2].x, self.rows[2].y, self.rows[2].z, self.rows[2].w,
+			self.rows[0].x,
+			self.rows[0].y,
+			self.rows[0].z,
+			self.rows[0].w,
+			self.rows[1].x,
+			self.rows[1].y,
+			self.rows[1].z,
+			self.rows[1].w,
+			self.rows[2].x,
+			self.rows[2].y,
+			self.rows[2].z,
+			self.rows[2].w,
 		]
 	}
 

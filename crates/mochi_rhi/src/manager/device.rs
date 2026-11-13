@@ -151,10 +151,16 @@ impl<B: RhiBackend> Device<B> {
 	}
 
 	pub fn write_texture_descriptor(&self, view: &ImageView2<B>, sampler: &Sampler2<B>) -> u32 {
-		self.inner.write_texture_descriptor(view.raw(), sampler.raw())
+		self
+			.inner
+			.write_texture_descriptor(view.raw(), sampler.raw())
 	}
 
-	pub fn create_image_view(&self, image: &Image2<B>, format: Format) -> Result<ImageView2<B>, String> {
+	pub fn create_image_view(
+		&self,
+		image: &Image2<B>,
+		format: Format,
+	) -> Result<ImageView2<B>, String> {
 		let view = self
 			.inner
 			.create_image_view(image.raw(), format)
@@ -162,7 +168,11 @@ impl<B: RhiBackend> Device<B> {
 		Ok(ImageView2::from_raw(view))
 	}
 
-	pub fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> Result<Sampler2<B>, String> {
+	pub fn create_sampler(
+		&self,
+		filter: SamplerFilter,
+		address_mode: SamplerAddressMode,
+	) -> Result<Sampler2<B>, String> {
 		let sampler = self
 			.inner
 			.create_sampler(filter, address_mode)
@@ -179,7 +189,8 @@ impl<B: RhiBackend> Device<B> {
 		height: u32,
 		data: &[u8],
 	) -> Result<(), String> {
-		self.inner
+		self
+			.inner
 			.upload_image_data(alloc.raw(), queue, image.raw(), width, height, data)
 			.map_err(|e| format!("Failed to upload image data: {e}"))
 	}
@@ -192,8 +203,13 @@ impl<B: RhiBackend> Device<B> {
 		self.inner.sampler_heap().map(Buffer::from_raw)
 	}
 
-	pub fn create_surface<W: HasWindowHandle + HasDisplayHandle>(&self, window: &W) -> Result<Surface<B>, String> {
-		let handle = self.inner.create_surface(window)
+	pub fn create_surface<W: HasWindowHandle + HasDisplayHandle>(
+		&self,
+		window: &W,
+	) -> Result<Surface<B>, String> {
+		let handle = self
+			.inner
+			.create_surface(window)
 			.map_err(|e| format!("Failed to create surface: {e}"))?;
 		Ok(Surface::new(self.inner.clone(), handle))
 	}

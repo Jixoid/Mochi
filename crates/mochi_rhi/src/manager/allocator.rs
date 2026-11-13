@@ -15,9 +15,7 @@ use bitflags::bitflags;
 
 use crate::manager::device::Device;
 use crate::traits::{RhiAllocator, RhiBackend};
-use crate::{
-	Buffer, BufferUsage, Image2, Image2Desc, Sampler2, SamplerAddressMode, SamplerFilter,
-};
+use crate::{Buffer, BufferUsage, Image2, Image2Desc, Sampler2, SamplerAddressMode, SamplerFilter};
 
 
 bitflags! {
@@ -49,8 +47,7 @@ unsafe impl<B: RhiBackend> Sync for Allocator<B> {}
 
 impl<B: RhiBackend> Allocator<B> {
 	pub fn new(device: &Device<B>) -> Self {
-		let alloc = B::create_allocator(device.raw())
-			.expect("Failed to initialize RHI allocator");
+		let alloc = B::create_allocator(device.raw()).expect("Failed to initialize RHI allocator");
 		Self {
 			inner: Arc::new(alloc),
 		}

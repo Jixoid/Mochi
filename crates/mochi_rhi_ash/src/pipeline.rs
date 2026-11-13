@@ -16,7 +16,8 @@ use ash::vk;
 
 use crate::shader::AshShader;
 use crate::types::{
-	to_vk_format, to_vk_polygon_mode, to_vk_primitive_topology, to_vk_sample_count, to_vk_shader_stage,
+	to_vk_format, to_vk_polygon_mode, to_vk_primitive_topology, to_vk_sample_count,
+	to_vk_shader_stage,
 };
 use mochi_rhi::error::{RhiError, RhiResult};
 use mochi_rhi::format::Format;
@@ -183,8 +184,8 @@ impl AshPipeline {
 		}
 
 		let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
-		let dynamic_state = vk::PipelineDynamicStateCreateInfo::default()
-			.dynamic_states(&dynamic_states);
+		let dynamic_state =
+			vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
 
 		let vertex_input = vk::PipelineVertexInputStateCreateInfo::default();
 
@@ -229,7 +230,11 @@ impl AshPipeline {
 		let depth_stencil = vk::PipelineDepthStencilStateCreateInfo::default()
 			.depth_test_enable(has_depth)
 			.depth_write_enable(has_depth && depth_write)
-			.depth_compare_op(if has_depth { vk::CompareOp::LESS_OR_EQUAL } else { vk::CompareOp::ALWAYS })
+			.depth_compare_op(if has_depth {
+				vk::CompareOp::LESS_OR_EQUAL
+			} else {
+				vk::CompareOp::ALWAYS
+			})
 			.depth_bounds_test_enable(false)
 			.stencil_test_enable(false);
 
@@ -287,10 +292,18 @@ impl AshPipeline {
 		let pipelines = unsafe {
 			device
 				.create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
-				.map_err(|(_, e)| RhiError::PipelineCreation(format!("Failed to create graphics pipeline: {e}")))?
+				.map_err(|(_, e)| {
+					RhiError::PipelineCreation(format!("Failed to create graphics pipeline: {e}"))
+				})?
 		};
 
-		Ok(Self::new(device, pipelines[0], meta.layout(), descriptor_set, PipelineKind::Graphic))
+		Ok(Self::new(
+			device,
+			pipelines[0],
+			meta.layout(),
+			descriptor_set,
+			PipelineKind::Graphic,
+		))
 	}
 
 	pub fn create_compute(
@@ -299,7 +312,8 @@ impl AshPipeline {
 		shader: &AshShader,
 		descriptor_set: Option<vk::DescriptorSet>,
 	) -> RhiResult<Self> {
-		let entry_point = CString::new(shader.entry()).unwrap_or_else(|_| CString::new("main").unwrap());
+		let entry_point =
+			CString::new(shader.entry()).unwrap_or_else(|_| CString::new("main").unwrap());
 		let stage_info = vk::PipelineShaderStageCreateInfo::default()
 			.stage(vk::ShaderStageFlags::COMPUTE)
 			.module(shader.handle())
@@ -312,10 +326,18 @@ impl AshPipeline {
 		let pipelines = unsafe {
 			device
 				.create_compute_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
-				.map_err(|(_, e)| RhiError::PipelineCreation(format!("Failed to create compute pipeline: {e}")))?
+				.map_err(|(_, e)| {
+					RhiError::PipelineCreation(format!("Failed to create compute pipeline: {e}"))
+				})?
 		};
 
-		Ok(Self::new(device, pipelines[0], meta.layout(), descriptor_set, PipelineKind::Compute))
+		Ok(Self::new(
+			device,
+			pipelines[0],
+			meta.layout(),
+			descriptor_set,
+			PipelineKind::Compute,
+		))
 	}
 
 	pub fn handle(&self) -> vk::Pipeline {

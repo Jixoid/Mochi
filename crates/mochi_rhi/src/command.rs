@@ -76,14 +76,20 @@ impl<B: RhiBackend> Command<B> {
 		self.state = CommandState::Executable;
 	}
 
-	pub fn begin_rendering(&mut self, target: &RenderTarget<'_, B>, clear_color: impl Into<Vec4<f32>>) {
+	pub fn begin_rendering(
+		&mut self,
+		target: &RenderTarget<'_, B>,
+		clear_color: impl Into<Vec4<f32>>,
+	) {
 		assert!(
 			self.state == CommandState::Recording,
 			"Cannot begin rendering: Command is not recording or already rendering (current state: {:?})",
 			self.state
 		);
 		let col = clear_color.into();
-		self.inner.begin_rendering(target.raw(), ClearColor([col.x, col.y, col.z, col.w]));
+		self
+			.inner
+			.begin_rendering(target.raw(), ClearColor([col.x, col.y, col.z, col.w]));
 		self.state = CommandState::Rendering;
 	}
 
@@ -97,7 +103,12 @@ impl<B: RhiBackend> Command<B> {
 		self.state = CommandState::Recording;
 	}
 
-	pub fn render_pass<F, R>(&mut self, target: &RenderTarget<'_, B>, clear_color: impl Into<Vec4<f32>>, f: F) -> R
+	pub fn render_pass<F, R>(
+		&mut self,
+		target: &RenderTarget<'_, B>,
+		clear_color: impl Into<Vec4<f32>>,
+		f: F,
+	) -> R
 	where
 		F: FnOnce(&mut Command<B>) -> R,
 	{
@@ -107,7 +118,15 @@ impl<B: RhiBackend> Command<B> {
 		res
 	}
 
-	pub fn set_viewport(&mut self, x: f32, y: f32, width: f32, height: f32, min_depth: f32, max_depth: f32) {
+	pub fn set_viewport(
+		&mut self,
+		x: f32,
+		y: f32,
+		width: f32,
+		height: f32,
+		min_depth: f32,
+		max_depth: f32,
+	) {
 		assert!(
 			self.state == CommandState::Recording || self.state == CommandState::Rendering,
 			"Cannot set_viewport: Command must be recording"
@@ -187,15 +206,25 @@ impl<B: RhiBackend> Command<B> {
 			self.state == CommandState::Rendering,
 			"Cannot bind index buffer: Command must be inside an active dynamic rendering pass"
 		);
-		self.inner.bind_index_buffer(buffer.raw(), offset, index_type);
+		self
+			.inner
+			.bind_index_buffer(buffer.raw(), offset, index_type);
 	}
 
-	pub fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
+	pub fn draw(
+		&mut self,
+		vertex_count: u32,
+		instance_count: u32,
+		first_vertex: u32,
+		first_instance: u32,
+	) {
 		assert!(
 			self.state == CommandState::Rendering,
 			"Cannot draw: Command must be inside an active dynamic rendering pass (call render_pass or begin_rendering)"
 		);
-		self.inner.draw(vertex_count, instance_count, first_vertex, first_instance);
+		self
+			.inner
+			.draw(vertex_count, instance_count, first_vertex, first_instance);
 	}
 
 	pub fn draw_indexed(
@@ -210,7 +239,13 @@ impl<B: RhiBackend> Command<B> {
 			self.state == CommandState::Rendering,
 			"Cannot draw indexed: Command must be inside an active dynamic rendering pass (call render_pass or begin_rendering)"
 		);
-		self.inner.draw_indexed(index_count, instance_count, first_index, vertex_offset, first_instance);
+		self.inner.draw_indexed(
+			index_count,
+			instance_count,
+			first_index,
+			vertex_offset,
+			first_instance,
+		);
 	}
 
 	pub fn dispatch(&mut self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
@@ -218,7 +253,9 @@ impl<B: RhiBackend> Command<B> {
 			self.state == CommandState::Recording,
 			"Cannot dispatch: Command must be recording (outside any dynamic rendering pass)"
 		);
-		self.inner.dispatch(group_count_x, group_count_y, group_count_z);
+		self
+			.inner
+			.dispatch(group_count_x, group_count_y, group_count_z);
 	}
 
 	pub fn compute_barrier(&mut self) {

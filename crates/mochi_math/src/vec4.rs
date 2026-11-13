@@ -24,8 +24,18 @@ pub struct Vec4<T: Number = f32> {
 }
 
 impl<T: Number> Vec4<T> {
-	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ZERO, w: T::ZERO};
-	pub const ONE: Self = Self{x: T::ONE, y: T::ONE, z: T::ONE, w: T::ONE};
+	pub const ZERO: Self = Self {
+		x: T::ZERO,
+		y: T::ZERO,
+		z: T::ZERO,
+		w: T::ZERO,
+	};
+	pub const ONE: Self = Self {
+		x: T::ONE,
+		y: T::ONE,
+		z: T::ONE,
+		w: T::ONE,
+	};
 
 
 	pub const fn new(x: T, y: T, z: T, w: T) -> Self {
@@ -37,7 +47,12 @@ impl<T: Number> Vec4<T> {
 	}
 
 	pub const fn new_cast(v: T) -> Self {
-		Self { x: v, y: v, z: v, w: v }
+		Self {
+			x: v,
+			y: v,
+			z: v,
+			w: v,
+		}
 	}
 
 
@@ -125,7 +140,7 @@ impl<T: Number> Vec4<T> {
 	pub fn to_array(&self) -> [T; 4] {
 		[self.x, self.y, self.z, self.w]
 	}
-	
+
 	pub fn to_tuple(&self) -> (T, T, T, T) {
 		(self.x, self.y, self.z, self.w)
 	}

@@ -72,9 +72,21 @@ impl<T: Float> Frustum<T> {
 	pub fn intersects_aabb(&self, aabb: &AABB<T>) -> bool {
 		for plane in &self.planes {
 			// Find positive vertex (furthest in direction of normal)
-			let px = if plane.normal.x >= T::ZERO { aabb.max.x } else { aabb.min.x };
-			let py = if plane.normal.y >= T::ZERO { aabb.max.y } else { aabb.min.y };
-			let pz = if plane.normal.z >= T::ZERO { aabb.max.z } else { aabb.min.z };
+			let px = if plane.normal.x >= T::ZERO {
+				aabb.max.x
+			} else {
+				aabb.min.x
+			};
+			let py = if plane.normal.y >= T::ZERO {
+				aabb.max.y
+			} else {
+				aabb.min.y
+			};
+			let pz = if plane.normal.z >= T::ZERO {
+				aabb.max.z
+			} else {
+				aabb.min.z
+			};
 
 			if plane.distance_to_point(Vec3::new(px, py, pz)) < T::ZERO {
 				return false;

@@ -76,9 +76,24 @@ impl<T: Number> Affine3<T> {
 
 	pub fn to_mat3x4(&self) -> Mat3x4<T> {
 		Mat3x4::new(
-			Vec4::new(self.matrix3[0].x, self.matrix3[0].y, self.matrix3[0].z, self.translation.x),
-			Vec4::new(self.matrix3[1].x, self.matrix3[1].y, self.matrix3[1].z, self.translation.y),
-			Vec4::new(self.matrix3[2].x, self.matrix3[2].y, self.matrix3[2].z, self.translation.z),
+			Vec4::new(
+				self.matrix3[0].x,
+				self.matrix3[0].y,
+				self.matrix3[0].z,
+				self.translation.x,
+			),
+			Vec4::new(
+				self.matrix3[1].x,
+				self.matrix3[1].y,
+				self.matrix3[1].z,
+				self.translation.y,
+			),
+			Vec4::new(
+				self.matrix3[2].x,
+				self.matrix3[2].y,
+				self.matrix3[2].z,
+				self.translation.z,
+			),
 		)
 	}
 
@@ -104,7 +119,11 @@ impl<T: Number> Affine3<T> {
 }
 
 impl<T: Float> Affine3<T> {
-	pub fn from_scale_rotation_translation(scale: Vec3<T>, rotation: Quat<T>, translation: Vec3<T>) -> Self {
+	pub fn from_scale_rotation_translation(
+		scale: Vec3<T>,
+		rotation: Quat<T>,
+		translation: Vec3<T>,
+	) -> Self {
 		let m = Mat3x4::model(translation, rotation, scale);
 		Self::from_mat3x4(m)
 	}

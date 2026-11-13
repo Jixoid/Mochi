@@ -48,12 +48,7 @@ impl VelocityManager {
 			FULLSCREEN_VERT_SPV,
 			"main",
 		);
-		let frag = rhi::Shader::new(
-			device,
-			rhi::ShaderStage::Pixel,
-			VELOCITY_FRAG_SPV,
-			"main",
-		);
+		let frag = rhi::Shader::new(device, rhi::ShaderStage::Pixel, VELOCITY_FRAG_SPV, "main");
 		let meta = rhi::PipelineMeta::new_raw(
 			rhi::ShaderStage::Pixel,
 			std::mem::size_of::<VelocityPushConstants>() as u32,

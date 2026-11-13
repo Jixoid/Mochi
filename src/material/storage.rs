@@ -65,9 +65,13 @@ impl MaterialStorage {
 			return;
 		}
 
-		let required_size = (std::mem::size_of::<PbrMaterialGpuData>() * self.gpu_data.len().max(16)) as u64;
+		let required_size =
+			(std::mem::size_of::<PbrMaterialGpuData>() * self.gpu_data.len().max(16)) as u64;
 
-		let needs_realloc = self.gpu_buffer.as_ref().map_or(true, |b| b.size() < required_size);
+		let needs_realloc = self
+			.gpu_buffer
+			.as_ref()
+			.map_or(true, |b| b.size() < required_size);
 
 		if needs_realloc {
 			let new_buffer = rhi::Buffer::new(

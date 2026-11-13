@@ -30,7 +30,10 @@ impl<T: Float> Plane<T> {
 	pub fn from_point_normal(point: Vec3<T>, normal: Vec3<T>) -> Self {
 		let n = normal.normalize();
 		let distance = -n.dot(&point);
-		Self { normal: n, distance }
+		Self {
+			normal: n,
+			distance,
+		}
 	}
 
 	pub fn from_coplanar_points(a: Vec3<T>, b: Vec3<T>, c: Vec3<T>) -> Self {
@@ -62,7 +65,7 @@ impl<T: Float> Plane<T> {
 		}
 	}
 
-	
+
 	pub fn dot_point(&self, p: Vec3<T>) -> T {
 		self.distance_to_point(p)
 	}

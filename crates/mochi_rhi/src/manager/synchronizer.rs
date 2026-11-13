@@ -54,7 +54,12 @@ impl<B: RhiBackend> Synchronizer<B> {
 	}
 
 	pub fn image_available_semaphore(&self) -> B::Semaphore {
-		self.sync.lock().unwrap().image_available_semaphore().clone()
+		self
+			.sync
+			.lock()
+			.unwrap()
+			.image_available_semaphore()
+			.clone()
 	}
 
 	pub fn in_flight_fence(&self) -> B::Fence {

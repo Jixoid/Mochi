@@ -22,8 +22,14 @@ pub struct Vec2<T: Number = f32> {
 }
 
 impl<T: Number> Vec2<T> {
-	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO};
-	pub const ONE: Self = Self{x: T::ONE, y: T::ONE};
+	pub const ZERO: Self = Self {
+		x: T::ZERO,
+		y: T::ZERO,
+	};
+	pub const ONE: Self = Self {
+		x: T::ONE,
+		y: T::ONE,
+	};
 
 	pub const fn new(x: T, y: T) -> Self {
 		Self { x, y }
@@ -79,7 +85,7 @@ impl<T: Number> Vec2<T> {
 		}
 	}
 
-	
+
 	pub fn clamp(&self, min: &Self, max: &Self) -> Self {
 		Self {
 			x: T::clamp(self.x, min.x, max.x),
@@ -105,7 +111,7 @@ impl<T: Number> Vec2<T> {
 	pub fn to_array(&self) -> [T; 2] {
 		[self.x, self.y]
 	}
-	
+
 	pub fn to_tuple(&self) -> (T, T) {
 		(self.x, self.y)
 	}

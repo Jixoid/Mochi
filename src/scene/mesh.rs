@@ -48,18 +48,25 @@ pub struct Mesh {
 }
 
 impl Mesh {
-	pub fn new_with_indices(_device: &rhi::Device, alloc: &rhi::Allocator, vertices: &[Vertex], indices: &[u32]) -> Arc<Self> {
+	pub fn new_with_indices(
+		_device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		vertices: &[Vertex],
+		indices: &[u32],
+	) -> Arc<Self> {
 		let vertex_buffer = rhi::Buffer::from_slice(
 			alloc,
 			BufferUsage::DeviceAddress | BufferUsage::StorageBuffer | BufferUsage::VertexBuffer,
 			vertices,
-		).expect("Failed to create vertex buffer");
+		)
+		.expect("Failed to create vertex buffer");
 
 		let index_buffer = rhi::Buffer::from_slice(
 			alloc,
 			BufferUsage::DeviceAddress | BufferUsage::StorageBuffer | BufferUsage::IndexBuffer,
 			indices,
-		).expect("Failed to create index buffer");
+		)
+		.expect("Failed to create index buffer");
 
 		let aabb = Self::compute_aabb(vertices);
 
@@ -72,12 +79,17 @@ impl Mesh {
 		})
 	}
 
-	pub fn new_unindexed(_device: &rhi::Device, alloc: &rhi::Allocator, vertices: &[Vertex]) -> Arc<Self> {
+	pub fn new_unindexed(
+		_device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		vertices: &[Vertex],
+	) -> Arc<Self> {
 		let vertex_buffer = rhi::Buffer::from_slice(
 			alloc,
 			BufferUsage::DeviceAddress | BufferUsage::StorageBuffer | BufferUsage::VertexBuffer,
 			vertices,
-		).expect("Failed to create vertex buffer");
+		)
+		.expect("Failed to create vertex buffer");
 
 		let aabb = Self::compute_aabb(vertices);
 
@@ -141,9 +153,24 @@ impl Mesh {
 
 	pub fn create_triangle(device: &rhi::Device, alloc: &rhi::Allocator) -> Arc<Self> {
 		let vertices = [
-			Vertex::new([0.0, 0.6, 0.0], [0.0, 0.0, 1.0], [0.5, 0.0], [1.0, 0.2, 0.2, 1.0]),
-			Vertex::new([-0.6, -0.6, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0], [0.2, 1.0, 0.2, 1.0]),
-			Vertex::new([0.6, -0.6, 0.0], [0.0, 0.0, 1.0], [1.0, 1.0], [0.2, 0.4, 1.0, 1.0]),
+			Vertex::new(
+				[0.0, 0.6, 0.0],
+				[0.0, 0.0, 1.0],
+				[0.5, 0.0],
+				[1.0, 0.2, 0.2, 1.0],
+			),
+			Vertex::new(
+				[-0.6, -0.6, 0.0],
+				[0.0, 0.0, 1.0],
+				[0.0, 1.0],
+				[0.2, 1.0, 0.2, 1.0],
+			),
+			Vertex::new(
+				[0.6, -0.6, 0.0],
+				[0.0, 0.0, 1.0],
+				[1.0, 1.0],
+				[0.2, 0.4, 1.0, 1.0],
+			),
 		];
 		Self::new_unindexed(device, alloc, &vertices)
 	}
@@ -188,7 +215,6 @@ impl Mesh {
 			Vertex::new([-h, -h, h], fnz, [0.0, 0.0], red),
 			Vertex::new([h, h, h], fnz, [1.0, 1.0], red),
 			Vertex::new([-h, h, h], fnz, [0.0, 1.0], red),
-
 			// Back (-Z)
 			Vertex::new([h, -h, -h], bnz, [0.0, 0.0], cyan),
 			Vertex::new([-h, -h, -h], bnz, [1.0, 0.0], cyan),
@@ -196,7 +222,6 @@ impl Mesh {
 			Vertex::new([h, -h, -h], bnz, [0.0, 0.0], cyan),
 			Vertex::new([-h, h, -h], bnz, [1.0, 1.0], cyan),
 			Vertex::new([h, h, -h], bnz, [0.0, 1.0], cyan),
-
 			// Top (+Y)
 			Vertex::new([-h, h, h], tny, [0.0, 0.0], green),
 			Vertex::new([h, h, h], tny, [1.0, 0.0], green),
@@ -204,7 +229,6 @@ impl Mesh {
 			Vertex::new([-h, h, h], tny, [0.0, 0.0], green),
 			Vertex::new([h, h, -h], tny, [1.0, 1.0], green),
 			Vertex::new([-h, h, -h], tny, [0.0, 1.0], green),
-
 			// Bottom (-Y)
 			Vertex::new([-h, -h, -h], bny, [0.0, 0.0], yellow),
 			Vertex::new([h, -h, -h], bny, [1.0, 0.0], yellow),
@@ -212,7 +236,6 @@ impl Mesh {
 			Vertex::new([-h, -h, -h], bny, [0.0, 0.0], yellow),
 			Vertex::new([h, -h, h], bny, [1.0, 1.0], yellow),
 			Vertex::new([-h, -h, h], bny, [0.0, 1.0], yellow),
-
 			// Right (+X)
 			Vertex::new([h, -h, h], rnx, [0.0, 0.0], blue),
 			Vertex::new([h, -h, -h], rnx, [1.0, 0.0], blue),
@@ -220,7 +243,6 @@ impl Mesh {
 			Vertex::new([h, -h, h], rnx, [0.0, 0.0], blue),
 			Vertex::new([h, h, -h], rnx, [1.0, 1.0], blue),
 			Vertex::new([h, h, h], rnx, [0.0, 1.0], blue),
-
 			// Left (-X)
 			Vertex::new([-h, -h, -h], lnx, [0.0, 0.0], magenta),
 			Vertex::new([-h, -h, h], lnx, [1.0, 0.0], magenta),

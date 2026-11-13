@@ -21,7 +21,13 @@ pub struct CpalAudioBackend;
 impl AhiBackend for CpalAudioBackend {
 	type Device = CpalAudioDevice;
 
-	fn create_device(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> AhiResult<Self::Device> {
+	fn create_device(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		build: u16,
+	) -> AhiResult<Self::Device> {
 		CpalAudioDevice::new(app_name, major, minor, patch, build)
 	}
 }

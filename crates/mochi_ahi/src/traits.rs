@@ -18,7 +18,13 @@ use crate::error::AhiResult;
 pub trait AhiBackend: 'static + Sized + Send + Sync {
 	type Device: AhiDevice;
 
-	fn create_device(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> AhiResult<Self::Device>;
+	fn create_device(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		build: u16,
+	) -> AhiResult<Self::Device>;
 }
 
 

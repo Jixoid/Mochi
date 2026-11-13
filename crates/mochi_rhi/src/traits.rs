@@ -34,10 +34,21 @@ pub trait RhiBackend: 'static + Sized + Send + Sync {
 	type Semaphore: Send + Sync + Clone;
 	type Fence: Send + Sync + Clone;
 
-	fn create_device(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> RhiResult<Self::Device>;
+	fn create_device(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		build: u16,
+	) -> RhiResult<Self::Device>;
 	fn create_allocator(device: &Self::Device) -> RhiResult<Self::Allocator>;
 	fn create_command_queue(device: &Self::Device) -> RhiResult<Self::CommandQueue>;
-	fn create_swapchain(device: &Self::Device, surface: u64, width: u32, height: u32) -> RhiResult<Self::Swapchain>;
+	fn create_swapchain(
+		device: &Self::Device,
+		surface: u64,
+		width: u32,
+		height: u32,
+	) -> RhiResult<Self::Swapchain>;
 }
 
 
@@ -55,7 +66,11 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 	fn destroy_surface(&self, surface_handle: u64);
 
 	fn create_shader(&self, stage: ShaderStage, code: &[u8], entry: &str) -> RhiResult<B::Shader>;
-	fn create_pipeline_meta(&self, push_stages: ShaderStage, push_size: u32) -> RhiResult<B::PipelineMeta>;
+	fn create_pipeline_meta(
+		&self,
+		push_stages: ShaderStage,
+		push_size: u32,
+	) -> RhiResult<B::PipelineMeta>;
 	fn create_graphics_pipeline(
 		&self,
 		meta: &B::PipelineMeta,
@@ -81,8 +96,15 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 	fn sampler_heap(&self) -> Option<B::Buffer>;
 
 	fn create_image_view(&self, image: &B::Image2, format: Format) -> RhiResult<B::ImageView2>;
-	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<B::Sampler>;
-	fn create_render_target(&self, desc: &crate::render_target::RenderTargetDesc<B>) -> B::RenderTarget;
+	fn create_sampler(
+		&self,
+		filter: SamplerFilter,
+		address_mode: SamplerAddressMode,
+	) -> RhiResult<B::Sampler>;
+	fn create_render_target(
+		&self,
+		desc: &crate::render_target::RenderTargetDesc<B>,
+	) -> B::RenderTarget;
 	fn upload_image_data(
 		&self,
 		alloc: &B::Allocator,
@@ -198,11 +220,30 @@ pub trait RhiCommandBuffer<B: RhiBackend>: Send + Sync {
 	fn set_viewport(&mut self, vp: Viewport);
 	fn set_scissor(&mut self, scissor: Rect2D);
 	fn bind_pipeline(&mut self, pipeline: &B::Pipeline);
-	fn bind_descriptor_heap(&mut self, res_heap: Option<&B::Buffer>, samp_heap: Option<&B::Buffer>, res_sz: u64, samp_sz: u64);
+	fn bind_descriptor_heap(
+		&mut self,
+		res_heap: Option<&B::Buffer>,
+		samp_heap: Option<&B::Buffer>,
+		res_sz: u64,
+		samp_sz: u64,
+	);
 	fn push_constant(&mut self, stages: ShaderStage, offset: u32, bytes: &[u8]);
 	fn bind_index_buffer(&mut self, buffer: &B::Buffer, offset: u64, index_type: IndexType);
-	fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32);
-	fn draw_indexed(&mut self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32);
+	fn draw(
+		&mut self,
+		vertex_count: u32,
+		instance_count: u32,
+		first_vertex: u32,
+		first_instance: u32,
+	);
+	fn draw_indexed(
+		&mut self,
+		index_count: u32,
+		instance_count: u32,
+		first_index: u32,
+		vertex_offset: i32,
+		first_instance: u32,
+	);
 
 	fn begin_rendering(&mut self, target: &B::RenderTarget, clear_color: ClearColor);
 	fn end_rendering(&mut self, target: &B::RenderTarget);
@@ -216,5 +257,11 @@ pub trait RhiCommandBuffer<B: RhiBackend>: Send + Sync {
 pub trait RhiCommandQueue<B: RhiBackend>: Send + Sync {
 	fn allocate_graphic_command(&self) -> RhiResult<B::CommandBuffer>;
 	fn submit(&self, cmd: &B::CommandBuffer) -> RhiResult<()>;
-	fn submit_with_sync(&self, cmd: &B::CommandBuffer, wait_semaphore: Option<&B::Semaphore>, signal_semaphore: Option<&B::Semaphore>, fence: Option<&B::Fence>) -> RhiResult<()>;
+	fn submit_with_sync(
+		&self,
+		cmd: &B::CommandBuffer,
+		wait_semaphore: Option<&B::Semaphore>,
+		signal_semaphore: Option<&B::Semaphore>,
+		fence: Option<&B::Fence>,
+	) -> RhiResult<()>;
 }

@@ -50,11 +50,12 @@ impl AshCommandBuffer {
 
 impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 	fn begin(&mut self) -> RhiResult<()> {
-		let begin_info = vk::CommandBufferBeginInfo::default()
-			.flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+		let begin_info =
+			vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
 		unsafe {
-			self.device
+			self
+				.device
 				.begin_command_buffer(self.handle, &begin_info)
 				.map_err(|e| RhiError::BackendError(format!("Failed to begin command buffer: {e}")))?;
 		}
@@ -63,7 +64,8 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 	fn end(&mut self) -> RhiResult<()> {
 		unsafe {
-			self.device
+			self
+				.device
 				.end_command_buffer(self.handle)
 				.map_err(|e| RhiError::BackendError(format!("Failed to end command buffer: {e}")))?;
 		}
@@ -101,11 +103,9 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		self.current_pipeline_layout = pipeline.layout();
 		let bind_point = to_vk_pipeline_bind_point(pipeline.kind());
 		unsafe {
-			self.device.cmd_bind_pipeline(
-				self.handle,
-				bind_point,
-				pipeline.handle(),
-			);
+			self
+				.device
+				.cmd_bind_pipeline(self.handle, bind_point, pipeline.handle());
 			if let Some(set) = pipeline.descriptor_set() {
 				self.device.cmd_bind_descriptor_sets(
 					self.handle,
@@ -154,7 +154,13 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		}
 	}
 
-	fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
+	fn draw(
+		&mut self,
+		vertex_count: u32,
+		instance_count: u32,
+		first_vertex: u32,
+		first_instance: u32,
+	) {
 		unsafe {
 			self.device.cmd_draw(
 				self.handle,
@@ -192,7 +198,10 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 		if target.color_image != vk::Image::null() {
 			let color_barrier = vk::ImageMemoryBarrier2::default()
-				.src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags2::FRAGMENT_SHADER)
+				.src_stage_mask(
+					vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
+						| vk::PipelineStageFlags2::FRAGMENT_SHADER,
+				)
 				.src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
 				.dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
 				.dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
@@ -232,9 +241,18 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 		if target.depth_image != vk::Image::null() {
 			let depth_barrier = vk::ImageMemoryBarrier2::default()
-				.src_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags2::FRAGMENT_SHADER)
-				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
-				.dst_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
+				.src_stage_mask(
+					vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS
+						| vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS
+						| vk::PipelineStageFlags2::FRAGMENT_SHADER,
+				)
+				.src_access_mask(
+					vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ,
+				)
+				.dst_stage_mask(
+					vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS
+						| vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS,
+				)
 				.dst_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
 				.old_layout(vk::ImageLayout::UNDEFINED)
 				.new_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
@@ -252,9 +270,18 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 		if target.resolve_depth_image != vk::Image::null() {
 			let resolve_depth_barrier = vk::ImageMemoryBarrier2::default()
-				.src_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags2::FRAGMENT_SHADER)
-				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
-				.dst_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
+				.src_stage_mask(
+					vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS
+						| vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS
+						| vk::PipelineStageFlags2::FRAGMENT_SHADER,
+				)
+				.src_access_mask(
+					vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ,
+				)
+				.dst_stage_mask(
+					vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS
+						| vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS,
+				)
 				.dst_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
 				.old_layout(vk::ImageLayout::UNDEFINED)
 				.new_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
@@ -313,7 +340,9 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		};
 
 		let has_depth_resolve = target.resolve_depth_view != vk::ImageView::null();
-		let depth_store_op = if is_depth_only || (!has_depth_resolve && target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) {
+		let depth_store_op = if is_depth_only
+			|| (!has_depth_resolve && target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+		{
 			vk::AttachmentStoreOp::STORE
 		} else {
 			vk::AttachmentStoreOp::DONT_CARE
@@ -353,7 +382,9 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		}
 
 		unsafe {
-			self.device.cmd_begin_rendering(self.handle, &rendering_info);
+			self
+				.device
+				.cmd_begin_rendering(self.handle, &rendering_info);
 		}
 	}
 
@@ -372,11 +403,18 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 				target.color_image
 			};
 
-			let (dst_stage, dst_access) = if target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
-				(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
-			} else {
-				(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::NONE)
-			};
+			let (dst_stage, dst_access) =
+				if target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
+					(
+						vk::PipelineStageFlags2::FRAGMENT_SHADER,
+						vk::AccessFlags2::SHADER_READ,
+					)
+				} else {
+					(
+						vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
+						vk::AccessFlags2::NONE,
+					)
+				};
 
 			// Transition back to target.final_layout
 			let color_barrier = vk::ImageMemoryBarrier2::default()
@@ -405,7 +443,9 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			target.depth_image
 		};
 
-		if depth_image_to_transition != vk::Image::null() && (is_depth_only || target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) {
+		if depth_image_to_transition != vk::Image::null()
+			&& (is_depth_only || target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+		{
 			let depth_barrier = vk::ImageMemoryBarrier2::default()
 				.src_stage_mask(vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
 				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
@@ -436,12 +476,9 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 	fn dispatch(&mut self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
 		unsafe {
-			self.device.cmd_dispatch(
-				self.handle,
-				group_count_x,
-				group_count_y,
-				group_count_z,
-			);
+			self
+				.device
+				.cmd_dispatch(self.handle, group_count_x, group_count_y, group_count_z);
 		}
 	}
 
@@ -449,12 +486,13 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 		let memory_barrier = vk::MemoryBarrier2::default()
 			.src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
 			.src_access_mask(vk::AccessFlags2::SHADER_WRITE)
-			.dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER | vk::PipelineStageFlags2::FRAGMENT_SHADER)
+			.dst_stage_mask(
+				vk::PipelineStageFlags2::COMPUTE_SHADER | vk::PipelineStageFlags2::FRAGMENT_SHADER,
+			)
 			.dst_access_mask(vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE);
 
 		let memory_barriers = [memory_barrier];
-		let dep_info = vk::DependencyInfo::default()
-			.memory_barriers(&memory_barriers);
+		let dep_info = vk::DependencyInfo::default().memory_barriers(&memory_barriers);
 
 		unsafe {
 			self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
@@ -523,7 +561,8 @@ impl RhiCommandQueue<AshVulkanBackend> for AshCommandQueue {
 			.command_buffer_count(1);
 
 		let bufs = unsafe {
-			self.inner
+			self
+				.inner
 				.device
 				.allocate_command_buffers(&alloc_info)
 				.map_err(|e| RhiError::BackendError(format!("Failed to allocate command buffer: {e}")))?
@@ -539,7 +578,8 @@ impl RhiCommandQueue<AshVulkanBackend> for AshCommandQueue {
 
 		let _guard = self.inner.submit_lock.lock().unwrap();
 		unsafe {
-			self.inner
+			self
+				.inner
 				.device
 				.queue_submit(self.inner.queue, &submits, vk::Fence::null())
 				.map_err(|e| RhiError::BackendError(format!("queue_submit failed: {e}")))?;
@@ -579,7 +619,8 @@ impl RhiCommandQueue<AshVulkanBackend> for AshCommandQueue {
 
 		let _guard = self.inner.submit_lock.lock().unwrap();
 		unsafe {
-			self.inner
+			self
+				.inner
 				.device
 				.queue_submit(self.inner.queue, &submits, fence_handle)
 				.map_err(|e| RhiError::BackendError(format!("queue_submit with sync failed: {e}")))?;

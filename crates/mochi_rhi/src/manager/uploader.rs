@@ -51,12 +51,22 @@ impl<B: RhiBackend> Uploader<B> {
 			src.len(),
 			dst.size()
 		);
-		dst.write_bytes(0, src).expect("Failed to write memory to buffer in Uploader");
+		dst
+			.write_bytes(0, src)
+			.expect("Failed to write memory to buffer in Uploader");
 	}
 
 	pub fn copy_memory_to_image(&self, _time: TransferTime, src: &[u8], dst: &mut Image2<B>) {
-		assert!(!src.is_empty(), "Uploader: Cannot copy empty slice to Image2");
-		assert!(dst.width() > 0 && dst.height() > 0, "Uploader: Cannot copy to 0-sized Image2 (extent: ({},{}))", dst.width(), dst.height());
+		assert!(
+			!src.is_empty(),
+			"Uploader: Cannot copy empty slice to Image2"
+		);
+		assert!(
+			dst.width() > 0 && dst.height() > 0,
+			"Uploader: Cannot copy to 0-sized Image2 (extent: ({},{}))",
+			dst.width(),
+			dst.height()
+		);
 		assert!(
 			(src.len() as u64) >= (dst.width() as u64 * dst.height() as u64),
 			"Uploader: Source slice ({} bytes) is smaller than image dimension pixels ({}x{})",

@@ -23,8 +23,8 @@ pub struct AudioSystem {
 
 impl AudioSystem {
 	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> Self {
-		let mut device = Device::new(app_name, major, minor, patch, build)
-			.expect("Failed to initialize audio device");
+		let mut device =
+			Device::new(app_name, major, minor, patch, build).expect("Failed to initialize audio device");
 		let mixer = Arc::new(Mutex::new(Mixer::new()));
 
 		let mixer_cb = Arc::clone(&mixer);

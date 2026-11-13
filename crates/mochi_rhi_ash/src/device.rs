@@ -60,19 +60,31 @@ unsafe impl Sync for DeviceInner {}
 
 impl DeviceInner {
 	pub fn device(&self) -> &ash::Device {
-		self.device.as_ref().expect("Ash logical device already destroyed")
+		self
+			.device
+			.as_ref()
+			.expect("Ash logical device already destroyed")
 	}
 
 	pub fn instance(&self) -> &ash::Instance {
-		self.instance.as_ref().expect("Ash instance already destroyed")
+		self
+			.instance
+			.as_ref()
+			.expect("Ash instance already destroyed")
 	}
 
 	pub fn surface_loader(&self) -> &ash::khr::surface::Instance {
-		self.surface_loader.as_ref().expect("Ash surface loader already destroyed")
+		self
+			.surface_loader
+			.as_ref()
+			.expect("Ash surface loader already destroyed")
 	}
 
 	pub fn allocator(&self) -> &Arc<Mutex<Allocator>> {
-		self.allocator.as_ref().expect("Ash allocator already destroyed")
+		self
+			.allocator
+			.as_ref()
+			.expect("Ash allocator already destroyed")
 	}
 
 	pub fn bindless_layout(&self) -> Option<vk::DescriptorSetLayout> {
@@ -116,19 +128,24 @@ unsafe impl Sync for AshDevice {}
 
 impl AshDevice {
 	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, _build: u16) -> RhiResult<Self> {
-		let entry = unsafe { ash::Entry::load().map_err(|e| RhiError::InitializationFailed(format!("{e}")))? };
+		let entry =
+			unsafe { ash::Entry::load().map_err(|e| RhiError::InitializationFailed(format!("{e}")))? };
 
-		let app_cname = CString::new(app_name).map_err(|e| RhiError::InitializationFailed(e.to_string()))?;
+		let app_cname =
+			CString::new(app_name).map_err(|e| RhiError::InitializationFailed(e.to_string()))?;
 		let app_info = vk::ApplicationInfo::default()
 			.application_name(&app_cname)
-			.application_version(vk::make_api_version(0, major as u32, minor as u32, patch as u32))
+			.application_version(vk::make_api_version(
+				0,
+				major as u32,
+				minor as u32,
+				patch as u32,
+			))
 			.engine_name(c"Mochi")
 			.engine_version(vk::make_api_version(0, 0, 1, 0))
 			.api_version(vk::API_VERSION_1_3);
 
-		let mut extension_names = vec![
-			ash::khr::surface::NAME.as_ptr(),
-		];
+		let mut extension_names = vec![ash::khr::surface::NAME.as_ptr()];
 
 		#[cfg(all(unix, not(target_os = "android"), not(target_os = "macos")))]
 		{
@@ -165,7 +182,9 @@ impl AshDevice {
 		let instance = unsafe {
 			entry
 				.create_instance(&instance_create_info, None)
-				.map_err(|e| RhiError::InitializationFailed(format!("Failed to create Vulkan instance: {e}")))?
+				.map_err(|e| {
+					RhiError::InitializationFailed(format!("Failed to create Vulkan instance: {e}"))
+				})?
 		};
 
 		let surface_loader = ash::khr::surface::Instance::new(&entry, &instance);
@@ -185,7 +204,10 @@ impl AshDevice {
 			if props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
 				let q_props = unsafe { instance.get_physical_device_queue_family_properties(*phys) };
 				for (idx, q) in q_props.iter().enumerate() {
-					if q.queue_flags.contains(vk::QueueFlags::GRAPHICS | vk::QueueFlags::COMPUTE) {
+					if q
+						.queue_flags
+						.contains(vk::QueueFlags::GRAPHICS | vk::QueueFlags::COMPUTE)
+					{
 						selected_phys = Some(*phys);
 						selected_q_family = Some(idx as u32);
 						break;
@@ -201,7 +223,10 @@ impl AshDevice {
 			for phys in &physical_devices {
 				let q_props = unsafe { instance.get_physical_device_queue_family_properties(*phys) };
 				for (idx, q) in q_props.iter().enumerate() {
-					if q.queue_flags.contains(vk::QueueFlags::GRAPHICS | vk::QueueFlags::COMPUTE) {
+					if q
+						.queue_flags
+						.contains(vk::QueueFlags::GRAPHICS | vk::QueueFlags::COMPUTE)
+					{
 						selected_phys = Some(*phys);
 						selected_q_family = Some(idx as u32);
 						break;
@@ -213,8 +238,9 @@ impl AshDevice {
 			}
 		}
 
-		let physical_device = selected_phys
-			.ok_or_else(|| RhiError::InitializationFailed("No suitable Vulkan physical device found".into()))?;
+		let physical_device = selected_phys.ok_or_else(|| {
+			RhiError::InitializationFailed("No suitable Vulkan physical device found".into())
+		})?;
 		let queue_family = selected_q_family.unwrap();
 
 		let queue_priorities = [1.0f32];
@@ -273,7 +299,9 @@ impl AshDevice {
 		let device = unsafe {
 			instance
 				.create_device(physical_device, &device_create_info, None)
-				.map_err(|e| RhiError::InitializationFailed(format!("Failed to create Vulkan logical device: {e}")))?
+				.map_err(|e| {
+					RhiError::InitializationFailed(format!("Failed to create Vulkan logical device: {e}"))
+				})?
 		};
 
 		let queue = unsafe { device.get_device_queue(queue_family, 0) };
@@ -287,11 +315,13 @@ impl AshDevice {
 			allocation_sizes: Default::default(),
 		};
 
-		let allocator = Allocator::new(&allocator_desc)
-			.map_err(|e| RhiError::InitializationFailed(format!("Failed to create GPU allocator: {e}")))?;
+		let allocator = Allocator::new(&allocator_desc).map_err(|e| {
+			RhiError::InitializationFailed(format!("Failed to create GPU allocator: {e}"))
+		})?;
 
 		let props = unsafe { instance.get_physical_device_properties(physical_device) };
-		let dev_name = unsafe { std::ffi::CStr::from_ptr(props.device_name.as_ptr()) }.to_string_lossy();
+		let dev_name =
+			unsafe { std::ffi::CStr::from_ptr(props.device_name.as_ptr()) }.to_string_lossy();
 		let pdt = match props.device_type {
 			PhysicalDeviceType::INTEGRATED_GPU => "integrated",
 			PhysicalDeviceType::DISCRETE_GPU => "discrete",
@@ -309,11 +339,11 @@ impl AshDevice {
 			.descriptor_count(MAX_BINDLESS_TEXTURES)
 			.stage_flags(vk::ShaderStageFlags::ALL);
 
-		let binding_flags = [vk::DescriptorBindingFlags::PARTIALLY_BOUND
-			| vk::DescriptorBindingFlags::UPDATE_AFTER_BIND];
+		let binding_flags =
+			[vk::DescriptorBindingFlags::PARTIALLY_BOUND | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND];
 
-		let mut binding_flags_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default()
-			.binding_flags(&binding_flags);
+		let mut binding_flags_info =
+			vk::DescriptorSetLayoutBindingFlagsCreateInfo::default().binding_flags(&binding_flags);
 
 		let bindings = [binding];
 		let layout_info = vk::DescriptorSetLayoutCreateInfo::default()
@@ -324,7 +354,9 @@ impl AshDevice {
 		let bindless_layout = unsafe {
 			device
 				.create_descriptor_set_layout(&layout_info, None)
-				.map_err(|e| RhiError::InitializationFailed(format!("Failed to create bindless set layout: {e}")))?
+				.map_err(|e| {
+					RhiError::InitializationFailed(format!("Failed to create bindless set layout: {e}"))
+				})?
 		};
 
 		let pool_size = [vk::DescriptorPoolSize::default()
@@ -339,7 +371,9 @@ impl AshDevice {
 		let bindless_pool = unsafe {
 			device
 				.create_descriptor_pool(&pool_info, None)
-				.map_err(|e| RhiError::InitializationFailed(format!("Failed to create bindless pool: {e}")))?
+				.map_err(|e| {
+					RhiError::InitializationFailed(format!("Failed to create bindless pool: {e}"))
+				})?
 		};
 
 		let set_layouts = [bindless_layout];
@@ -348,9 +382,9 @@ impl AshDevice {
 			.set_layouts(&set_layouts);
 
 		let bindless_sets = unsafe {
-			device
-				.allocate_descriptor_sets(&alloc_info)
-				.map_err(|e| RhiError::InitializationFailed(format!("Failed to allocate bindless descriptor set: {e}")))?
+			device.allocate_descriptor_sets(&alloc_info).map_err(|e| {
+				RhiError::InitializationFailed(format!("Failed to allocate bindless descriptor set: {e}"))
+			})?
 		};
 
 		let bindless_heap = AshBindlessHeap {
@@ -413,16 +447,19 @@ impl AshDevice {
 		self.inner.surface_loader()
 	}
 
-	pub fn create_shader(&self, stage: ShaderStage, code: &[u8], entry: &str) -> RhiResult<AshShader> {
+	pub fn create_shader(
+		&self,
+		stage: ShaderStage,
+		code: &[u8],
+		entry: &str,
+	) -> RhiResult<AshShader> {
 		if code.len() % 4 != 0 {
 			return Err(RhiError::ShaderCompilation(
 				"SPIR-V code length must be a multiple of 4 bytes".into(),
 			));
 		}
 		let words: Vec<u32> = if code.as_ptr() as usize % std::mem::align_of::<u32>() == 0 {
-			unsafe {
-				std::slice::from_raw_parts(code.as_ptr() as *const u32, code.len() / 4).to_vec()
-			}
+			unsafe { std::slice::from_raw_parts(code.as_ptr() as *const u32, code.len() / 4).to_vec() }
 		} else {
 			let mut words = vec![0u32; code.len() / 4];
 			unsafe {
@@ -432,7 +469,8 @@ impl AshDevice {
 		};
 		let info = vk::ShaderModuleCreateInfo::default().code(&words);
 		let module = unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.create_shader_module(&info, None)
 				.map_err(|e| RhiError::ShaderCompilation(format!("Failed to create shader module: {e}")))?
@@ -440,8 +478,17 @@ impl AshDevice {
 		Ok(AshShader::new(self.inner.device(), module, stage, entry))
 	}
 
-	pub fn create_pipeline_meta(&self, push_stages: ShaderStage, push_size: u32) -> RhiResult<AshPipelineMeta> {
-		AshPipelineMeta::create(self.inner.device(), self.inner.bindless_layout(), push_stages, push_size)
+	pub fn create_pipeline_meta(
+		&self,
+		push_stages: ShaderStage,
+		push_size: u32,
+	) -> RhiResult<AshPipelineMeta> {
+		AshPipelineMeta::create(
+			self.inner.device(),
+			self.inner.bindless_layout(),
+			push_stages,
+			push_size,
+		)
 	}
 
 	pub fn create_graphics_pipeline(
@@ -476,19 +523,15 @@ impl AshDevice {
 		meta: &AshPipelineMeta,
 		shader: &AshShader,
 	) -> RhiResult<AshPipeline> {
-		AshPipeline::create_compute(
-			self.inner.device(),
-			meta,
-			shader,
-			self.inner.bindless_set(),
-		)
+		AshPipeline::create_compute(self.inner.device(), meta, shader, self.inner.bindless_set())
 	}
 }
 
 impl RhiDevice<AshVulkanBackend> for AshDevice {
 	fn wait_idle(&self) -> RhiResult<()> {
 		unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.device_wait_idle()
 				.map_err(|e| RhiError::BackendError(format!("{e}")))?;
@@ -502,7 +545,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 
 	fn create_semaphore(&self) -> RhiResult<AshSemaphore> {
 		let sem = unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.create_semaphore(&vk::SemaphoreCreateInfo::default(), None)
 				.map_err(|e| RhiError::BackendError(format!("{e}")))?
@@ -516,7 +560,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 			info = info.flags(vk::FenceCreateFlags::SIGNALED);
 		}
 		let fence = unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.create_fence(&info, None)
 				.map_err(|e| RhiError::BackendError(format!("{e}")))?
@@ -526,7 +571,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 
 	fn wait_fence(&self, fence: &AshFence, timeout_ns: u64) -> RhiResult<()> {
 		unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.wait_for_fences(&[fence.handle()], true, timeout_ns)
 				.map_err(|e| match e {
@@ -539,7 +585,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 
 	fn reset_fence(&self, fence: &AshFence) -> RhiResult<()> {
 		unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.reset_fences(&[fence.handle()])
 				.map_err(|e| RhiError::BackendError(format!("{e}")))?;
@@ -559,8 +606,14 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 			.as_raw();
 
 		let surface = unsafe {
-			ash_window::create_surface(&self.inner.entry, self.inner.instance(), raw_disp, raw_win, None)
-				.map_err(|e| RhiError::SurfaceCreation(format!("Failed to create window surface: {e}")))?
+			ash_window::create_surface(
+				&self.inner.entry,
+				self.inner.instance(),
+				raw_disp,
+				raw_win,
+				None,
+			)
+			.map_err(|e| RhiError::SurfaceCreation(format!("Failed to create window surface: {e}")))?
 		};
 
 		Ok(surface.as_raw())
@@ -646,7 +699,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 			.subresource_range(subresource_range);
 
 		let view = unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.create_image_view(&view_info, None)
 				.map_err(|e| RhiError::BackendError(format!("Failed to create image view: {e}")))?
@@ -655,7 +709,11 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		Ok(AshImageView2::new(self.inner.device(), view))
 	}
 
-	fn create_sampler(&self, filter: SamplerFilter, address_mode: SamplerAddressMode) -> RhiResult<AshSampler> {
+	fn create_sampler(
+		&self,
+		filter: SamplerFilter,
+		address_mode: SamplerAddressMode,
+	) -> RhiResult<AshSampler> {
 		let vk_filter = to_vk_filter(filter);
 		let vk_addr = to_vk_address_mode(address_mode);
 		let is_clamp_to_border = address_mode == SamplerAddressMode::ClampToBorder;
@@ -679,7 +737,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 			.mipmap_mode(vk::SamplerMipmapMode::LINEAR);
 
 		let sampler = unsafe {
-			self.inner
+			self
+				.inner
 				.device()
 				.create_sampler(&sampler_info, None)
 				.map_err(|e| RhiError::ResourceCreation(format!("Failed to create sampler: {e}")))?
@@ -688,7 +747,10 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		Ok(AshSampler::new(self.inner.device(), sampler))
 	}
 
-	fn create_render_target(&self, desc: &mochi_rhi::RenderTargetDesc<AshVulkanBackend>) -> AshRenderTarget {
+	fn create_render_target(
+		&self,
+		desc: &mochi_rhi::RenderTargetDesc<AshVulkanBackend>,
+	) -> AshRenderTarget {
 		AshRenderTarget::new_from_desc(desc)
 	}
 
@@ -716,8 +778,8 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		staging_buf.unmap();
 
 		let cmd = queue.allocate_graphic_command()?;
-		let begin_info = vk::CommandBufferBeginInfo::default()
-			.flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+		let begin_info =
+			vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
 		let raw_dev = self.inner.device();
 		unsafe {
@@ -817,7 +879,11 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		self.create_shader(stage, code, entry)
 	}
 
-	fn create_pipeline_meta(&self, push_stages: ShaderStage, push_size: u32) -> RhiResult<AshPipelineMeta> {
+	fn create_pipeline_meta(
+		&self,
+		push_stages: ShaderStage,
+		push_size: u32,
+	) -> RhiResult<AshPipelineMeta> {
 		self.create_pipeline_meta(push_stages, push_size)
 	}
 
@@ -833,7 +899,17 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		depth_write: bool,
 		samples: mochi_rhi::MsaaSamples,
 	) -> RhiResult<AshPipeline> {
-		self.create_graphics_pipeline(meta, shaders, polymode, primitive_topology, color_format, depth_format, blend_enable, depth_write, samples)
+		self.create_graphics_pipeline(
+			meta,
+			shaders,
+			polymode,
+			primitive_topology,
+			color_format,
+			depth_format,
+			blend_enable,
+			depth_write,
+			samples,
+		)
 	}
 
 	fn create_compute_pipeline(

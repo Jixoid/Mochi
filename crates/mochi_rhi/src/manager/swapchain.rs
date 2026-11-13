@@ -88,7 +88,10 @@ impl<B: RhiBackend> Swapchain<B> {
 		self.acquire_next_image_with_semaphore(None)
 	}
 
-	pub fn acquire_next_image_with_semaphore(&mut self, signal_semaphore: Option<&B::Semaphore>) -> u32 {
+	pub fn acquire_next_image_with_semaphore(
+		&mut self,
+		signal_semaphore: Option<&B::Semaphore>,
+	) -> u32 {
 		self
 			.inner
 			.lock()
@@ -101,8 +104,16 @@ impl<B: RhiBackend> Swapchain<B> {
 		self.present_with_semaphore(image_index, None);
 	}
 
-	pub fn present_with_semaphore(&mut self, image_index: u32, wait_semaphore: Option<&B::Semaphore>) {
-		let _ = self.inner.lock().unwrap().present(image_index, wait_semaphore);
+	pub fn present_with_semaphore(
+		&mut self,
+		image_index: u32,
+		wait_semaphore: Option<&B::Semaphore>,
+	) {
+		let _ = self
+			.inner
+			.lock()
+			.unwrap()
+			.present(image_index, wait_semaphore);
 	}
 
 	pub fn image_count(&self) -> u32 {
@@ -111,10 +122,18 @@ impl<B: RhiBackend> Swapchain<B> {
 
 	pub fn render_target<'a>(&'a self, index: u32) -> Option<RenderTarget<'a, B>> {
 		let lock = self.inner.lock().unwrap();
-		lock.render_target(index).cloned().map(RenderTarget::from_raw)
+		lock
+			.render_target(index)
+			.cloned()
+			.map(RenderTarget::from_raw)
 	}
 
 	pub fn render_finished_semaphore(&self, index: u32) -> B::Semaphore {
-		self.inner.lock().unwrap().render_finished_semaphore(index).clone()
+		self
+			.inner
+			.lock()
+			.unwrap()
+			.render_finished_semaphore(index)
+			.clone()
 	}
 }

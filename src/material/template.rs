@@ -48,10 +48,7 @@ impl MaterialTemplate {
 		let vert = Shader::new(device, ShaderStage::Vertex, vert_spv, "main");
 		let frag = Shader::new(device, ShaderStage::Pixel, frag_spv, "main");
 
-		let meta = PipelineMeta::new_raw(
-			ShaderStage::Vertex | ShaderStage::Pixel,
-			push_constant_size,
-		);
+		let meta = PipelineMeta::new_raw(ShaderStage::Vertex | ShaderStage::Pixel, push_constant_size);
 
 		let (blend_enable, depth_write) = match blend_mode {
 			BlendMode::Opaque | BlendMode::Masked { .. } => (false, true),
@@ -120,8 +117,14 @@ impl MaterialTemplate {
 	pub fn pipeline(&self, pass: PassKind) -> Option<rhi::Pipeline> {
 		match pass {
 			PassKind::ForwardLit => Some(self.forward_pipeline.read().unwrap().clone()),
-			PassKind::ShadowCaster => self.shadow_pipeline.clone().or_else(|| Some(self.forward_pipeline.read().unwrap().clone())),
-			PassKind::DepthPrepass => self.depth_pipeline.clone().or_else(|| Some(self.forward_pipeline.read().unwrap().clone())),
+			PassKind::ShadowCaster => self
+				.shadow_pipeline
+				.clone()
+				.or_else(|| Some(self.forward_pipeline.read().unwrap().clone())),
+			PassKind::DepthPrepass => self
+				.depth_pipeline
+				.clone()
+				.or_else(|| Some(self.forward_pipeline.read().unwrap().clone())),
 		}
 	}
 }

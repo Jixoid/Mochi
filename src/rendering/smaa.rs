@@ -162,7 +162,7 @@ impl SmaaManager {
 		let area_image = rhi::Image2::builder(AREATEX_WIDTH, AREATEX_HEIGHT, rhi::Format::V2Norm8U)
 			.usage(rhi::ImageUsage::Sampled | rhi::ImageUsage::TransferDst)
 			.build(alloc);
-		
+
 		device
 			.upload_image_data(
 				alloc,
@@ -199,18 +199,8 @@ impl SmaaManager {
 		let search_descriptor_id = device.write_texture_descriptor(&search_view, &point_sampler);
 
 		// 3. Create Pass 1 Pipeline (Edge Detection)
-		let edge_vert = rhi::Shader::new(
-			device,
-			rhi::ShaderStage::Vertex,
-			SMAA_EDGE_VERT_SPV,
-			"main",
-		);
-		let edge_frag = rhi::Shader::new(
-			device,
-			rhi::ShaderStage::Pixel,
-			SMAA_EDGE_FRAG_SPV,
-			"main",
-		);
+		let edge_vert = rhi::Shader::new(device, rhi::ShaderStage::Vertex, SMAA_EDGE_VERT_SPV, "main");
+		let edge_frag = rhi::Shader::new(device, rhi::ShaderStage::Pixel, SMAA_EDGE_FRAG_SPV, "main");
 		let edge_meta = rhi::PipelineMeta::new_raw(
 			rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
 			std::mem::size_of::<SmaaEdgePushConstants>() as u32,
@@ -235,12 +225,7 @@ impl SmaaManager {
 			SMAA_BLEND_VERT_SPV,
 			"main",
 		);
-		let blend_frag = rhi::Shader::new(
-			device,
-			rhi::ShaderStage::Pixel,
-			SMAA_BLEND_FRAG_SPV,
-			"main",
-		);
+		let blend_frag = rhi::Shader::new(device, rhi::ShaderStage::Pixel, SMAA_BLEND_FRAG_SPV, "main");
 		let blend_meta = rhi::PipelineMeta::new_raw(
 			rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
 			std::mem::size_of::<SmaaBlendPushConstants>() as u32,
@@ -406,7 +391,7 @@ impl SmaaManager {
 		let edges_image = rhi::Image2::builder(width, height, rhi::Format::V2Norm8U)
 			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
 			.build(alloc);
-		
+
 		let edges_view = device
 			.create_image_view(&edges_image, rhi::Format::V2Norm8U)
 			.expect("Failed to create SMAA edges image view");
@@ -416,7 +401,7 @@ impl SmaaManager {
 		let blend_image = rhi::Image2::builder(width, height, rhi::Format::V4Norm8U)
 			.usage(rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled)
 			.build(alloc);
-		
+
 		let blend_view = device
 			.create_image_view(&blend_image, rhi::Format::V4Norm8U)
 			.expect("Failed to create SMAA blend image view");

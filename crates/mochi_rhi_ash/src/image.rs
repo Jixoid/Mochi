@@ -77,7 +77,13 @@ impl AshImage2 {
 		}
 	}
 
-	pub fn new_unowned(device: &ash::Device, handle: vk::Image, width: u32, height: u32, format: Format) -> Self {
+	pub fn new_unowned(
+		device: &ash::Device,
+		handle: vk::Image,
+		width: u32,
+		height: u32,
+		format: Format,
+	) -> Self {
 		Self {
 			inner: Arc::new(Mutex::new(Image2Inner {
 				device: device.clone(),

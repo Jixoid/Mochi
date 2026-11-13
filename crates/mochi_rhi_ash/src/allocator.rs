@@ -18,8 +18,8 @@ use crate::buffer::AshBuffer;
 use crate::image::AshImage2;
 use crate::sampler::AshSampler;
 use crate::types::{
-	to_vk_address_mode, to_vk_buffer_usage, to_vk_filter, to_vk_format, to_vk_image_tiling, to_vk_image_usage,
-	to_vk_sample_count,
+	to_vk_address_mode, to_vk_buffer_usage, to_vk_filter, to_vk_format, to_vk_image_tiling,
+	to_vk_image_usage, to_vk_sample_count,
 };
 use crate::AshVulkanBackend;
 use mochi_rhi::error::{RhiError, RhiResult};
@@ -67,7 +67,8 @@ impl RhiAllocator<AshVulkanBackend> for AshAllocator {
 			.sharing_mode(vk::SharingMode::EXCLUSIVE);
 
 		let buffer = unsafe {
-			self.device
+			self
+				.device
 				.create_buffer(&buffer_info, None)
 				.map_err(|e| RhiError::ResourceCreation(format!("Failed to create buffer: {e}")))?
 		};
@@ -105,7 +106,8 @@ impl RhiAllocator<AshVulkanBackend> for AshAllocator {
 			.map_err(|_e| RhiError::OutOfMemory)?;
 
 		unsafe {
-			self.device
+			self
+				.device
 				.bind_buffer_memory(buffer, allocation.memory(), allocation.offset())
 				.map_err(|e| RhiError::BackendError(format!("Failed to bind buffer memory: {e}")))?;
 		}
@@ -162,7 +164,8 @@ impl RhiAllocator<AshVulkanBackend> for AshAllocator {
 			.initial_layout(vk::ImageLayout::UNDEFINED);
 
 		let image = unsafe {
-			self.device
+			self
+				.device
 				.create_image(&image_info, None)
 				.map_err(|e| RhiError::ResourceCreation(format!("Failed to create image: {e}")))?
 		};
@@ -190,7 +193,8 @@ impl RhiAllocator<AshVulkanBackend> for AshAllocator {
 			.map_err(|_e| RhiError::OutOfMemory)?;
 
 		unsafe {
-			self.device
+			self
+				.device
 				.bind_image_memory(image, allocation.memory(), allocation.offset())
 				.map_err(|e| RhiError::BackendError(format!("Failed to bind image memory: {e}")))?;
 		}
@@ -227,7 +231,8 @@ impl RhiAllocator<AshVulkanBackend> for AshAllocator {
 			.mipmap_mode(vk::SamplerMipmapMode::LINEAR);
 
 		let sampler = unsafe {
-			self.device
+			self
+				.device
 				.create_sampler(&sampler_info, None)
 				.map_err(|e| RhiError::ResourceCreation(format!("Failed to create sampler: {e}")))?
 		};

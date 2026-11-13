@@ -10,9 +10,14 @@
 */
 
 
-use crate::rendering::cluster::{CLUSTER_DIM_X, CLUSTER_DIM_Y, CLUSTER_DIM_Z, MAX_POINT_LIGHTS_PER_CLUSTER};
+use crate::rendering::cluster::{
+	CLUSTER_DIM_X, CLUSTER_DIM_Y, CLUSTER_DIM_Z, MAX_POINT_LIGHTS_PER_CLUSTER,
+};
 use crate::rhi::{self, AllocationCreate, AllocationLocation, BufferUsage, TransferTime};
-use crate::scene::{CameraComponent, DirectionalLightComponent, PointLightComponent, Scene, SpotLightComponent, TransformComponent};
+use crate::scene::{
+	CameraComponent, DirectionalLightComponent, PointLightComponent, Scene, SpotLightComponent,
+	TransformComponent,
+};
 
 
 pub const MAX_DIRECTIONAL_LIGHTS: usize = 4;
@@ -96,10 +101,7 @@ const _: () = {
 impl Default for SceneFrameData {
 	fn default() -> Self {
 		let identity_mat = [
-			1.0, 0.0, 0.0, 0.0,
-			0.0, 1.0, 0.0, 0.0,
-			0.0, 0.0, 1.0, 0.0,
-			0.0, 0.0, 0.0, 1.0,
+			1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
 		];
 		Self {
 			view: identity_mat,
@@ -224,7 +226,11 @@ impl SceneFrameBuffer {
 		// 1. Query Directional Lights
 		let mut dir_lights = [DirectionalLightGpuData::default(); MAX_DIRECTIONAL_LIGHTS];
 		let mut dir_idx = 0;
-		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &DirectionalLightComponent)>().iter() {
+		for (_e, (t, light)) in scene
+			.world()
+			.query::<(&TransformComponent, &DirectionalLightComponent)>()
+			.iter()
+		{
 			if dir_idx >= MAX_DIRECTIONAL_LIGHTS {
 				break;
 			}
@@ -233,7 +239,12 @@ impl SceneFrameBuffer {
 				self.primary_sun_dir = dir;
 			}
 			dir_lights[dir_idx] = DirectionalLightGpuData {
-				direction: [dir.x, dir.y, dir.z, if light.cast_shadows { 1.0 } else { 0.0 }],
+				direction: [
+					dir.x,
+					dir.y,
+					dir.z,
+					if light.cast_shadows { 1.0 } else { 0.0 },
+				],
 				color: [light.color.x, light.color.y, light.color.z, light.intensity],
 			};
 			dir_idx += 1;
@@ -241,7 +252,11 @@ impl SceneFrameBuffer {
 
 		// 2. Query Dynamic Point Lights
 		let mut point_lights_vec = Vec::new();
-		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &PointLightComponent)>().iter() {
+		for (_e, (t, light)) in scene
+			.world()
+			.query::<(&TransformComponent, &PointLightComponent)>()
+			.iter()
+		{
 			let pos = t.translation;
 			point_lights_vec.push(PointLightGpuData {
 				position: [pos.x, pos.y, pos.z, light.radius],
@@ -278,7 +293,11 @@ impl SceneFrameBuffer {
 
 		// 3. Query Dynamic Spot Lights
 		let mut spot_lights_vec = Vec::new();
-		for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &SpotLightComponent)>().iter() {
+		for (_e, (t, light)) in scene
+			.world()
+			.query::<(&TransformComponent, &SpotLightComponent)>()
+			.iter()
+		{
 			let pos = t.translation;
 			let dir = t.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
 			let inner_cos = (light.inner_cone_angle_deg.to_radians() * 0.5).cos();
@@ -288,7 +307,12 @@ impl SceneFrameBuffer {
 				position_radius: [pos.x, pos.y, pos.z, light.radius],
 				color_intensity: [light.color.x, light.color.y, light.color.z, light.intensity],
 				direction_cos_inner: [dir.x, dir.y, dir.z, inner_cos],
-				params: [outer_cos, if light.cast_shadows { 1.0 } else { 0.0 }, 0.0, 0.0],
+				params: [
+					outer_cos,
+					if light.cast_shadows { 1.0 } else { 0.0 },
+					0.0,
+					0.0,
+				],
 			});
 		}
 		self.spot_light_count = spot_lights_vec.len() as u32;

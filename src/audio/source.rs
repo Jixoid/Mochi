@@ -114,7 +114,13 @@ impl AudioSource {
 		self.max_distance = max.max(self.min_distance);
 	}
 
-	pub fn mix_frames(&mut self, mix_buffer: &mut [f32], frame_count: u32, vol_l: f32, vol_r: f32) -> u32 {
+	pub fn mix_frames(
+		&mut self,
+		mix_buffer: &mut [f32],
+		frame_count: u32,
+		vol_l: f32,
+		vol_r: f32,
+	) -> u32 {
 		if self.state != SourceState::Playing {
 			return 0;
 		}

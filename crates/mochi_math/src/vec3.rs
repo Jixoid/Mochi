@@ -24,19 +24,51 @@ pub struct Vec3<T: Number = f32> {
 
 
 impl<T: Number + const Neg<Output = T>> Vec3<T> {
-	pub const UP: Self = Self{x: T::ZERO, y: T::ONE, z: T::ZERO};
-	pub const DOWN: Self = Self{x: T::ZERO, y: -T::ONE, z: T::ZERO};
-	
-	pub const LEFT: Self = Self{x: -T::ONE, y: T::ZERO, z: T::ZERO};
-	pub const RIGHT: Self = Self{x: T::ONE, y: T::ZERO, z: T::ZERO};
+	pub const UP: Self = Self {
+		x: T::ZERO,
+		y: T::ONE,
+		z: T::ZERO,
+	};
+	pub const DOWN: Self = Self {
+		x: T::ZERO,
+		y: -T::ONE,
+		z: T::ZERO,
+	};
 
-	pub const FORWARD: Self = Self{x: T::ZERO, y: T::ZERO, z: -T::ONE};
-	pub const BACK: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ONE};
+	pub const LEFT: Self = Self {
+		x: -T::ONE,
+		y: T::ZERO,
+		z: T::ZERO,
+	};
+	pub const RIGHT: Self = Self {
+		x: T::ONE,
+		y: T::ZERO,
+		z: T::ZERO,
+	};
+
+	pub const FORWARD: Self = Self {
+		x: T::ZERO,
+		y: T::ZERO,
+		z: -T::ONE,
+	};
+	pub const BACK: Self = Self {
+		x: T::ZERO,
+		y: T::ZERO,
+		z: T::ONE,
+	};
 }
 
 impl<T: Number> Vec3<T> {
-	pub const ZERO: Self = Self{x: T::ZERO, y: T::ZERO, z: T::ZERO};
-	pub const ONE: Self = Self{x: T::ONE, y: T::ONE, z: T::ONE};
+	pub const ZERO: Self = Self {
+		x: T::ZERO,
+		y: T::ZERO,
+		z: T::ZERO,
+	};
+	pub const ONE: Self = Self {
+		x: T::ONE,
+		y: T::ONE,
+		z: T::ONE,
+	};
 
 
 	pub const fn new(x: T, y: T, z: T) -> Self {

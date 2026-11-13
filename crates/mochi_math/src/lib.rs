@@ -15,23 +15,23 @@
 #![feature(f128)]
 
 
+mod aabb;
+mod affine;
+mod color;
 mod degree;
+mod euler;
+mod frustum;
+mod mat3x4;
+mod mat4x4;
+mod plane;
+mod quat;
+mod ray;
+mod rect;
 mod traits;
+mod transform;
 mod vec2;
 mod vec3;
 mod vec4;
-mod quat;
-mod mat3x4;
-mod mat4x4;
-mod affine;
-mod transform;
-mod euler;
-mod aabb;
-mod plane;
-mod ray;
-mod rect;
-mod frustum;
-mod color;
 
 pub use degree::*;
 pub use traits::*;

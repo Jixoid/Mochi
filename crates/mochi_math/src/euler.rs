@@ -23,7 +23,11 @@ pub struct Euler<T: Float = f32> {
 
 
 impl<T: Float> Euler<T> {
-	pub const ZERO: Self = Self {pitch: Rad::ZERO, yaw: Rad::ZERO, roll: Rad::ZERO};
+	pub const ZERO: Self = Self {
+		pitch: Rad::ZERO,
+		yaw: Rad::ZERO,
+		roll: Rad::ZERO,
+	};
 
 	pub const fn new(pitch: Rad<T>, yaw: Rad<T>, roll: Rad<T>) -> Self {
 		Self { pitch, yaw, roll }

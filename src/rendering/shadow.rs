@@ -14,8 +14,7 @@ use mochi_math::{Mat4x4, Vec3, Vec4};
 
 use crate::rendering::frame::MAX_DIRECTIONAL_LIGHTS;
 use crate::rhi::{
-	self, Format, ImageUsage, PipelineMeta, SamplerAddressMode, SamplerFilter, Shader,
-	ShaderStage,
+	self, Format, ImageUsage, PipelineMeta, SamplerAddressMode, SamplerFilter, Shader, ShaderStage,
 };
 use crate::scene::{CameraComponent, TransformComponent};
 
@@ -58,18 +57,10 @@ pub struct ShadowManager {
 impl ShadowManager {
 	pub fn new(device: &rhi::Device, _alloc: &rhi::Allocator) -> Result<Self, String> {
 		let sampler = device
-			.create_sampler(
-				SamplerFilter::Linear,
-				SamplerAddressMode::ClampToBorder,
-			)
+			.create_sampler(SamplerFilter::Linear, SamplerAddressMode::ClampToBorder)
 			.map_err(|e| format!("Failed to create shadow comparison sampler: {e}"))?;
 
-		let shadow_vert = Shader::new(
-			device,
-			ShaderStage::Vertex,
-			SHADOW_VERT_SPV,
-			"main",
-		);
+		let shadow_vert = Shader::new(device, ShaderStage::Vertex, SHADOW_VERT_SPV, "main");
 
 		let meta = PipelineMeta::new_raw(
 			ShaderStage::Vertex,
@@ -97,7 +88,9 @@ impl ShadowManager {
 		light_idx: usize,
 	) -> Result<(), String> {
 		if light_idx >= MAX_DIRECTIONAL_LIGHTS {
-			return Err(format!("Light index {light_idx} exceeds MAX_DIRECTIONAL_LIGHTS"));
+			return Err(format!(
+				"Light index {light_idx} exceeds MAX_DIRECTIONAL_LIGHTS"
+			));
 		}
 
 		if self.cascade_sets[light_idx].is_some() {

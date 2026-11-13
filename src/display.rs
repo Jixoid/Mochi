@@ -28,19 +28,32 @@ pub struct Display {
 }
 
 impl Display {
-	pub fn new(event_loop: &ActiveEventLoop, device: &Device, title: &str, width: u32, height: u32) -> Result<Self, String> {
+	pub fn new(
+		event_loop: &ActiveEventLoop,
+		device: &Device,
+		title: &str,
+		width: u32,
+		height: u32,
+	) -> Result<Self, String> {
 		let attributes = WindowAttributes::default()
 			.with_title(title)
 			.with_inner_size(PhysicalSize::new(width, height));
 
-		let window = Arc::new(event_loop
-			.create_window(attributes)
-			.map_err(|e| format!("Failed to create window: {e}"))?);
+		let window = Arc::new(
+			event_loop
+				.create_window(attributes)
+				.map_err(|e| format!("Failed to create window: {e}"))?,
+		);
 
 		let surface = device.create_surface(&*window)?;
 		let swapchain = Swapchain::new(device, &surface, width, height);
 
-		mochi_disp!("Native window created ({}x{}) with swapchain ({} images)", width, height, swapchain.image_count());
+		mochi_disp!(
+			"Native window created ({}x{}) with swapchain ({} images)",
+			width,
+			height,
+			swapchain.image_count()
+		);
 
 		Ok(Self {
 			swapchain,
@@ -53,7 +66,9 @@ impl Display {
 
 
 	pub fn resize(&mut self, width: u32, height: u32) {
-		if width == 0 || height == 0 { return }
+		if width == 0 || height == 0 {
+			return;
+		}
 
 		self.width = width;
 		self.height = height;
@@ -65,7 +80,9 @@ impl Display {
 	}
 
 	pub fn acquire_next_image_with_semaphore(&mut self, signal_semaphore: &rhi::Semaphore) -> u32 {
-		self.swapchain.acquire_next_image_with_semaphore(Some(signal_semaphore))
+		self
+			.swapchain
+			.acquire_next_image_with_semaphore(Some(signal_semaphore))
 	}
 
 	pub fn present(&mut self, image_index: u32) {
@@ -73,7 +90,9 @@ impl Display {
 	}
 
 	pub fn present_with_semaphore(&mut self, image_index: u32, wait_semaphore: &rhi::Semaphore) {
-		self.swapchain.present_with_semaphore(image_index, Some(wait_semaphore));
+		self
+			.swapchain
+			.present_with_semaphore(image_index, Some(wait_semaphore));
 	}
 
 	pub fn render_target(&self, index: u32) -> Option<rhi::RenderTarget<'_>> {

@@ -73,7 +73,12 @@ impl AshBuffer {
 		}
 	}
 
-	pub fn new_unowned(device: &ash::Device, handle: vk::Buffer, size: u64, device_address: u64) -> Self {
+	pub fn new_unowned(
+		device: &ash::Device,
+		handle: vk::Buffer,
+		size: u64,
+		device_address: u64,
+	) -> Self {
 		Self {
 			inner: Arc::new(Mutex::new(BufferInner {
 				device: device.clone(),
@@ -107,7 +112,9 @@ impl RhiBuffer for AshBuffer {
 				return Ok(ptr.as_ptr() as *mut u8);
 			}
 		}
-		Err(RhiError::BackendError("Buffer memory is not host visible or cannot be mapped".into()))
+		Err(RhiError::BackendError(
+			"Buffer memory is not host visible or cannot be mapped".into(),
+		))
 	}
 
 	fn unmap(&mut self) {

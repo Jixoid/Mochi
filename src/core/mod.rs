@@ -23,7 +23,7 @@ use crate::asset::SceneAsset;
 use crate::audio::AudioSystem;
 use crate::display::Display;
 use crate::rendering::RenderingSystem;
-use crate::rhi as rhi;
+use crate::rhi;
 use crate::scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
 use crate::script::ScriptSystem;
 use mochi_except::*;
@@ -154,9 +154,17 @@ impl EngineApp {
 impl ApplicationHandler for EngineApp {
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.display.is_none() {
-			match Display::new(event_loop, self.device.as_ref().unwrap(), &self.title, self.width, self.height) {
+			match Display::new(
+				event_loop,
+				self.device.as_ref().unwrap(),
+				&self.title,
+				self.width,
+				self.height,
+			) {
 				Ok(display) => {
-					if let (Some(rendering), Some(target)) = (&mut self.rendering_system, display.render_target(0)) {
+					if let (Some(rendering), Some(target)) =
+						(&mut self.rendering_system, display.render_target(0))
+					{
 						let device = self.device.as_ref().unwrap();
 						let alloc = self.alloca.as_ref().unwrap();
 
@@ -171,8 +179,13 @@ impl ApplicationHandler for EngineApp {
 						let scene_path = &self.config.scene.start_scene;
 						match SceneAsset::load(scene_path) {
 							Ok(scene_asset) => {
-								mochi_disp!("Loaded scene asset '{}' from {}", scene_asset.name, scene_path);
-								if let Err(err) = scene_asset.instantiate(device, alloc, rendering, &mut self.scene) {
+								mochi_disp!(
+									"Loaded scene asset '{}' from {}",
+									scene_asset.name,
+									scene_path
+								);
+								if let Err(err) = scene_asset.instantiate(device, alloc, rendering, &mut self.scene)
+								{
 									mochi_error!("Failed to instantiate scene: {err}");
 								}
 							}
@@ -181,10 +194,9 @@ impl ApplicationHandler for EngineApp {
 								if let Some(mat) = rendering.default_material() {
 									let cube_mesh = Mesh::create_cube(device, alloc, 1.2);
 									let cube_transform = TransformComponent::default();
-									self.scene.spawn((
-										cube_transform,
-										MeshRendererComponent::new(cube_mesh, mat),
-									));
+									self
+										.scene
+										.spawn((cube_transform, MeshRendererComponent::new(cube_mesh, mat)));
 								}
 							}
 						}
@@ -201,7 +213,12 @@ impl ApplicationHandler for EngineApp {
 		}
 	}
 
-	fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
+	fn window_event(
+		&mut self,
+		event_loop: &ActiveEventLoop,
+		_window_id: WindowId,
+		event: WindowEvent,
+	) {
 		self.input.handle_window_event(&event);
 
 		match event {
@@ -229,7 +246,9 @@ impl ApplicationHandler for EngineApp {
 			}
 			WindowEvent::RedrawRequested => {
 				let now = Instant::now();
-				let dt = self.last_frame_time.map_or(0.016, |t| (now - t).as_secs_f32());
+				let dt = self
+					.last_frame_time
+					.map_or(0.016, |t| (now - t).as_secs_f32());
 				self.last_frame_time = Some(now);
 				let time = self.start_time.elapsed().as_secs_f32();
 
@@ -238,7 +257,9 @@ impl ApplicationHandler for EngineApp {
 				}
 
 				// Execute QW scripts on active entities
-				self.script_system.update(&mut self.scene, &self.input, dt, time);
+				self
+					.script_system
+					.update(&mut self.scene, &self.input, dt, time);
 
 				if let Some(req_aa) = crate::script::api::take_requested_aa_mode() {
 					if let (Some(display), Some(rendering), Some(device), Some(alloc)) = (
@@ -252,11 +273,9 @@ impl ApplicationHandler for EngineApp {
 						crate::script::api::set_current_msaa(req_aa.msaa_samples());
 					}
 				} else if let Some(req_msaa) = crate::script::api::take_requested_msaa() {
-					if let (Some(display), Some(rendering), Some(device)) = (
-						&mut self.display,
-						&mut self.rendering_system,
-						&self.device,
-					) {
+					if let (Some(display), Some(rendering), Some(device)) =
+						(&mut self.display, &mut self.rendering_system, &self.device)
+					{
 						rendering.set_msaa(device, display, req_msaa);
 						crate::script::api::set_current_msaa(req_msaa);
 					}
@@ -270,7 +289,10 @@ impl ApplicationHandler for EngineApp {
 					if let (Some(display), Some(rendering)) = (&self.display, &self.rendering_system) {
 						display.window().set_title(&format!(
 							"{} - [{} FPS] Frame: {} | AA: {}",
-							self.title, fps, self.frame_count, rendering.aa_mode().name()
+							self.title,
+							fps,
+							self.frame_count,
+							rendering.aa_mode().name()
 						));
 					}
 				}
@@ -279,7 +301,14 @@ impl ApplicationHandler for EngineApp {
 					audio.update();
 				}
 
-				if let (Some(display), Some(rendering), Some(sync), Some(cmdmng), Some(device), Some(alloc)) = (
+				if let (
+					Some(display),
+					Some(rendering),
+					Some(sync),
+					Some(cmdmng),
+					Some(device),
+					Some(alloc),
+				) = (
 					&mut self.display,
 					&mut self.rendering_system,
 					&mut self.syncer,

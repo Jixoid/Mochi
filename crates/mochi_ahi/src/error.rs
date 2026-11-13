@@ -26,7 +26,9 @@ pub enum AhiError {
 impl fmt::Display for AhiError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::DeviceInitializationFailed(msg) => write!(f, "Audio device initialization failed: {msg}"),
+			Self::DeviceInitializationFailed(msg) => {
+				write!(f, "Audio device initialization failed: {msg}")
+			}
 			Self::DeviceNotAvailable(msg) => write!(f, "Audio device not available: {msg}"),
 			Self::StreamError(msg) => write!(f, "Audio stream error: {msg}"),
 			Self::DecodeError(msg) => write!(f, "Audio decode error: {msg}"),

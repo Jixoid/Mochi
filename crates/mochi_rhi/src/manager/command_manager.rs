@@ -28,8 +28,8 @@ unsafe impl<B: RhiBackend> Sync for CommandManager<B> {}
 
 impl<B: RhiBackend> CommandManager<B> {
 	pub fn new(device: &Device<B>) -> Self {
-		let queue = B::create_command_queue(device.raw())
-			.expect("Failed to initialize RHI command queue");
+		let queue =
+			B::create_command_queue(device.raw()).expect("Failed to initialize RHI command queue");
 		Self {
 			inner: Arc::new(queue),
 			submit_lock: Arc::new(Mutex::new(())),

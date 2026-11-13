@@ -160,7 +160,11 @@ impl<B: RhiBackend> Image2<B> {
 	}
 
 	pub fn from_raw(inner: B::Image2, width: u32, height: u32) -> Self {
-		Self { inner, width, height }
+		Self {
+			inner,
+			width,
+			height,
+		}
 	}
 
 	pub fn raw(&self) -> &B::Image2 {
@@ -170,7 +174,7 @@ impl<B: RhiBackend> Image2<B> {
 	pub fn width(&self) -> u32 {
 		self.width
 	}
-	
+
 	pub fn height(&self) -> u32 {
 		self.height
 	}

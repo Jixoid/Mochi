@@ -16,7 +16,9 @@ pub use crate::buffer::BufferUsage;
 pub use crate::image::{ImageTiling, ImageUsage};
 pub use crate::sampler::{SamplerAddressMode, SamplerFilter};
 pub use crate::shader::ShaderStage;
-pub use crate::pipeline::{PolygonMode, PrimitiveTopology, PipelineKind, VertexInputRate, DescriptorType};
+pub use crate::pipeline::{
+	PolygonMode, PrimitiveTopology, PipelineKind, VertexInputRate, DescriptorType,
+};
 pub use crate::manager::{AllocationCreate, AllocationLocation};
 
 
@@ -32,7 +34,14 @@ pub struct Viewport {
 
 impl Viewport {
 	pub fn new(x: f32, y: f32, width: f32, height: f32, min_depth: f32, max_depth: f32) -> Self {
-		Self { x, y, width, height, min_depth, max_depth }
+		Self {
+			x,
+			y,
+			width,
+			height,
+			min_depth,
+			max_depth,
+		}
 	}
 
 	pub fn from_size(width: f32, height: f32) -> Self {
@@ -58,11 +67,21 @@ pub struct Rect2D {
 
 impl Rect2D {
 	pub fn new(x: i32, y: i32, width: u32, height: u32) -> Self {
-		Self { x, y, width, height }
+		Self {
+			x,
+			y,
+			width,
+			height,
+		}
 	}
 
 	pub fn from_size(width: u32, height: u32) -> Self {
-		Self { x: 0, y: 0, width, height }
+		Self {
+			x: 0,
+			y: 0,
+			width,
+			height,
+		}
 	}
 }
 

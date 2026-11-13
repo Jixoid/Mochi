@@ -22,7 +22,10 @@ pub struct AABB<T: Number = f32> {
 
 
 impl<T: Number> AABB<T> {
-	pub const ZERO: Self = Self {min: Vec3::ZERO, max: Vec3::ZERO};
+	pub const ZERO: Self = Self {
+		min: Vec3::ZERO,
+		max: Vec3::ZERO,
+	};
 
 
 	pub const fn new(min: Vec3<T>, max: Vec3<T>) -> Self {
@@ -67,15 +70,21 @@ impl<T: Number> AABB<T> {
 	}
 
 	pub fn contains_point(&self, p: Vec3<T>) -> bool {
-		p.x >= self.min.x && p.x <= self.max.x
-			&& p.y >= self.min.y && p.y <= self.max.y
-			&& p.z >= self.min.z && p.z <= self.max.z
+		p.x >= self.min.x
+			&& p.x <= self.max.x
+			&& p.y >= self.min.y
+			&& p.y <= self.max.y
+			&& p.z >= self.min.z
+			&& p.z <= self.max.z
 	}
 
 	pub fn intersects(&self, other: &Self) -> bool {
-		self.min.x <= other.max.x && self.max.x >= other.min.x
-			&& self.min.y <= other.max.y && self.max.y >= other.min.y
-			&& self.min.z <= other.max.z && self.max.z >= other.min.z
+		self.min.x <= other.max.x
+			&& self.max.x >= other.min.x
+			&& self.min.y <= other.max.y
+			&& self.max.y >= other.min.y
+			&& self.min.z <= other.max.z
+			&& self.max.z >= other.min.z
 	}
 
 	pub fn expand(&mut self, p: Vec3<T>) {

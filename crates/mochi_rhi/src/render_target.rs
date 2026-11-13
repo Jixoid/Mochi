@@ -147,18 +147,42 @@ impl<'a, B: RhiBackend> RenderTargetBuilder<'a, B> {
 			if let (Some(msaa_img), Some(msaa_view)) = (self.msaa_color_image, self.msaa_color_view) {
 				let res_img = self.color_image.map(|i| i.raw());
 				let res_view = self.color_view.map(|v| v.raw());
-				(Some(msaa_img.raw()), Some(msaa_view.raw()), res_img, res_view, self.samples)
+				(
+					Some(msaa_img.raw()),
+					Some(msaa_view.raw()),
+					res_img,
+					res_view,
+					self.samples,
+				)
 			} else {
-				(self.color_image.map(|i| i.raw()), self.color_view.map(|v| v.raw()), None, None, MsaaSamples::Off)
+				(
+					self.color_image.map(|i| i.raw()),
+					self.color_view.map(|v| v.raw()),
+					None,
+					None,
+					MsaaSamples::Off,
+				)
 			};
 
 		let (depth_image, depth_view, resolve_depth_image, resolve_depth_view) =
-			if let (Some(msaa_depth_img), Some(msaa_depth_view)) = (self.msaa_depth_image, self.msaa_depth_view) {
+			if let (Some(msaa_depth_img), Some(msaa_depth_view)) =
+				(self.msaa_depth_image, self.msaa_depth_view)
+			{
 				let res_depth_img = self.depth_image.map(|i| i.raw());
 				let res_depth_view = self.depth_view.map(|v| v.raw());
-				(Some(msaa_depth_img.raw()), Some(msaa_depth_view.raw()), res_depth_img, res_depth_view)
+				(
+					Some(msaa_depth_img.raw()),
+					Some(msaa_depth_view.raw()),
+					res_depth_img,
+					res_depth_view,
+				)
 			} else {
-				(self.depth_image.map(|i| i.raw()), self.depth_view.map(|v| v.raw()), None, None)
+				(
+					self.depth_image.map(|i| i.raw()),
+					self.depth_view.map(|v| v.raw()),
+					None,
+					None,
+				)
 			};
 
 		let desc = RenderTargetDesc {

@@ -83,8 +83,12 @@ impl ClusterManager {
 	pub fn new(device: &rhi::Device, alloc: &rhi::Allocator) -> Result<Self, String> {
 		let aabb_size = (TOTAL_CLUSTERS as usize * std::mem::size_of::<GpuClusterAABB>()) as u64;
 		let grid_size = (TOTAL_CLUSTERS as usize * std::mem::size_of::<GpuClusterRecord>()) as u64;
-		let pt_index_size = (TOTAL_CLUSTERS as usize * MAX_POINT_LIGHTS_PER_CLUSTER as usize * std::mem::size_of::<u32>()) as u64;
-		let spot_index_size = (TOTAL_CLUSTERS as usize * MAX_SPOT_LIGHTS_PER_CLUSTER as usize * std::mem::size_of::<u32>()) as u64;
+		let pt_index_size = (TOTAL_CLUSTERS as usize
+			* MAX_POINT_LIGHTS_PER_CLUSTER as usize
+			* std::mem::size_of::<u32>()) as u64;
+		let spot_index_size = (TOTAL_CLUSTERS as usize
+			* MAX_SPOT_LIGHTS_PER_CLUSTER as usize
+			* std::mem::size_of::<u32>()) as u64;
 
 		let buffer_usage = BufferUsage::StorageBuffer | BufferUsage::DeviceAddress;
 
@@ -201,11 +205,7 @@ impl ClusterManager {
 		cmd.compute_barrier();
 	}
 
-	pub fn cull_lights(
-		&mut self,
-		cmd: &mut rhi::Command,
-		scene_address: u64,
-	) {
+	pub fn cull_lights(&mut self, cmd: &mut rhi::Command, scene_address: u64) {
 		let pc = CullPushConstants {
 			scene_address,
 			aabb_buffer_address: self.aabb_buffer.address(),

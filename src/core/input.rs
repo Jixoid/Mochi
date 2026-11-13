@@ -80,12 +80,11 @@ impl Input {
 	pub fn handle_window_event(&mut self, event: &WindowEvent) {
 		match event {
 			WindowEvent::KeyboardInput {
-				event:
-					KeyEvent {
-						physical_key: PhysicalKey::Code(code),
-						state,
-						..
-					},
+				event: KeyEvent {
+					physical_key: PhysicalKey::Code(code),
+					state,
+					..
+				},
 				..
 			} => {
 				let keycode = keycode_to_u32(*code);
@@ -136,16 +135,14 @@ impl Input {
 					}
 				}
 			}
-			WindowEvent::MouseWheel { delta, .. } => {
-				match delta {
-					winit::event::MouseScrollDelta::LineDelta(_x, y) => {
-						self.mouse_wheel_delta += *y;
-					}
-					winit::event::MouseScrollDelta::PixelDelta(pos) => {
-						self.mouse_wheel_delta += (pos.y as f32) / 32.0;
-					}
+			WindowEvent::MouseWheel { delta, .. } => match delta {
+				winit::event::MouseScrollDelta::LineDelta(_x, y) => {
+					self.mouse_wheel_delta += *y;
 				}
-			}
+				winit::event::MouseScrollDelta::PixelDelta(pos) => {
+					self.mouse_wheel_delta += (pos.y as f32) / 32.0;
+				}
+			},
 			_ => {}
 		}
 	}

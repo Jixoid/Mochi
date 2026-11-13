@@ -53,7 +53,11 @@ impl RenderQueue {
 	) {
 		self.clear();
 
-		for (_entity, (transform, renderer)) in scene.world().query::<(&TransformComponent, &MeshRendererComponent)>().iter() {
+		for (_entity, (transform, renderer)) in scene
+			.world()
+			.query::<(&TransformComponent, &MeshRendererComponent)>()
+			.iter()
+		{
 			if !renderer.is_visible {
 				continue;
 			}
@@ -149,11 +153,7 @@ impl RenderQueue {
 			raw_depth_quantized
 		} & 0xFFFFF;
 
-		(pass_bits << 60)
-			| (layer_bits << 52)
-			| (pipeline_bits << 36)
-			| (mat_bits << 20)
-			| depth_bits
+		(pass_bits << 60) | (layer_bits << 52) | (pipeline_bits << 36) | (mat_bits << 20) | depth_bits
 	}
 }
 

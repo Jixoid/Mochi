@@ -47,7 +47,12 @@ unsafe impl Send for AshShader {}
 unsafe impl Sync for AshShader {}
 
 impl AshShader {
-	pub fn new(device: &ash::Device, handle: vk::ShaderModule, stage: ShaderStage, entry: &str) -> Self {
+	pub fn new(
+		device: &ash::Device,
+		handle: vk::ShaderModule,
+		stage: ShaderStage,
+		entry: &str,
+	) -> Self {
 		Self {
 			inner: Arc::new(ShaderInner {
 				device: device.clone(),

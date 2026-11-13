@@ -24,7 +24,11 @@ pub struct RenderingPass<'a, B: RhiBackend> {
 }
 
 impl<'a, B: RhiBackend> RenderingPass<'a, B> {
-	pub fn new(cmd: &'a mut B::CommandBuffer, target: &'a B::RenderTarget, clear_color: impl Into<ClearColor>) -> Self {
+	pub fn new(
+		cmd: &'a mut B::CommandBuffer,
+		target: &'a B::RenderTarget,
+		clear_color: impl Into<ClearColor>,
+	) -> Self {
 		cmd.begin_rendering(target, clear_color.into());
 		Self {
 			cmd,
@@ -52,7 +56,9 @@ impl<'a, B: RhiBackend> RenderingPass<'a, B> {
 		res_sz: u64,
 		samp_sz: u64,
 	) {
-		self.cmd.bind_descriptor_heap(res_heap, samp_heap, res_sz, samp_sz);
+		self
+			.cmd
+			.bind_descriptor_heap(res_heap, samp_heap, res_sz, samp_sz);
 	}
 
 	pub fn push_constant_bytes(&mut self, stages: ShaderStage, offset: u32, bytes: &[u8]) {
@@ -66,12 +72,25 @@ impl<'a, B: RhiBackend> RenderingPass<'a, B> {
 		self.push_constant_bytes(stages, offset, slice);
 	}
 
-	pub fn bind_index_buffer(&mut self, buffer: &crate::Buffer<B>, offset: u64, index_type: IndexType) {
+	pub fn bind_index_buffer(
+		&mut self,
+		buffer: &crate::Buffer<B>,
+		offset: u64,
+		index_type: IndexType,
+	) {
 		self.cmd.bind_index_buffer(buffer.raw(), offset, index_type);
 	}
 
-	pub fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
-		self.cmd.draw(vertex_count, instance_count, first_vertex, first_instance);
+	pub fn draw(
+		&mut self,
+		vertex_count: u32,
+		instance_count: u32,
+		first_vertex: u32,
+		first_instance: u32,
+	) {
+		self
+			.cmd
+			.draw(vertex_count, instance_count, first_vertex, first_instance);
 	}
 
 	pub fn draw_indexed(
@@ -82,7 +101,13 @@ impl<'a, B: RhiBackend> RenderingPass<'a, B> {
 		vertex_offset: i32,
 		first_instance: u32,
 	) {
-		self.cmd.draw_indexed(index_count, instance_count, first_index, vertex_offset, first_instance);
+		self.cmd.draw_indexed(
+			index_count,
+			instance_count,
+			first_index,
+			vertex_offset,
+			first_instance,
+		);
 	}
 
 	pub fn finish(mut self) {

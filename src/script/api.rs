@@ -117,16 +117,30 @@ pub extern "C" fn mochi_set_position(entity_id: u64, in_pos: *const CVec3) {
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_rotate(entity_id: u64, dx: f32, dy: f32, dz: f32) {
 	with_transform_mut(entity_id, |t| {
-		let rx = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(1.0, 0.0, 0.0), mochi_math::Rad::new(dx));
-		let ry = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(0.0, 1.0, 0.0), mochi_math::Rad::new(dy));
-		let rz = mochi_math::Quat::from_axis_angle(mochi_math::Vec3::new(0.0, 0.0, 1.0), mochi_math::Rad::new(dz));
+		let rx = mochi_math::Quat::from_axis_angle(
+			mochi_math::Vec3::new(1.0, 0.0, 0.0),
+			mochi_math::Rad::new(dx),
+		);
+		let ry = mochi_math::Quat::from_axis_angle(
+			mochi_math::Vec3::new(0.0, 1.0, 0.0),
+			mochi_math::Rad::new(dy),
+		);
+		let rz = mochi_math::Quat::from_axis_angle(
+			mochi_math::Vec3::new(0.0, 0.0, 1.0),
+			mochi_math::Rad::new(dz),
+		);
 		let delta = (ry * rx * rz).normalize();
 		t.rotation = (t.rotation * delta).normalize();
 	});
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mochi_move_relative(entity_id: u64, forward_delta: f32, right_delta: f32, up_delta: f32) {
+pub extern "C" fn mochi_move_relative(
+	entity_id: u64,
+	forward_delta: f32,
+	right_delta: f32,
+	up_delta: f32,
+) {
 	with_transform_mut(entity_id, |t| {
 		let forward = t.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
 		let right = t.rotation * mochi_math::Vec3::new(1.0, 0.0, 0.0);
@@ -144,10 +158,8 @@ pub extern "C" fn mochi_camera_look(entity_id: u64, pitch_delta: f32, yaw_delta:
 		);
 		let r1 = (yaw_rot * t.rotation).normalize();
 		let local_right = r1 * mochi_math::Vec3::new(1.0, 0.0, 0.0);
-		let pitch_rot = mochi_math::Quat::from_axis_angle(
-			local_right,
-			mochi_math::Rad::new(pitch_delta),
-		);
+		let pitch_rot =
+			mochi_math::Quat::from_axis_angle(local_right, mochi_math::Rad::new(pitch_delta));
 		t.rotation = (pitch_rot * r1).normalize();
 	});
 }
@@ -218,10 +230,14 @@ pub extern "C" fn mochi_get_mouse_delta(out_dx: *mut f32, out_dy: *mut f32) {
 			let input = unsafe { ctx.input.as_ref() };
 			let (dx, dy) = input.mouse_delta();
 			if !out_dx.is_null() {
-				unsafe { *out_dx = dx; }
+				unsafe {
+					*out_dx = dx;
+				}
 			}
 			if !out_dy.is_null() {
-				unsafe { *out_dy = dy; }
+				unsafe {
+					*out_dy = dy;
+				}
 			}
 		}
 	});
@@ -229,9 +245,7 @@ pub extern "C" fn mochi_get_mouse_delta(out_dx: *mut f32, out_dy: *mut f32) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_get_time() -> f32 {
-	CURRENT_CONTEXT.with(|ctx| {
-		ctx.borrow().as_ref().map(|c| c.time).unwrap_or(0.0)
-	})
+	CURRENT_CONTEXT.with(|ctx| ctx.borrow().as_ref().map(|c| c.time).unwrap_or(0.0))
 }
 
 static REQUESTED_MSAA: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
@@ -252,7 +266,10 @@ pub fn set_current_msaa(samples: crate::rhi::MsaaSamples) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_set_msaa(samples: i32) {
-	REQUESTED_MSAA.store((samples.max(1)) as u32, std::sync::atomic::Ordering::Relaxed);
+	REQUESTED_MSAA.store(
+		(samples.max(1)) as u32,
+		std::sync::atomic::Ordering::Relaxed,
+	);
 }
 
 #[unsafe(no_mangle)]

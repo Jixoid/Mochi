@@ -107,7 +107,12 @@ impl Default for MaterialAsset {
 impl MaterialAsset {
 	pub fn to_pbr_properties(&self) -> PbrProperties {
 		PbrProperties {
-			base_color: Vec4::new_with(self.base_color[0], self.base_color[1], self.base_color[2], self.base_color[3]),
+			base_color: Vec4::new_with(
+				self.base_color[0],
+				self.base_color[1],
+				self.base_color[2],
+				self.base_color[3],
+			),
 			emissive: Vec3::new(self.emissive[0], self.emissive[1], self.emissive[2]),
 			emissive_intensity: self.emissive_intensity,
 			metallic: self.metallic,
@@ -144,10 +149,13 @@ impl ModelAsset {
 
 		if path.ends_with(".masset") {
 			let bytes = fs::read(path).map_err(|e| format!("Failed to read binary asset {path}: {e}"))?;
-			postcard::from_bytes::<Self>(&bytes).map_err(|e| format!("Failed to deserialize binary asset {path}: {e}"))
+			postcard::from_bytes::<Self>(&bytes)
+				.map_err(|e| format!("Failed to deserialize binary asset {path}: {e}"))
 		} else {
-			let content = fs::read_to_string(path).map_err(|e| format!("Failed to read RON asset {path}: {e}"))?;
-			let desc = ron::from_str::<Self>(&content).map_err(|e| format!("Failed to deserialize RON asset {path}: {e}"))?;
+			let content =
+				fs::read_to_string(path).map_err(|e| format!("Failed to read RON asset {path}: {e}"))?;
+			let desc = ron::from_str::<Self>(&content)
+				.map_err(|e| format!("Failed to deserialize RON asset {path}: {e}"))?;
 
 			if let Some(src) = &desc.source {
 				let resolved_source = if Path::new(src).is_absolute() {
@@ -170,7 +178,12 @@ impl ModelAsset {
 					imported.materials = desc.materials;
 				}
 				if !desc.exclude_meshes.is_empty() {
-					imported.submeshes.retain(|s| !desc.exclude_meshes.iter().any(|exc| s.name.starts_with(exc)));
+					imported.submeshes.retain(|s| {
+						!desc
+							.exclude_meshes
+							.iter()
+							.any(|exc| s.name.starts_with(exc))
+					});
 					imported.exclude_meshes = desc.exclude_meshes;
 				}
 				Ok(imported)
@@ -183,9 +196,11 @@ impl ModelAsset {
 	pub fn load_gltf(path: impl AsRef<Path>) -> Result<Self, String> {
 		let path_ref = path.as_ref();
 		let base = path_ref.parent().unwrap_or_else(|| Path::new("./"));
-		let file = fs::File::open(path_ref).map_err(|e| format!("Failed to open glTF {}: {e}", path_ref.display()))?;
+		let file = fs::File::open(path_ref)
+			.map_err(|e| format!("Failed to open glTF {}: {e}", path_ref.display()))?;
 		let reader = std::io::BufReader::new(file);
-		let gltf = gltf::Gltf::from_reader(reader).map_err(|e| format!("Failed to parse glTF {}: {e}", path_ref.display()))?;
+		let gltf = gltf::Gltf::from_reader(reader)
+			.map_err(|e| format!("Failed to parse glTF {}: {e}", path_ref.display()))?;
 		let (document, blob) = (gltf.document, gltf.blob);
 		let buffers = gltf::import_buffers(&document, Some(base), blob)
 			.map_err(|e| format!("Failed to import buffers for {}: {e}", path_ref.display()))?;
@@ -330,8 +345,8 @@ impl ModelAsset {
 	}
 
 	pub fn save_binary(&self, path: &str) -> Result<(), String> {
-		let bytes = postcard::to_stdvec(self)
-			.map_err(|e| format!("Failed to serialize model to binary: {e}"))?;
+		let bytes =
+			postcard::to_stdvec(self).map_err(|e| format!("Failed to serialize model to binary: {e}"))?;
 		fs::write(path, bytes).map_err(|e| format!("Failed to write binary file {path}: {e}"))
 	}
 
@@ -374,13 +389,25 @@ impl ModelAsset {
 
 					let mut uploaded_textures: HashMap<(usize, mochi_rhi::Format), u32> = HashMap::new();
 
-					let get_or_upload = |uploaded: &mut HashMap<(usize, mochi_rhi::Format), u32>, tm: &mut TextureManager, img_idx: usize, fmt: mochi_rhi::Format| -> u32 {
+					let get_or_upload = |uploaded: &mut HashMap<(usize, mochi_rhi::Format), u32>,
+					                     tm: &mut TextureManager,
+					                     img_idx: usize,
+					                     fmt: mochi_rhi::Format|
+					 -> u32 {
 						if let Some(&id) = uploaded.get(&(img_idx, fmt)) {
 							return id;
 						}
 						if let Some(img_data) = images.get(img_idx) {
 							let rgba = decode_image_rgba8(img_data);
-							let id = tm.load_raw_rgba8(device, alloc, cmdmng, img_data.width, img_data.height, fmt, &rgba);
+							let id = tm.load_raw_rgba8(
+								device,
+								alloc,
+								cmdmng,
+								img_data.width,
+								img_data.height,
+								fmt,
+								&rgba,
+							);
 							uploaded.insert((img_idx, fmt), id);
 							id
 						} else {
@@ -392,18 +419,35 @@ impl ModelAsset {
 						let pbr = doc_mat.pbr_metallic_roughness();
 
 						let albedo_id = pbr.base_color_texture().map(|t| {
-							get_or_upload(&mut uploaded_textures, tm, t.texture().source().index(), mochi_rhi::Format::RGBA8_SRGB)
+							get_or_upload(
+								&mut uploaded_textures,
+								tm,
+								t.texture().source().index(),
+								mochi_rhi::Format::RGBA8_SRGB,
+							)
 						});
 
 						let normal_id = doc_mat.normal_texture().map(|t| {
-							get_or_upload(&mut uploaded_textures, tm, t.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM)
+							get_or_upload(
+								&mut uploaded_textures,
+								tm,
+								t.texture().source().index(),
+								mochi_rhi::Format::RGBA8_UNORM,
+							)
 						});
 
 						let mr_tex = pbr.metallic_roughness_texture();
 						let occ_tex = doc_mat.occlusion_texture();
 						let orm_id = match (occ_tex, mr_tex) {
-							(Some(occ), Some(mr)) if occ.texture().source().index() == mr.texture().source().index() => {
-								Some(get_or_upload(&mut uploaded_textures, tm, occ.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM))
+							(Some(occ), Some(mr))
+								if occ.texture().source().index() == mr.texture().source().index() =>
+							{
+								Some(get_or_upload(
+									&mut uploaded_textures,
+									tm,
+									occ.texture().source().index(),
+									mochi_rhi::Format::RGBA8_UNORM,
+								))
 							}
 							(Some(occ), Some(mr)) => {
 								let occ_idx = occ.texture().source().index();
@@ -411,7 +455,9 @@ impl ModelAsset {
 								let key = (usize::MAX - 1 - mat_idx, mochi_rhi::Format::RGBA8_UNORM);
 								if let Some(&id) = uploaded_textures.get(&key) {
 									Some(id)
-								} else if let (Some(occ_img), Some(mr_img)) = (images.get(occ_idx), images.get(mr_idx)) {
+								} else if let (Some(occ_img), Some(mr_img)) =
+									(images.get(occ_idx), images.get(mr_idx))
+								{
 									let occ_rgba = decode_image_rgba8(occ_img);
 									let mr_rgba = decode_image_rgba8(mr_img);
 									let w = mr_img.width;
@@ -424,27 +470,50 @@ impl ModelAsset {
 										let b = mr_rgba.get(i * 4 + 2).copied().unwrap_or(255);
 										combined.extend_from_slice(&[r, g, b, 255]);
 									}
-									let id = tm.load_raw_rgba8(device, alloc, cmdmng, w, h, mochi_rhi::Format::RGBA8_UNORM, &combined);
+									let id = tm.load_raw_rgba8(
+										device,
+										alloc,
+										cmdmng,
+										w,
+										h,
+										mochi_rhi::Format::RGBA8_UNORM,
+										&combined,
+									);
 									uploaded_textures.insert(key, id);
 									Some(id)
 								} else {
 									None
 								}
 							}
-							(None, Some(mr)) => {
-								Some(get_or_upload(&mut uploaded_textures, tm, mr.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM))
-							}
-							(Some(occ), None) => {
-								Some(get_or_upload(&mut uploaded_textures, tm, occ.texture().source().index(), mochi_rhi::Format::RGBA8_UNORM))
-							}
+							(None, Some(mr)) => Some(get_or_upload(
+								&mut uploaded_textures,
+								tm,
+								mr.texture().source().index(),
+								mochi_rhi::Format::RGBA8_UNORM,
+							)),
+							(Some(occ), None) => Some(get_or_upload(
+								&mut uploaded_textures,
+								tm,
+								occ.texture().source().index(),
+								mochi_rhi::Format::RGBA8_UNORM,
+							)),
 							(None, None) => None,
 						};
 
 						let emissive_id = doc_mat.emissive_texture().map(|t| {
-							get_or_upload(&mut uploaded_textures, tm, t.texture().source().index(), mochi_rhi::Format::RGBA8_SRGB)
+							get_or_upload(
+								&mut uploaded_textures,
+								tm,
+								t.texture().source().index(),
+								mochi_rhi::Format::RGBA8_SRGB,
+							)
 						});
 
-						let mut props = self.materials.get(mat_idx).map(|m| m.to_pbr_properties()).unwrap_or_default();
+						let mut props = self
+							.materials
+							.get(mat_idx)
+							.map(|m| m.to_pbr_properties())
+							.unwrap_or_default();
 						props.albedo_texture_id = albedo_id;
 						props.normal_texture_id = normal_id;
 						props.orm_texture_id = orm_id;
@@ -492,7 +561,8 @@ impl ModelAsset {
 
 		let fallback_mat = MaterialInstance::new_default(Arc::clone(default_template));
 
-		self.submeshes
+		self
+			.submeshes
 			.iter()
 			.map(|sm| {
 				let vertices: Vec<Vertex> = sm.vertices.iter().map(Vertex::from).collect();

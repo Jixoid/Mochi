@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 use crate::asset::model::ModelAsset;
 use crate::rendering::RenderingSystem;
 use crate::rhi;
-use crate::scene::{CameraComponent, DirectionalLightComponent, MeshRendererComponent, PointLightComponent, Scene, SpotLightComponent, TransformComponent};
+use crate::scene::{
+	CameraComponent, DirectionalLightComponent, MeshRendererComponent, PointLightComponent, Scene,
+	SpotLightComponent, TransformComponent,
+};
 use crate::script::ScriptComponent;
 use mochi_except::*;
 use mochi_math::{Quat, Transform, Vec3, Vec4};
@@ -32,9 +35,15 @@ pub struct TransformDesc {
 	pub scale: [f32; 3],
 }
 
-fn default_translation() -> [f32; 3] { [0.0, 0.0, 0.0] }
-fn default_rotation() -> [f32; 4] { [0.0, 0.0, 0.0, 1.0] }
-fn default_scale() -> [f32; 3] { [1.0, 1.0, 1.0] }
+fn default_translation() -> [f32; 3] {
+	[0.0, 0.0, 0.0]
+}
+fn default_rotation() -> [f32; 4] {
+	[0.0, 0.0, 0.0, 1.0]
+}
+fn default_scale() -> [f32; 3] {
+	[1.0, 1.0, 1.0]
+}
 
 impl Default for TransformDesc {
 	fn default() -> Self {
@@ -49,8 +58,17 @@ impl Default for TransformDesc {
 impl TransformDesc {
 	pub fn to_transform(&self) -> Transform<f32> {
 		Transform {
-			translation: Vec3::new(self.translation[0], self.translation[1], self.translation[2]),
-			rotation: Quat::new(self.rotation[0], self.rotation[1], self.rotation[2], self.rotation[3]),
+			translation: Vec3::new(
+				self.translation[0],
+				self.translation[1],
+				self.translation[2],
+			),
+			rotation: Quat::new(
+				self.rotation[0],
+				self.rotation[1],
+				self.rotation[2],
+				self.rotation[3],
+			),
 			scale: Vec3::new(self.scale[0], self.scale[1], self.scale[2]),
 		}
 	}
@@ -70,11 +88,21 @@ pub struct CameraDesc {
 	pub clear_color: [f32; 4],
 }
 
-fn default_fov() -> f32 { 60.0 }
-fn default_near() -> f32 { 0.1 }
-fn default_far() -> f32 { 1000.0 }
-fn default_active() -> bool { true }
-fn default_clear_color() -> [f32; 4] { [0.1, 0.15, 0.25, 1.0] }
+fn default_fov() -> f32 {
+	60.0
+}
+fn default_near() -> f32 {
+	0.1
+}
+fn default_far() -> f32 {
+	1000.0
+}
+fn default_active() -> bool {
+	true
+}
+fn default_clear_color() -> [f32; 4] {
+	[0.1, 0.15, 0.25, 1.0]
+}
 
 impl Default for CameraDesc {
 	fn default() -> Self {
@@ -97,7 +125,9 @@ pub struct DirectionalLightDesc {
 	pub cast_shadows: bool,
 }
 
-fn default_cast_shadows() -> bool { true }
+fn default_cast_shadows() -> bool {
+	true
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PointLightDesc {
@@ -126,7 +156,9 @@ pub struct MeshRendererDesc {
 	pub cast_shadows: bool,
 }
 
-fn default_visible() -> bool { true }
+fn default_visible() -> bool {
+	true
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScriptDesc {
@@ -157,10 +189,13 @@ impl SceneAsset {
 	pub fn load(path: &str) -> Result<Self, String> {
 		if path.ends_with(".mscene") {
 			let bytes = fs::read(path).map_err(|e| format!("Failed to read binary scene {path}: {e}"))?;
-			postcard::from_bytes::<Self>(&bytes).map_err(|e| format!("Failed to deserialize binary scene {path}: {e}"))
+			postcard::from_bytes::<Self>(&bytes)
+				.map_err(|e| format!("Failed to deserialize binary scene {path}: {e}"))
 		} else {
-			let content = fs::read_to_string(path).map_err(|e| format!("Failed to read RON scene {path}: {e}"))?;
-			ron::from_str::<Self>(&content).map_err(|e| format!("Failed to deserialize RON scene {path}: {e}"))
+			let content =
+				fs::read_to_string(path).map_err(|e| format!("Failed to read RON scene {path}: {e}"))?;
+			ron::from_str::<Self>(&content)
+				.map_err(|e| format!("Failed to deserialize RON scene {path}: {e}"))
 		}
 	}
 
@@ -171,8 +206,8 @@ impl SceneAsset {
 	}
 
 	pub fn save_binary(&self, path: &str) -> Result<(), String> {
-		let bytes = postcard::to_stdvec(self)
-			.map_err(|e| format!("Failed to serialize scene to binary: {e}"))?;
+		let bytes =
+			postcard::to_stdvec(self).map_err(|e| format!("Failed to serialize scene to binary: {e}"))?;
 		fs::write(path, bytes).map_err(|e| format!("Failed to write binary scene {path}: {e}"))
 	}
 
@@ -190,7 +225,13 @@ impl SceneAsset {
 			.transparent_template()
 			.ok_or_else(|| "Transparent MaterialTemplate not available in RenderingSystem".to_string())?;
 
-		let mut loaded_models: HashMap<String, Vec<(std::sync::Arc<crate::scene::Mesh>, std::sync::Arc<crate::material::MaterialInstance>)>> = HashMap::new();
+		let mut loaded_models: HashMap<
+			String,
+			Vec<(
+				std::sync::Arc<crate::scene::Mesh>,
+				std::sync::Arc<crate::material::MaterialInstance>,
+			)>,
+		> = HashMap::new();
 
 		for entity_desc in &self.entities {
 			let transform = entity_desc

@@ -11,7 +11,9 @@
 
 
 use std::sync::Arc;
-use crate::material::{BlendMode, MaterialInstance, MaterialStorage, MaterialTemplate, PassKind, TextureManager};
+use crate::material::{
+	BlendMode, MaterialInstance, MaterialStorage, MaterialTemplate, PassKind, TextureManager,
+};
 use crate::rendering::aa::AntiAliasingMode;
 use crate::rendering::cluster::ClusterManager;
 use crate::rendering::frame::{MAX_DIRECTIONAL_LIGHTS, SceneFrameBuffer};
@@ -194,12 +196,7 @@ impl RenderingSystem {
 			FULLSCREEN_VERT_SPV,
 			"main",
 		);
-		let fxaa_frag = rhi::Shader::new(
-			device,
-			rhi::ShaderStage::Pixel,
-			FXAA_FRAG_SPV,
-			"main",
-		);
+		let fxaa_frag = rhi::Shader::new(device, rhi::ShaderStage::Pixel, FXAA_FRAG_SPV, "main");
 		let fxaa_meta = rhi::PipelineMeta::new_raw(
 			rhi::ShaderStage::Pixel,
 			std::mem::size_of::<FxaaPushConstants>() as u32,
@@ -272,7 +269,10 @@ impl RenderingSystem {
 	}
 
 	pub fn velocity_target(&self) -> Option<&crate::rendering::velocity::VelocityTarget> {
-		self.velocity_manager.as_ref().and_then(|v| v.target.as_ref())
+		self
+			.velocity_manager
+			.as_ref()
+			.and_then(|v| v.target.as_ref())
 	}
 
 	pub fn history_target(&self) -> Option<&HistoryTarget> {
@@ -358,7 +358,15 @@ impl RenderingSystem {
 				target.msaa_samples = msaa_samples;
 				if needs_msaa {
 					let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
-						Self::create_msaa_attachments(device, alloc, width, height, color_format, depth_format, msaa_samples);
+						Self::create_msaa_attachments(
+							device,
+							alloc,
+							width,
+							height,
+							color_format,
+							depth_format,
+							msaa_samples,
+						);
 					target.msaa_attachments = Some(MsaaOffscreenAttachments {
 						color_image: msaa_col_img,
 						color_view: msaa_col_view,
@@ -400,7 +408,15 @@ impl RenderingSystem {
 
 		let msaa_attachments = if needs_msaa {
 			let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
-				Self::create_msaa_attachments(device, alloc, width, height, color_format, depth_format, msaa_samples);
+				Self::create_msaa_attachments(
+					device,
+					alloc,
+					width,
+					height,
+					color_format,
+					depth_format,
+					msaa_samples,
+				);
 			Some(MsaaOffscreenAttachments {
 				color_image: msaa_col_img,
 				color_view: msaa_col_view,
@@ -527,7 +543,11 @@ impl RenderingSystem {
 
 		let width = display.width();
 		let height = display.height();
-		let aspect = if height > 0 { width as f32 / height as f32 } else { 1.0 };
+		let aspect = if height > 0 {
+			width as f32 / height as f32
+		} else {
+			1.0
+		};
 
 		let (cam_transform, camera) = scene
 			.active_camera()
@@ -540,13 +560,18 @@ impl RenderingSystem {
 
 		let clear_color = camera.clear_color;
 
-		let mut cascade_view_proj = [[[mochi_math::Mat4x4::IDENTITY.to_array(); 4]; MAX_DIRECTIONAL_LIGHTS]; 1][0];
+		let mut cascade_view_proj =
+			[[[mochi_math::Mat4x4::IDENTITY.to_array(); 4]; MAX_DIRECTIONAL_LIGHTS]; 1][0];
 		let mut cascade_shadow_ids = [[0u32; 4]; MAX_DIRECTIONAL_LIGHTS];
 		let cascade_split_depths = [2.5, 8.0, 24.0, 80.0];
 
 		if let Some(sm) = &mut self.shadow_manager {
 			let mut light_idx = 0;
-			for (_e, (t, light)) in scene.world().query::<(&TransformComponent, &DirectionalLightComponent)>().iter() {
+			for (_e, (t, light)) in scene
+				.world()
+				.query::<(&TransformComponent, &DirectionalLightComponent)>()
+				.iter()
+			{
 				if light_idx >= MAX_DIRECTIONAL_LIGHTS {
 					break;
 				}
@@ -562,7 +587,11 @@ impl RenderingSystem {
 		}
 
 		let (grid_addr, pt_index_addr, spot_index_addr) = if let Some(cm) = &self.cluster_manager {
-			(cm.grid_address(), cm.point_index_list_address(), cm.spot_index_list_address())
+			(
+				cm.grid_address(),
+				cm.point_index_list_address(),
+				cm.spot_index_list_address(),
+			)
 		} else {
 			(0, 0, 0)
 		};
@@ -661,11 +690,7 @@ impl RenderingSystem {
 									vertex_addr: packet.vertex_buffer_addr,
 								};
 
-								pass.push_constant(
-									rhi::ShaderStage::Vertex,
-									0,
-									&pc,
-								);
+								pass.push_constant(rhi::ShaderStage::Vertex, 0, &pc);
 
 								if packet.is_indexed && packet.index_count > 0 {
 									if let Some(index_buf) = packet.mesh.index_buffer() {
@@ -695,8 +720,16 @@ impl RenderingSystem {
 		if is_post_process {
 			if let Some(offscreen) = &self.offscreen_target {
 				let mut target_builder = rhi::RenderTarget::builder(width, height)
-					.color(&offscreen.color_image, &offscreen.color_view, offscreen.color_format)
-					.depth(&offscreen.depth_image, &offscreen.depth_view, offscreen.depth_format);
+					.color(
+						&offscreen.color_image,
+						&offscreen.color_view,
+						offscreen.color_format,
+					)
+					.depth(
+						&offscreen.depth_image,
+						&offscreen.depth_view,
+						offscreen.depth_format,
+					);
 
 				if let Some(msaa) = &offscreen.msaa_attachments {
 					target_builder = target_builder
@@ -736,11 +769,7 @@ impl RenderingSystem {
 									depth_tex_id: offscreen.depth_descriptor_id,
 									_pad: 0,
 								};
-								pass.push_constant(
-									rhi::ShaderStage::Pixel,
-									0,
-									&pc,
-								);
+								pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
 								pass.draw(3, 1, 0, 0);
 							});
 						}
@@ -750,10 +779,9 @@ impl RenderingSystem {
 				}
 
 				if self.aa_mode.is_fxaa() {
-					if let (Some(swapchain_target), Some(fxaa_pipeline)) = (
-						display.render_target(img_idx),
-						&self.fxaa_pipeline,
-					) {
+					if let (Some(swapchain_target), Some(fxaa_pipeline)) =
+						(display.render_target(img_idx), &self.fxaa_pipeline)
+					{
 						let target_no_depth = swapchain_target.without_depth();
 						cmd.render_pass(&target_no_depth, clear_color, |pass| {
 							pass.set_viewport_and_scissor(width, height);
@@ -766,11 +794,7 @@ impl RenderingSystem {
 								_pad: 0.0,
 							};
 
-							pass.push_constant(
-								rhi::ShaderStage::Pixel,
-								0,
-								&pc,
-							);
+							pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
 
 							pass.draw(3, 1, 0, 0);
 						});
@@ -789,7 +813,11 @@ impl RenderingSystem {
 
 							// 1. Pass 1: SMAA Edge Detection (Color)
 							let edges_rt = rhi::RenderTarget::builder(width, height)
-								.color(&targets.edges_image, &targets.edges_view, rhi::Format::V2Norm8U)
+								.color(
+									&targets.edges_image,
+									&targets.edges_view,
+									rhi::Format::V2Norm8U,
+								)
 								.build(device);
 							let edge_clear = [0.0, 0.0, 0.0, 0.0];
 							cmd.render_pass(&edges_rt, edge_clear, |pass| {
@@ -803,17 +831,17 @@ impl RenderingSystem {
 									_pad1: 0,
 									_pad2: 0,
 								};
-								pass.push_constant(
-									rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-									0,
-									&pc,
-								);
+								pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
 								pass.draw(3, 1, 0, 0);
 							});
 
 							// 2. Pass 2: SMAA Blending Weight Calculation
 							let blend_rt = rhi::RenderTarget::builder(width, height)
-								.color(&targets.blend_image, &targets.blend_view, rhi::Format::V4Norm8U)
+								.color(
+									&targets.blend_image,
+									&targets.blend_view,
+									rhi::Format::V4Norm8U,
+								)
 								.build(device);
 							let blend_clear = [0.0, 0.0, 0.0, 0.0];
 							cmd.render_pass(&blend_rt, blend_clear, |pass| {
@@ -839,11 +867,7 @@ impl RenderingSystem {
 									search_tex_id: smaa.search_descriptor_id,
 									_pad: 0,
 								};
-								pass.push_constant(
-									rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-									0,
-									&pc,
-								);
+								pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
 								pass.draw(3, 1, 0, 0);
 							});
 
@@ -855,11 +879,7 @@ impl RenderingSystem {
 								.unwrap_or(0);
 
 							if needs_history {
-								if let (
-									Some(history_images),
-									Some(history_views),
-									Some(history_descs),
-								) = (
+								if let (Some(history_images), Some(history_views), Some(history_descs)) = (
 									&targets.history_images,
 									&targets.history_views,
 									&targets.history_descriptor_ids,
@@ -869,7 +889,11 @@ impl RenderingSystem {
 
 									// 3. Pass 3: SMAA Neighborhood Blending (Reprojected with Velocity in Alpha)
 									let history_rt = rhi::RenderTarget::builder(width, height)
-										.color(&history_images[curr_idx], &history_views[curr_idx], smaa.swapchain_color_format)
+										.color(
+											&history_images[curr_idx],
+											&history_views[curr_idx],
+											smaa.swapchain_color_format,
+										)
 										.build(device);
 									let hist_clear = [0.0, 0.0, 0.0, 0.0];
 									cmd.render_pass(&history_rt, hist_clear, |pass| {
@@ -883,11 +907,7 @@ impl RenderingSystem {
 											velocity_tex_id,
 											_pad: 0,
 										};
-										pass.push_constant(
-											rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-											0,
-											&pc,
-										);
+										pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
 										pass.draw(3, 1, 0, 0);
 									});
 
@@ -905,11 +925,7 @@ impl RenderingSystem {
 												velocity_tex_id,
 												has_history: if smaa.has_history { 1 } else { 0 },
 											};
-											pass.push_constant(
-												rhi::ShaderStage::Pixel,
-												0,
-												&pc,
-											);
+											pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
 											pass.draw(3, 1, 0, 0);
 										});
 									}
@@ -930,11 +946,7 @@ impl RenderingSystem {
 											velocity_tex_id: 0,
 											_pad: 0,
 										};
-										pass.push_constant(
-											rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-											0,
-											&pc,
-										);
+										pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
 										pass.draw(3, 1, 0, 0);
 									});
 								}
@@ -998,11 +1010,7 @@ impl RenderingSystem {
 				flags: 0,
 			};
 
-			pass.push_constant(
-				rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-				0,
-				&pc,
-			);
+			pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
 
 			if packet.is_indexed && packet.index_count > 0 {
 				if let Some(index_buf) = packet.mesh.index_buffer() {

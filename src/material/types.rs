@@ -109,8 +109,18 @@ impl Default for PbrProperties {
 impl PbrProperties {
 	pub fn to_gpu_data(&self) -> PbrMaterialGpuData {
 		PbrMaterialGpuData {
-			base_color: [self.base_color.x, self.base_color.y, self.base_color.z, self.base_color.w],
-			emissive: [self.emissive.x, self.emissive.y, self.emissive.z, self.emissive_intensity],
+			base_color: [
+				self.base_color.x,
+				self.base_color.y,
+				self.base_color.z,
+				self.base_color.w,
+			],
+			emissive: [
+				self.emissive.x,
+				self.emissive.y,
+				self.emissive.z,
+				self.emissive_intensity,
+			],
 			roughness: self.roughness,
 			metallic: self.metallic,
 			normal_scale: self.normal_scale,

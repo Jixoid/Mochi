@@ -71,10 +71,22 @@ impl<T: Number> Mat4x4<T> {
 
 	pub fn to_array(&self) -> [T; 16] {
 		[
-			self.rows[0].x, self.rows[0].y, self.rows[0].z, self.rows[0].w,
-			self.rows[1].x, self.rows[1].y, self.rows[1].z, self.rows[1].w,
-			self.rows[2].x, self.rows[2].y, self.rows[2].z, self.rows[2].w,
-			self.rows[3].x, self.rows[3].y, self.rows[3].z, self.rows[3].w,
+			self.rows[0].x,
+			self.rows[0].y,
+			self.rows[0].z,
+			self.rows[0].w,
+			self.rows[1].x,
+			self.rows[1].y,
+			self.rows[1].z,
+			self.rows[1].w,
+			self.rows[2].x,
+			self.rows[2].y,
+			self.rows[2].z,
+			self.rows[2].w,
+			self.rows[3].x,
+			self.rows[3].y,
+			self.rows[3].z,
+			self.rows[3].w,
 		]
 	}
 
@@ -149,10 +161,30 @@ impl<T: Float> Mat4x4<T> {
 
 	pub fn inverse(&self) -> Self {
 		let mut a = [
-			[self.rows[0].x, self.rows[0].y, self.rows[0].z, self.rows[0].w],
-			[self.rows[1].x, self.rows[1].y, self.rows[1].z, self.rows[1].w],
-			[self.rows[2].x, self.rows[2].y, self.rows[2].z, self.rows[2].w],
-			[self.rows[3].x, self.rows[3].y, self.rows[3].z, self.rows[3].w],
+			[
+				self.rows[0].x,
+				self.rows[0].y,
+				self.rows[0].z,
+				self.rows[0].w,
+			],
+			[
+				self.rows[1].x,
+				self.rows[1].y,
+				self.rows[1].z,
+				self.rows[1].w,
+			],
+			[
+				self.rows[2].x,
+				self.rows[2].y,
+				self.rows[2].z,
+				self.rows[2].w,
+			],
+			[
+				self.rows[3].x,
+				self.rows[3].y,
+				self.rows[3].z,
+				self.rows[3].w,
+			],
 		];
 		let mut b = [
 			[T::ONE, T::ZERO, T::ZERO, T::ZERO],
@@ -310,4 +342,3 @@ impl<T: Number> From<Mat3x4<T>> for Mat4x4<T> {
 		m.to_mat4()
 	}
 }
-

@@ -108,7 +108,12 @@ pub struct VertexBindSlot {
 
 impl VertexBindSlot {
 	pub fn new(items: Vec<VT>, stride: u64, input_rate: VertexInputRate, index: u8) -> Self {
-		Self { items, stride, input_rate, index }
+		Self {
+			items,
+			stride,
+			input_rate,
+			index,
+		}
 	}
 
 	pub fn items(&self) -> &[VT] {
@@ -232,7 +237,10 @@ unsafe impl<B: RhiBackend> Send for Pipeline<B> {}
 unsafe impl<B: RhiBackend> Sync for Pipeline<B> {}
 
 impl<B: RhiBackend> Pipeline<B> {
-	pub fn builder<'a>(device: &'a Device<B>, meta: &'a PipelineMeta<B>) -> GraphicsPipelineBuilder<'a, B> {
+	pub fn builder<'a>(
+		device: &'a Device<B>,
+		meta: &'a PipelineMeta<B>,
+	) -> GraphicsPipelineBuilder<'a, B> {
 		GraphicsPipelineBuilder::new(device, meta)
 	}
 
@@ -272,11 +280,7 @@ impl<B: RhiBackend> Pipeline<B> {
 		}
 	}
 
-	pub fn new_compute(
-		device: &Device<B>,
-		meta: &PipelineMeta<B>,
-		shader: &Shader<B>,
-	) -> Self {
+	pub fn new_compute(device: &Device<B>, meta: &PipelineMeta<B>, shader: &Shader<B>) -> Self {
 		let raw_meta = meta.get_or_create_raw(device);
 		let pipe = device
 			.raw()

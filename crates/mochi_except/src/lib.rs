@@ -33,13 +33,11 @@ pub enum LogType {
 
 static BOOT: OnceLock<Instant> = OnceLock::new();
 
-static GLOBAL_LEVEL: AtomicU8 = AtomicU8::new(
-	if cfg!(debug_assertions) {
-		LogType::Verbose as u8
-	} else {
-		LogType::Display as u8
-	}
-);
+static GLOBAL_LEVEL: AtomicU8 = AtomicU8::new(if cfg!(debug_assertions) {
+	LogType::Verbose as u8
+} else {
+	LogType::Display as u8
+});
 
 pub fn start() {
 	BOOT.get_or_init(Instant::now);
@@ -65,14 +63,20 @@ pub fn resolve_module_tag(module_path: &str) -> &'static str {
 		_ if module_path.starts_with("mochi_rhi") => "RHI",
 		_ if module_path.starts_with("mochi_ahi") => "AHI",
 
-		_ if module_path.starts_with("mochi_math")   => "MATH",
+		_ if module_path.starts_with("mochi_math") => "MATH",
 		_ if module_path.starts_with("mochi_plugin") => "PLUGIN",
 		_ if module_path.starts_with("mochi_except") => "EXCEPT",
-		
-		_ if module_path.starts_with("Mochi::render") || module_path.starts_with("mochi::render")   => "RENDER",
-		_ if module_path.starts_with("Mochi::audio") || module_path.starts_with("mochi::audio")     => "AUDIO",
-		_ if module_path.starts_with("Mochi::display") || module_path.starts_with("mochi::display") => "DISPLAY",
-		
+
+		_ if module_path.starts_with("Mochi::render") || module_path.starts_with("mochi::render") => {
+			"RENDER"
+		}
+		_ if module_path.starts_with("Mochi::audio") || module_path.starts_with("mochi::audio") => {
+			"AUDIO"
+		}
+		_ if module_path.starts_with("Mochi::display") || module_path.starts_with("mochi::display") => {
+			"DISPLAY"
+		}
+
 		_ if module_path.starts_with("Mochi::core") || module_path.starts_with("mochi::core") => "CORE",
 
 		_ => "MOCHI",
@@ -100,11 +104,11 @@ pub fn log(typ: LogType, module_path: &'static str, args: std::fmt::Arguments) {
 
 	let sym = match typ {
 		LogType::Verbose => 'V',
-		LogType::Log     => 'L',
+		LogType::Log => 'L',
 		LogType::Display => 'D',
 		LogType::Warning => 'W',
-		LogType::Error   => 'E',
-		LogType::Panic   => 'P',
+		LogType::Error => 'E',
+		LogType::Panic => 'P',
 	};
 
 	let msg = if (typ as u8) >= (LogType::Warning as u8) {
@@ -112,7 +116,6 @@ pub fn log(typ: LogType, module_path: &'static str, args: std::fmt::Arguments) {
 			"{sym} [{sec}.{ms:03}] @{tag} {args}\n\
 			├─> mod: {module_path}\n\
 			╰─> file: {file_name}:{line}:{column}",
-			
 			line = loc.line(),
 			column = loc.column(),
 		)

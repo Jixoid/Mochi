@@ -74,15 +74,16 @@ impl ScriptSystem {
 				continue;
 			}
 
-			let script = self.loaded_scripts.entry(path_str.clone()).or_insert_with(|| {
-				match LoadedQwScript::load(path) {
+			let script = self
+				.loaded_scripts
+				.entry(path_str.clone())
+				.or_insert_with(|| match LoadedQwScript::load(path) {
 					Ok(loaded) => loaded,
 					Err(err) => {
 						mochi_error!("Failed to load script {}: {}", path.display(), err);
 						LoadedQwScript::empty(path)
 					}
-				}
-			});
+				});
 
 			if let Ok(true) = script.reload_if_changed() {
 				mochi_disp!("Hot-reloaded script '{}'", path_str);

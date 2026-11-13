@@ -66,9 +66,8 @@ impl<B: RhiBackend> Buffer<B> {
 			AllocationCreate::Mapped,
 			AllocationLocation::Auto,
 		);
-		let slice = unsafe {
-			std::slice::from_raw_parts(data.as_ptr() as *const u8, byte_size as usize)
-		};
+		let slice =
+			unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, byte_size as usize) };
 		buf.write_bytes(0, slice)?;
 		Ok(buf)
 	}
