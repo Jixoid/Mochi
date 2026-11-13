@@ -20,6 +20,7 @@ use crate::rendering::shadow::{CASCADE_COUNT, SHADOW_MAP_SIZE, ShadowManager, Sh
 use crate::rendering::smaa::{
 	SmaaBlendPushConstants, SmaaEdgePushConstants, SmaaManager, SmaaNeighborPushConstants,
 };
+use crate::rendering::velocity::{VelocityManager, VelocityPushConstants};
 use crate::rhi;
 use crate::scene::{CameraComponent, DirectionalLightComponent, Scene, TransformComponent};
 use mochi_except::*;
@@ -57,10 +58,20 @@ pub struct OffscreenSceneTarget {
 	pub depth_image: rhi::Image2,
 	pub depth_view: rhi::ImageView2,
 	pub descriptor_id: u32,
+	pub depth_descriptor_id: u32,
 	pub width: u32,
 	pub height: u32,
 	pub color_format: rhi::Format,
 	pub depth_format: rhi::Format,
+}
+
+pub struct HistoryTarget {
+	pub image: rhi::Image2,
+	pub view: rhi::ImageView2,
+	pub descriptor_id: u32,
+	pub width: u32,
+	pub height: u32,
+	pub format: rhi::Format,
 }
 
 
@@ -77,13 +88,17 @@ pub struct RenderingSystem {
 	transparent_material: Option<Arc<MaterialInstance>>,
 	aa_mode: AntiAliasingMode,
 	offscreen_target: Option<OffscreenSceneTarget>,
+	history_target: Option<HistoryTarget>,
 	fxaa_pipeline: Option<rhi::Pipeline>,
 	fxaa_meta: Option<rhi::PipelineMeta>,
 	fxaa_sampler: Option<rhi::Sampler2>,
+	point_sampler: Option<rhi::Sampler2>,
 	smaa_manager: Option<SmaaManager>,
+	velocity_manager: Option<VelocityManager>,
 	cluster_manager: Option<ClusterManager>,
 	shadow_manager: Option<ShadowManager>,
 	shadow_queue: RenderQueue,
+	frame_index: u64,
 }
 
 impl RenderingSystem {
@@ -108,13 +123,17 @@ impl RenderingSystem {
 			transparent_material: None,
 			aa_mode: AntiAliasingMode::Off,
 			offscreen_target: None,
+			history_target: None,
 			fxaa_pipeline: None,
 			fxaa_meta: None,
 			fxaa_sampler: None,
+			point_sampler: None,
 			smaa_manager: None,
+			velocity_manager: None,
 			cluster_manager: None,
 			shadow_manager: None,
 			shadow_queue: RenderQueue::new(),
+			frame_index: 0,
 		})
 	}
 
@@ -201,6 +220,17 @@ impl RenderingSystem {
 		let smaa_manager = SmaaManager::new(device, alloc, &self.cmdmng, color_format);
 		self.smaa_manager = Some(smaa_manager);
 
+		let point_sampler = device
+			.create_sampler(
+				rhi::SamplerFilter::Nearest,
+				rhi::SamplerAddressMode::ClampToEdge,
+			)
+			.expect("Failed to create point clamp sampler");
+		self.point_sampler = Some(point_sampler);
+
+		let velocity_manager = VelocityManager::new(device);
+		self.velocity_manager = Some(velocity_manager);
+
 		match ClusterManager::new(device, alloc) {
 			Ok(cm) => {
 				mochi_disp!("Clustered Forward light manager initialized");
@@ -236,6 +266,14 @@ impl RenderingSystem {
 
 	pub fn aa_mode(&self) -> AntiAliasingMode {
 		self.aa_mode
+	}
+
+	pub fn velocity_target(&self) -> Option<&crate::rendering::velocity::VelocityTarget> {
+		self.velocity_manager.as_ref().and_then(|v| v.target.as_ref())
+	}
+
+	pub fn history_target(&self) -> Option<&HistoryTarget> {
+		self.history_target.as_ref()
 	}
 
 	pub fn set_aa_mode(
@@ -305,7 +343,7 @@ impl RenderingSystem {
 			alloc,
 			ext,
 			depth_format,
-			rhi::ImageUsage::DepthStencilAttachment,
+			rhi::ImageUsage::DepthStencilAttachment | rhi::ImageUsage::Sampled,
 			rhi::ImageTiling::Optimal,
 			rhi::AllocationCreate::Dedicated,
 			rhi::AllocationLocation::PreferDevice,
@@ -320,12 +358,19 @@ impl RenderingSystem {
 			0
 		};
 
+		let depth_descriptor_id = if let Some(sampler) = &self.point_sampler {
+			device.write_texture_descriptor(&depth_view, sampler)
+		} else {
+			0
+		};
+
 		self.offscreen_target = Some(OffscreenSceneTarget {
 			color_image,
 			color_view,
 			depth_image,
 			depth_view,
 			descriptor_id,
+			depth_descriptor_id,
 			width,
 			height,
 			color_format,
@@ -445,6 +490,13 @@ impl RenderingSystem {
 			(0, 0, 0)
 		};
 
+		self.frame_index += 1;
+		let jitter = if self.aa_mode.needs_camera_jitter() {
+			crate::rendering::aa::get_subpixel_jitter(self.aa_mode, self.frame_index)
+		} else {
+			(0.0, 0.0)
+		};
+
 		// Update frame scene buffer (Camera + Dynamic Lights + Shadows)
 		self.frame_buffer.update(
 			device,
@@ -463,6 +515,7 @@ impl RenderingSystem {
 			cascade_view_proj,
 			cascade_split_depths,
 			cascade_shadow_ids,
+			jitter,
 		);
 
 		// Extract packets for ShadowCaster pass
@@ -588,6 +641,42 @@ impl RenderingSystem {
 						material_addr,
 					);
 				});
+
+				// On-demand Velocity Buffer generation (only if active mode requires it)
+				if self.aa_mode.needs_velocity() {
+					if let Some(vm) = &mut self.velocity_manager {
+						vm.ensure_target(device, alloc, width, height);
+						if let Some(vt) = &vm.target {
+							let velocity_rt = device.create_color_render_target(
+								&vt.image,
+								&vt.view,
+								rhi::Format::V2Float16,
+								width,
+								height,
+							);
+							let vel_clear = [0.0, 0.0, 0.0, 0.0];
+							cmd.render_pass(&velocity_rt, vel_clear, |pass| {
+								pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+								pass.set_scissor(0, 0, width, height);
+								pass.bind_pipeline(&vm.pipeline);
+
+								let pc = VelocityPushConstants {
+									scene_addr,
+									depth_tex_id: offscreen.depth_descriptor_id,
+									_pad: 0,
+								};
+								pass.push_constant(
+									rhi::ShaderStage::Pixel,
+									0,
+									&pc,
+								);
+								pass.draw(3, 1, 0, 0);
+							});
+						}
+					}
+				} else if let Some(vm) = &mut self.velocity_manager {
+					vm.free_target();
+				}
 
 				if self.aa_mode.is_fxaa() {
 					if let (Some(swapchain_target), Some(fxaa_pipeline)) = (

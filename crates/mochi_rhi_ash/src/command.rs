@@ -334,6 +334,7 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			self.device.cmd_end_rendering(self.handle);
 		}
 
+		let mut barriers = Vec::new();
 		let is_depth_only = target.color_image == vk::Image::null();
 
 		if !is_depth_only {
@@ -367,13 +368,10 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 						.layer_count(1),
 				);
 
-			let barriers = [color_barrier];
-			let dep_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
+			barriers.push(color_barrier);
+		}
 
-			unsafe {
-				self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
-			}
-		} else if target.depth_image != vk::Image::null() {
+		if target.depth_image != vk::Image::null() && (is_depth_only || target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) {
 			let depth_barrier = vk::ImageMemoryBarrier2::default()
 				.src_stage_mask(vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
 				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
@@ -391,9 +389,11 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 						.layer_count(1),
 				);
 
-			let barriers = [depth_barrier];
-			let dep_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
+			barriers.push(depth_barrier);
+		}
 
+		if !barriers.is_empty() {
+			let dep_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
 			unsafe {
 				self.device.cmd_pipeline_barrier2(self.handle, &dep_info);
 			}

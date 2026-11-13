@@ -87,6 +87,8 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	mat4 cascade_view_proj[4][4];
 	vec4 cascade_split_depths;
 	uvec4 cascade_shadow_ids[4];
+	mat4 prev_view_proj;
+	vec4 jitter;
 };
 
 struct PbrMaterialData {

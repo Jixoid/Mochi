@@ -67,10 +67,12 @@ pub struct SceneFrameData {
 	pub cascade_view_proj: [[[f32; 16]; 4]; MAX_DIRECTIONAL_LIGHTS],
 	pub cascade_split_depths: [f32; 4],
 	pub cascade_shadow_ids: [[u32; 4]; MAX_DIRECTIONAL_LIGHTS],
+	pub prev_view_proj: [f32; 16],
+	pub jitter: [f32; 4],
 }
 
 const _: () = {
-	assert!(std::mem::size_of::<SceneFrameData>() == 1616);
+	assert!(std::mem::size_of::<SceneFrameData>() == 1696);
 	assert!(std::mem::offset_of!(SceneFrameData, cluster_grid_address) == 288);
 	assert!(std::mem::offset_of!(SceneFrameData, point_light_index_list_address) == 296);
 	assert!(std::mem::offset_of!(SceneFrameData, spot_light_index_list_address) == 304);
@@ -87,6 +89,8 @@ const _: () = {
 	assert!(std::mem::offset_of!(SceneFrameData, cascade_view_proj) == 512);
 	assert!(std::mem::offset_of!(SceneFrameData, cascade_split_depths) == 1536);
 	assert!(std::mem::offset_of!(SceneFrameData, cascade_shadow_ids) == 1552);
+	assert!(std::mem::offset_of!(SceneFrameData, prev_view_proj) == 1616);
+	assert!(std::mem::offset_of!(SceneFrameData, jitter) == 1680);
 };
 
 impl Default for SceneFrameData {
@@ -127,6 +131,8 @@ impl Default for SceneFrameData {
 			cascade_view_proj: [[identity_mat; 4]; MAX_DIRECTIONAL_LIGHTS],
 			cascade_split_depths: [2.5, 8.0, 24.0, 80.0],
 			cascade_shadow_ids: [[0; 4]; MAX_DIRECTIONAL_LIGHTS],
+			prev_view_proj: identity_mat,
+			jitter: [0.0; 4],
 		}
 	}
 }
@@ -140,6 +146,8 @@ pub struct SceneFrameBuffer {
 	point_light_count: u32,
 	spot_light_count: u32,
 	primary_sun_dir: mochi_math::Vec3<f32>,
+	prev_view_proj: Option<[f32; 16]>,
+	prev_jitter: [f32; 2],
 }
 
 impl SceneFrameBuffer {
@@ -153,6 +161,8 @@ impl SceneFrameBuffer {
 			point_light_count: 0,
 			spot_light_count: 0,
 			primary_sun_dir: mochi_math::Vec3::new(0.5, -1.0, 0.3).normalize(),
+			prev_view_proj: None,
+			prev_jitter: [0.0; 2],
 		}
 	}
 
@@ -174,11 +184,40 @@ impl SceneFrameBuffer {
 		cascade_view_proj: [[[f32; 16]; 4]; MAX_DIRECTIONAL_LIGHTS],
 		cascade_split_depths: [f32; 4],
 		cascade_shadow_ids: [[u32; 4]; MAX_DIRECTIONAL_LIGHTS],
+		jitter: (f32, f32),
 	) {
 		let view = camera.view_matrix(camera_transform);
-		let proj = camera.projection_matrix(aspect);
+		let mut proj = camera.projection_matrix(aspect);
+
+		let jitter_ndc_x = if jitter.0 != 0.0 {
+			2.0 * jitter.0 / screen_width as f32
+		} else {
+			0.0
+		};
+		let jitter_ndc_y = if jitter.1 != 0.0 {
+			2.0 * jitter.1 / screen_height as f32
+		} else {
+			0.0
+		};
+
+		if jitter_ndc_x != 0.0 || jitter_ndc_y != 0.0 {
+			proj.rows[0].z -= jitter_ndc_x;
+			proj.rows[1].z -= jitter_ndc_y;
+		}
+
 		let view_proj = proj * view;
 		let inv_view_proj = view_proj.inverse();
+
+		let prev_vp = self.prev_view_proj.unwrap_or_else(|| view_proj.to_array());
+		self.prev_view_proj = Some(view_proj.to_array());
+
+		let jitter_data = [
+			jitter_ndc_x,
+			jitter_ndc_y,
+			self.prev_jitter[0],
+			self.prev_jitter[1],
+		];
+		self.prev_jitter = [jitter_ndc_x, jitter_ndc_y];
 
 		let cam_pos = camera_transform.translation;
 
@@ -313,6 +352,8 @@ impl SceneFrameBuffer {
 			cascade_view_proj,
 			cascade_split_depths,
 			cascade_shadow_ids,
+			prev_view_proj: prev_vp,
+			jitter: jitter_data,
 		};
 
 		let buffer_size = std::mem::size_of::<SceneFrameData>() as u64;
