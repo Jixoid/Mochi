@@ -19,6 +19,7 @@ use crate::rendering::queue::RenderQueue;
 use crate::rendering::shadow::{CASCADE_COUNT, SHADOW_MAP_SIZE, ShadowManager, ShadowPushConstants};
 use crate::rendering::smaa::{
 	SmaaBlendPushConstants, SmaaEdgePushConstants, SmaaManager, SmaaNeighborPushConstants,
+	SmaaResolvePushConstants,
 };
 use crate::rendering::velocity::{VelocityManager, VelocityPushConstants};
 use crate::rhi;
@@ -305,6 +306,10 @@ impl RenderingSystem {
 					target.depth_format(),
 				);
 			}
+		}
+
+		if let Some(smaa) = &mut self.smaa_manager {
+			smaa.has_history = false;
 		}
 
 		mochi_disp!("Anti-Aliasing mode set to: {}", mode.name());
@@ -707,7 +712,8 @@ impl RenderingSystem {
 					}
 				} else if self.aa_mode.is_smaa() {
 					if let Some(smaa) = &mut self.smaa_manager {
-						smaa.ensure_targets(device, alloc, width, height);
+						let needs_history = self.aa_mode.needs_history();
+						smaa.ensure_targets(device, alloc, width, height, needs_history);
 						if let Some(targets) = &smaa.targets {
 							let rt_metrics = [
 								1.0 / width as f32,
@@ -759,8 +765,20 @@ impl RenderingSystem {
 								pass.set_scissor(0, 0, width, height);
 								pass.bind_pipeline(&smaa.blend_pipeline);
 
+								let subsample_indices = match self.aa_mode {
+									AntiAliasingMode::SmaaT2x | AntiAliasingMode::Smaa4x => {
+										if (self.frame_index % 2) == 0 {
+											[1.0, 1.0, 1.0, 0.0]
+										} else {
+											[2.0, 2.0, 2.0, 0.0]
+										}
+									}
+									_ => [0.0, 0.0, 0.0, 0.0],
+								};
+
 								let pc = SmaaBlendPushConstants {
 									rt_metrics,
+									subsample_indices,
 									edges_tex_id: targets.edges_descriptor_id,
 									area_tex_id: smaa.area_descriptor_id,
 									search_tex_id: smaa.search_descriptor_id,
@@ -774,28 +792,104 @@ impl RenderingSystem {
 								pass.draw(3, 1, 0, 0);
 							});
 
-							// 3. Pass 3: SMAA Neighborhood Blending
-							if let Some(swapchain_target) = display.render_target(img_idx) {
-								let target_no_depth = swapchain_target.without_depth();
-								cmd.render_pass(&target_no_depth, clear_color, |pass| {
-									pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-									pass.set_scissor(0, 0, width, height);
-									pass.bind_pipeline(&smaa.neighbor_pipeline);
+							let velocity_tex_id = self
+								.velocity_manager
+								.as_ref()
+								.and_then(|v| v.target.as_ref())
+								.map(|vt| vt.descriptor_id)
+								.unwrap_or(0);
 
-									let pc = SmaaNeighborPushConstants {
-										rt_metrics,
-										color_tex_id: offscreen.descriptor_id,
-										blend_tex_id: targets.blend_descriptor_id,
-										_pad0: 0,
-										_pad1: 0,
-									};
-									pass.push_constant(
-										rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
-										0,
-										&pc,
+							if needs_history {
+								if let (
+									Some(history_images),
+									Some(history_views),
+									Some(history_descs),
+								) = (
+									&targets.history_images,
+									&targets.history_views,
+									&targets.history_descriptor_ids,
+								) {
+									let curr_idx = (self.frame_index % 2) as usize;
+									let prev_idx = 1 - curr_idx;
+
+									// 3. Pass 3: SMAA Neighborhood Blending (Reprojected with Velocity in Alpha)
+									let history_rt = device.create_color_render_target(
+										&history_images[curr_idx],
+										&history_views[curr_idx],
+										smaa.swapchain_color_format,
+										width,
+										height,
 									);
-									pass.draw(3, 1, 0, 0);
-								});
+									let hist_clear = [0.0, 0.0, 0.0, 0.0];
+									cmd.render_pass(&history_rt, hist_clear, |pass| {
+										pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+										pass.set_scissor(0, 0, width, height);
+										pass.bind_pipeline(&smaa.neighbor_reproject_pipeline);
+
+										let pc = SmaaNeighborPushConstants {
+											rt_metrics,
+											color_tex_id: offscreen.descriptor_id,
+											blend_tex_id: targets.blend_descriptor_id,
+											velocity_tex_id,
+											_pad: 0,
+										};
+										pass.push_constant(
+											rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
+											0,
+											&pc,
+										);
+										pass.draw(3, 1, 0, 0);
+									});
+
+									// 4. Pass 4: SMAA Temporal Resolve
+									if let Some(swapchain_target) = display.render_target(img_idx) {
+										let target_no_depth = swapchain_target.without_depth();
+										cmd.render_pass(&target_no_depth, clear_color, |pass| {
+											pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+											pass.set_scissor(0, 0, width, height);
+											pass.bind_pipeline(&smaa.resolve_pipeline);
+
+											let pc = SmaaResolvePushConstants {
+												rt_metrics,
+												current_color_tex_id: history_descs[curr_idx],
+												previous_color_tex_id: history_descs[prev_idx],
+												velocity_tex_id,
+												has_history: if smaa.has_history { 1 } else { 0 },
+											};
+											pass.push_constant(
+												rhi::ShaderStage::Pixel,
+												0,
+												&pc,
+											);
+											pass.draw(3, 1, 0, 0);
+										});
+									}
+									smaa.has_history = true;
+								}
+							} else {
+								// 3. Pass 3: SMAA Neighborhood Blending (Direct to Swapchain)
+								if let Some(swapchain_target) = display.render_target(img_idx) {
+									let target_no_depth = swapchain_target.without_depth();
+									cmd.render_pass(&target_no_depth, clear_color, |pass| {
+										pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+										pass.set_scissor(0, 0, width, height);
+										pass.bind_pipeline(&smaa.neighbor_pipeline);
+
+										let pc = SmaaNeighborPushConstants {
+											rt_metrics,
+											color_tex_id: offscreen.descriptor_id,
+											blend_tex_id: targets.blend_descriptor_id,
+											velocity_tex_id: 0,
+											_pad: 0,
+										};
+										pass.push_constant(
+											rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
+											0,
+											&pc,
+										);
+										pass.draw(3, 1, 0, 0);
+									});
+								}
 							}
 						}
 					}

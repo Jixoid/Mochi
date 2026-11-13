@@ -2,7 +2,7 @@ use mochi::*;
 
 ![C, export]
 pub fun on_start(entity: u64) {
-	mochi_set_aa_mode(2);
+	mochi_set_aa_mode(6);
 }
 
 ![C, export]
@@ -47,10 +47,10 @@ pub fun on_update(entity: u64, dt: f32) {
 		mochi_move_relative(entity, forward, right, up);
 	}
 
-	// 3. AA Mode Toggle (M or F4 key): Off (0) -> MSAA 2x (1) -> MSAA 4x (2) -> MSAA 8x (3) -> FXAA (4) -> SMAA 1x (5) -> Off (0)
+	// 3. AA Mode Toggle (M or F4 key): Off (0) -> MSAA 2x (1) -> MSAA 4x (2) -> MSAA 8x (3) -> FXAA (4) -> SMAA 1x (5) -> SMAA T2x (6) -> SMAA S2x (7) -> SMAA 4x (8) -> Off (0)
 	if mochi_is_key_just_pressed(77) || mochi_is_key_just_pressed(115) {
 		var next_mode = mochi_get_aa_mode() + 1;
-		if next_mode > 5 {
+		if next_mode > 8 {
 			next_mode = 0;
 		}
 		mochi_set_aa_mode(next_mode);

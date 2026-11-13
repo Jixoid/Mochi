@@ -61,7 +61,7 @@ impl AntiAliasingMode {
 
 	pub fn required_msaa(self) -> MsaaSamples {
 		match self {
-			Self::Msaa2x | Self::SmaaS2x | Self::Smaa4x => MsaaSamples::X2,
+			Self::Msaa2x => MsaaSamples::X2,
 			Self::Msaa4x => MsaaSamples::X4,
 			Self::Msaa8x => MsaaSamples::X8,
 			_ => MsaaSamples::Off,
@@ -241,9 +241,12 @@ mod tests {
 		assert!(AntiAliasingMode::Taa.needs_velocity());
 		assert!(AntiAliasingMode::FsrNativeAa.needs_velocity());
 
-		assert_eq!(AntiAliasingMode::SmaaS2x.required_msaa(), MsaaSamples::X2);
-		assert_eq!(AntiAliasingMode::Smaa4x.required_msaa(), MsaaSamples::X2);
+		assert_eq!(AntiAliasingMode::Msaa2x.required_msaa(), MsaaSamples::X2);
 		assert_eq!(AntiAliasingMode::Msaa4x.required_msaa(), MsaaSamples::X4);
+		assert_eq!(AntiAliasingMode::Msaa8x.required_msaa(), MsaaSamples::X8);
+		assert_eq!(AntiAliasingMode::SmaaT2x.required_msaa(), MsaaSamples::Off);
+		assert_eq!(AntiAliasingMode::SmaaS2x.required_msaa(), MsaaSamples::Off);
+		assert_eq!(AntiAliasingMode::Smaa4x.required_msaa(), MsaaSamples::Off);
 		assert_eq!(AntiAliasingMode::Taa.required_msaa(), MsaaSamples::Off);
 	}
 }

@@ -6,6 +6,7 @@ layout(location = 2) out vec4 out_offsets[3];
 
 layout(push_constant) uniform SmaaBlendPushConstants {
 	vec4 rt_metrics;
+	vec4 subsample_indices;
 	uint edges_tex_id;
 	uint area_tex_id;
 	uint search_tex_id;

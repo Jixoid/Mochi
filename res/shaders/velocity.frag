@@ -61,14 +61,12 @@ void main() {
 	SceneFrameData scene = SceneFrameData(pc.scene_addr);
 
 	vec2 ndc_xy = in_uv * 2.0 - 1.0;
-	ndc_xy -= scene.jitter.xy;
-
 	vec4 clip_pos = vec4(ndc_xy, depth, 1.0);
 	vec4 world_pos = scene.inv_view_proj * clip_pos;
 	world_pos /= world_pos.w;
 
 	vec4 prev_clip = scene.prev_view_proj * world_pos;
-	vec2 prev_ndc = (prev_clip.xy / prev_clip.w) - scene.jitter.zw;
+	vec2 prev_ndc = prev_clip.xy / prev_clip.w;
 
 	vec2 velocity = (ndc_xy - prev_ndc) * 0.5;
 

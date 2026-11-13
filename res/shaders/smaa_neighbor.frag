@@ -11,8 +11,8 @@ layout(push_constant) uniform SmaaNeighborPushConstants {
 	vec4 rt_metrics;
 	uint color_tex_id;
 	uint blend_tex_id;
-	uint _pad0;
-	uint _pad1;
+	uint velocity_tex_id;
+	uint _pad;
 } pc;
 
 #define SMAA_GLSL_4 1

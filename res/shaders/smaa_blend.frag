@@ -10,6 +10,7 @@ layout(set = 0, binding = 0) uniform sampler2D u_textures[];
 
 layout(push_constant) uniform SmaaBlendPushConstants {
 	vec4 rt_metrics;
+	vec4 subsample_indices;
 	uint edges_tex_id;
 	uint area_tex_id;
 	uint search_tex_id;
@@ -31,6 +32,6 @@ void main() {
 		u_textures[nonuniformEXT(pc.edges_tex_id)],
 		u_textures[nonuniformEXT(pc.area_tex_id)],
 		u_textures[nonuniformEXT(pc.search_tex_id)],
-		vec4(0.0)
+		pc.subsample_indices
 	);
 }
