@@ -212,6 +212,24 @@ impl<B: RhiBackend> Device<B> {
 		RenderTarget::from_raw(inner)
 	}
 
+	pub fn create_color_render_target<'a>(
+		&self,
+		color_image: &Image2<B>,
+		color_view: &ImageView2<B>,
+		color_format: Format,
+		width: u32,
+		height: u32,
+	) -> RenderTarget<'a, B> {
+		let inner = self.inner.create_color_render_target(
+			color_image.raw(),
+			color_view.raw(),
+			color_format,
+			width,
+			height,
+		);
+		RenderTarget::from_raw(inner)
+	}
+
 	pub fn upload_image_data(
 		&self,
 		alloc: &Allocator<B>,

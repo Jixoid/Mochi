@@ -88,6 +88,28 @@ impl AshRenderTarget {
 			samples: mochi_rhi::MsaaSamples::Off,
 		}
 	}
+
+	pub fn new_color_only(
+		color_image: vk::Image,
+		color_view: vk::ImageView,
+		color_format: Format,
+		width: u32,
+		height: u32,
+	) -> Self {
+		Self {
+			color_image,
+			color_view,
+			resolve_image: vk::Image::null(),
+			resolve_view: vk::ImageView::null(),
+			color_format,
+			depth_image: vk::Image::null(),
+			depth_view: vk::ImageView::null(),
+			depth_format: Format::Undefined,
+			extent: vk::Extent2D { width, height },
+			final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+			samples: mochi_rhi::MsaaSamples::Off,
+		}
+	}
 }
 
 impl RhiRenderTarget for AshRenderTarget {

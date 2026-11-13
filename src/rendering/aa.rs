@@ -22,6 +22,7 @@ pub enum AntiAliasingMode {
 	Msaa4x = 2,
 	Msaa8x = 3,
 	Fxaa = 4,
+	Smaa = 5,
 }
 
 impl AntiAliasingMode {
@@ -31,6 +32,7 @@ impl AntiAliasingMode {
 			2 => Self::Msaa4x,
 			3 => Self::Msaa8x,
 			4 => Self::Fxaa,
+			5 => Self::Smaa,
 			_ => Self::Off,
 		}
 	}
@@ -52,6 +54,14 @@ impl AntiAliasingMode {
 		matches!(self, Self::Fxaa)
 	}
 
+	pub fn is_smaa(self) -> bool {
+		matches!(self, Self::Smaa)
+	}
+
+	pub fn is_post_process(self) -> bool {
+		matches!(self, Self::Fxaa | Self::Smaa)
+	}
+
 	pub fn name(&self) -> &'static str {
 		match self {
 			Self::Off => "Off",
@@ -59,6 +69,7 @@ impl AntiAliasingMode {
 			Self::Msaa4x => "MSAA 4x",
 			Self::Msaa8x => "MSAA 8x",
 			Self::Fxaa => "FXAA",
+			Self::Smaa => "SMAA 1x",
 		}
 	}
 }

@@ -728,6 +728,23 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		)
 	}
 
+	fn create_color_render_target(
+		&self,
+		color_image: &AshImage,
+		color_view: &AshImageView,
+		color_format: Format,
+		width: u32,
+		height: u32,
+	) -> AshRenderTarget {
+		AshRenderTarget::new_color_only(
+			color_image.handle(),
+			color_view.handle(),
+			color_format,
+			width,
+			height,
+		)
+	}
+
 	fn upload_image_data(
 		&self,
 		alloc: &AshAllocator,

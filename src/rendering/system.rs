@@ -17,6 +17,9 @@ use crate::rendering::cluster::ClusterManager;
 use crate::rendering::frame::{MAX_DIRECTIONAL_LIGHTS, SceneFrameBuffer};
 use crate::rendering::queue::RenderQueue;
 use crate::rendering::shadow::{CASCADE_COUNT, SHADOW_MAP_SIZE, ShadowManager, ShadowPushConstants};
+use crate::rendering::smaa::{
+	SmaaBlendPushConstants, SmaaEdgePushConstants, SmaaManager, SmaaNeighborPushConstants,
+};
 use crate::rhi;
 use crate::scene::{CameraComponent, DirectionalLightComponent, Scene, TransformComponent};
 use mochi_except::*;
@@ -77,6 +80,7 @@ pub struct RenderingSystem {
 	fxaa_pipeline: Option<rhi::Pipeline>,
 	fxaa_meta: Option<rhi::PipelineMeta>,
 	fxaa_sampler: Option<rhi::Sampler2>,
+	smaa_manager: Option<SmaaManager>,
 	cluster_manager: Option<ClusterManager>,
 	shadow_manager: Option<ShadowManager>,
 	shadow_queue: RenderQueue,
@@ -107,6 +111,7 @@ impl RenderingSystem {
 			fxaa_pipeline: None,
 			fxaa_meta: None,
 			fxaa_sampler: None,
+			smaa_manager: None,
 			cluster_manager: None,
 			shadow_manager: None,
 			shadow_queue: RenderQueue::new(),
@@ -193,6 +198,9 @@ impl RenderingSystem {
 		self.fxaa_pipeline = Some(fxaa_pipeline);
 		self.fxaa_sampler = Some(fxaa_sampler);
 
+		let smaa_manager = SmaaManager::new(device, alloc, &self.cmdmng, color_format);
+		self.smaa_manager = Some(smaa_manager);
+
 		match ClusterManager::new(device, alloc) {
 			Ok(cm) => {
 				mochi_disp!("Clustered Forward light manager initialized");
@@ -246,7 +254,7 @@ impl RenderingSystem {
 		let msaa_samples = mode.msaa_samples();
 		self.set_msaa(device, display, msaa_samples);
 
-		if mode.is_fxaa() {
+		if mode.is_post_process() {
 			let width = display.width();
 			let height = display.height();
 			if let Some(target) = display.render_target(0) {
@@ -476,8 +484,8 @@ impl RenderingSystem {
 		// Update material storage GPU buffer
 		self.material_storage.update_gpu(device, alloc);
 
-		let is_fxaa = self.aa_mode.is_fxaa();
-		if is_fxaa {
+		let is_post_process = self.aa_mode.is_post_process();
+		if is_post_process {
 			if let Some(target) = display.render_target(0) {
 				self.ensure_offscreen_target(
 					device,
@@ -557,7 +565,7 @@ impl RenderingSystem {
 			cm.cull_lights(cmd, scene_addr);
 		}
 
-		if is_fxaa {
+		if is_post_process {
 			if let Some(offscreen) = &self.offscreen_target {
 				let scene_target = device.create_render_target(
 					&offscreen.color_image,
@@ -581,31 +589,127 @@ impl RenderingSystem {
 					);
 				});
 
-				if let (Some(swapchain_target), Some(fxaa_pipeline)) = (
-					display.render_target(img_idx),
-					&self.fxaa_pipeline,
-				) {
-					let target_no_depth = swapchain_target.without_depth();
-					cmd.render_pass(&target_no_depth, clear_color, |pass| {
-						pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
-						pass.set_scissor(0, 0, width, height);
-						pass.bind_pipeline(fxaa_pipeline);
+				if self.aa_mode.is_fxaa() {
+					if let (Some(swapchain_target), Some(fxaa_pipeline)) = (
+						display.render_target(img_idx),
+						&self.fxaa_pipeline,
+					) {
+						let target_no_depth = swapchain_target.without_depth();
+						cmd.render_pass(&target_no_depth, clear_color, |pass| {
+							pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+							pass.set_scissor(0, 0, width, height);
+							pass.bind_pipeline(fxaa_pipeline);
 
-						let pc = FxaaPushConstants {
-							texture_id: offscreen.descriptor_id,
-							texel_w: 1.0 / width as f32,
-							texel_h: 1.0 / height as f32,
-							_pad: 0.0,
-						};
+							let pc = FxaaPushConstants {
+								texture_id: offscreen.descriptor_id,
+								texel_w: 1.0 / width as f32,
+								texel_h: 1.0 / height as f32,
+								_pad: 0.0,
+							};
 
-						pass.push_constant(
-							rhi::ShaderStage::Pixel,
-							0,
-							&pc,
-						);
+							pass.push_constant(
+								rhi::ShaderStage::Pixel,
+								0,
+								&pc,
+							);
 
-						pass.draw(3, 1, 0, 0);
-					});
+							pass.draw(3, 1, 0, 0);
+						});
+					}
+				} else if self.aa_mode.is_smaa() {
+					if let Some(smaa) = &mut self.smaa_manager {
+						smaa.ensure_targets(device, alloc, width, height);
+						if let Some(targets) = &smaa.targets {
+							let rt_metrics = [
+								1.0 / width as f32,
+								1.0 / height as f32,
+								width as f32,
+								height as f32,
+							];
+
+							// 1. Pass 1: SMAA Edge Detection (Color)
+							let edges_rt = device.create_color_render_target(
+								&targets.edges_image,
+								&targets.edges_view,
+								rhi::Format::V2Norm8U,
+								width,
+								height,
+							);
+							let edge_clear = [0.0, 0.0, 0.0, 0.0];
+							cmd.render_pass(&edges_rt, edge_clear, |pass| {
+								pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+								pass.set_scissor(0, 0, width, height);
+								pass.bind_pipeline(&smaa.edge_pipeline);
+
+								let pc = SmaaEdgePushConstants {
+									rt_metrics,
+									color_tex_id: offscreen.descriptor_id,
+									_pad0: 0,
+									_pad1: 0,
+									_pad2: 0,
+								};
+								pass.push_constant(
+									rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
+									0,
+									&pc,
+								);
+								pass.draw(3, 1, 0, 0);
+							});
+
+							// 2. Pass 2: SMAA Blending Weight Calculation
+							let blend_rt = device.create_color_render_target(
+								&targets.blend_image,
+								&targets.blend_view,
+								rhi::Format::V4Norm8U,
+								width,
+								height,
+							);
+							let blend_clear = [0.0, 0.0, 0.0, 0.0];
+							cmd.render_pass(&blend_rt, blend_clear, |pass| {
+								pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+								pass.set_scissor(0, 0, width, height);
+								pass.bind_pipeline(&smaa.blend_pipeline);
+
+								let pc = SmaaBlendPushConstants {
+									rt_metrics,
+									edges_tex_id: targets.edges_descriptor_id,
+									area_tex_id: smaa.area_descriptor_id,
+									search_tex_id: smaa.search_descriptor_id,
+									_pad: 0,
+								};
+								pass.push_constant(
+									rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
+									0,
+									&pc,
+								);
+								pass.draw(3, 1, 0, 0);
+							});
+
+							// 3. Pass 3: SMAA Neighborhood Blending
+							if let Some(swapchain_target) = display.render_target(img_idx) {
+								let target_no_depth = swapchain_target.without_depth();
+								cmd.render_pass(&target_no_depth, clear_color, |pass| {
+									pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+									pass.set_scissor(0, 0, width, height);
+									pass.bind_pipeline(&smaa.neighbor_pipeline);
+
+									let pc = SmaaNeighborPushConstants {
+										rt_metrics,
+										color_tex_id: offscreen.descriptor_id,
+										blend_tex_id: targets.blend_descriptor_id,
+										_pad0: 0,
+										_pad1: 0,
+									};
+									pass.push_constant(
+										rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel,
+										0,
+										&pc,
+									);
+									pass.draw(3, 1, 0, 0);
+								});
+							}
+						}
+					}
 				}
 			}
 		} else if let Some(target) = display.render_target(img_idx) {

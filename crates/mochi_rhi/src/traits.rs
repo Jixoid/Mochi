@@ -102,6 +102,14 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 		width: u32,
 		height: u32,
 	) -> B::RenderTarget;
+	fn create_color_render_target(
+		&self,
+		color_image: &B::Image,
+		color_view: &B::ImageView,
+		color_format: Format,
+		width: u32,
+		height: u32,
+	) -> B::RenderTarget;
 	fn upload_image_data(
 		&self,
 		alloc: &B::Allocator,
