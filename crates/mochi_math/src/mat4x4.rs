@@ -198,8 +198,8 @@ impl<T: Float> Mat4x4<T> {
 		for k in 0..4 {
 			let mut pivot = k;
 			let mut max_val = a[k][k].abs();
-			for i in (k + 1)..4 {
-				let val = a[i][k].abs();
+			for (i, row) in a.iter().enumerate().skip(k + 1) {
+				let val = row[k].abs();
 				if val > max_val {
 					max_val = val;
 					pivot = i;

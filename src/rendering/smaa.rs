@@ -362,29 +362,30 @@ impl SmaaManager {
 		height: u32,
 		needs_history: bool,
 	) {
-		if let Some(targets) = &mut self.targets {
-			if targets.width == width && targets.height == height {
-				if needs_history && targets.history_images.is_none() {
-					let (imgs, views, descs) = Self::create_history_targets(
-						device,
-						alloc,
-						width,
-						height,
-						self.swapchain_color_format,
-						&self.linear_sampler,
-					);
-					targets.history_images = Some(imgs);
-					targets.history_views = Some(views);
-					targets.history_descriptor_ids = Some(descs);
-					self.has_history = false;
-				} else if !needs_history && targets.history_images.is_some() {
-					targets.history_images = None;
-					targets.history_views = None;
-					targets.history_descriptor_ids = None;
-					self.has_history = false;
-				}
-				return;
+		if let Some(targets) = &mut self.targets
+			&& targets.width == width
+			&& targets.height == height
+		{
+			if needs_history && targets.history_images.is_none() {
+				let (imgs, views, descs) = Self::create_history_targets(
+					device,
+					alloc,
+					width,
+					height,
+					self.swapchain_color_format,
+					&self.linear_sampler,
+				);
+				targets.history_images = Some(imgs);
+				targets.history_views = Some(views);
+				targets.history_descriptor_ids = Some(descs);
+				self.has_history = false;
+			} else if !needs_history && targets.history_images.is_some() {
+				targets.history_images = None;
+				targets.history_views = None;
+				targets.history_descriptor_ids = None;
+				self.has_history = false;
 			}
+			return;
 		}
 
 		// Pass 1 target: Edges (R8G8_UNORM)

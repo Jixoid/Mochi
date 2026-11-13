@@ -95,6 +95,7 @@ impl TextureManager {
 		manager
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn load_raw_rgba8(
 		&mut self,
 		device: &rhi::Device,

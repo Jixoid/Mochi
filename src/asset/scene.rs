@@ -225,13 +225,12 @@ impl SceneAsset {
 			.transparent_template()
 			.ok_or_else(|| "Transparent MaterialTemplate not available in RenderingSystem".to_string())?;
 
-		let mut loaded_models: HashMap<
-			String,
-			Vec<(
-				std::sync::Arc<crate::scene::Mesh>,
-				std::sync::Arc<crate::material::MaterialInstance>,
-			)>,
-		> = HashMap::new();
+		type LoadedMeshInstances = Vec<(
+			std::sync::Arc<crate::scene::Mesh>,
+			std::sync::Arc<crate::material::MaterialInstance>,
+		)>;
+
+		let mut loaded_models: HashMap<String, LoadedMeshInstances> = HashMap::new();
 
 		for entity_desc in &self.entities {
 			let transform = entity_desc

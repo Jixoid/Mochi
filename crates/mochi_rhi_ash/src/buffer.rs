@@ -107,10 +107,10 @@ impl RhiBuffer for AshBuffer {
 
 	fn map(&mut self) -> RhiResult<*mut u8> {
 		let inner = self.inner.lock().unwrap();
-		if let Some(alloc) = &inner.allocation {
-			if let Some(ptr) = alloc.mapped_ptr() {
-				return Ok(ptr.as_ptr() as *mut u8);
-			}
+		if let Some(alloc) = &inner.allocation
+			&& let Some(ptr) = alloc.mapped_ptr()
+		{
+			return Ok(ptr.as_ptr() as *mut u8);
 		}
 		Err(RhiError::BackendError(
 			"Buffer memory is not host visible or cannot be mapped".into(),

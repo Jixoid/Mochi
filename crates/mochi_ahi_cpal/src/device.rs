@@ -110,17 +110,17 @@ impl AhiDevice for CpalAudioDevice {
 
 		let stream_res = match fmt {
 			SampleFormat::F32 => {
-				let cfg = config.clone();
+				let cfg = config;
 				device.build_output_stream(
 					cfg,
 					move |data: &mut [f32], _| {
 						if *is_playing_clone.lock().unwrap() {
 							let frame_count = (data.len() / 2) as u32;
-							if let Ok(mut cb) = callback_clone.lock() {
-								if let Some(f) = cb.as_mut() {
-									f(data, frame_count);
-									return;
-								}
+							if let Ok(mut cb) = callback_clone.lock()
+								&& let Some(f) = cb.as_mut()
+							{
+								f(data, frame_count);
+								return;
 							}
 						}
 						data.fill(0.0);
@@ -130,7 +130,7 @@ impl AhiDevice for CpalAudioDevice {
 				)
 			}
 			SampleFormat::I16 => {
-				let cfg = config.clone();
+				let cfg = config;
 				let mut temp_buf = Vec::new();
 				device.build_output_stream(
 					cfg,
@@ -139,14 +139,14 @@ impl AhiDevice for CpalAudioDevice {
 						temp_buf.resize(len, 0.0f32);
 						if *is_playing_clone.lock().unwrap() {
 							let frame_count = (len / 2) as u32;
-							if let Ok(mut cb) = callback_clone.lock() {
-								if let Some(f) = cb.as_mut() {
-									f(&mut temp_buf, frame_count);
-									for (out, &sample) in data.iter_mut().zip(&temp_buf) {
-										*out = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
-									}
-									return;
+							if let Ok(mut cb) = callback_clone.lock()
+								&& let Some(f) = cb.as_mut()
+							{
+								f(&mut temp_buf, frame_count);
+								for (out, &sample) in data.iter_mut().zip(&temp_buf) {
+									*out = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
 								}
+								return;
 							}
 						}
 						data.fill(0);
@@ -156,7 +156,7 @@ impl AhiDevice for CpalAudioDevice {
 				)
 			}
 			SampleFormat::U16 => {
-				let cfg = config.clone();
+				let cfg = config;
 				let mut temp_buf = Vec::new();
 				device.build_output_stream(
 					cfg,
@@ -165,14 +165,14 @@ impl AhiDevice for CpalAudioDevice {
 						temp_buf.resize(len, 0.0f32);
 						if *is_playing_clone.lock().unwrap() {
 							let frame_count = (len / 2) as u32;
-							if let Ok(mut cb) = callback_clone.lock() {
-								if let Some(f) = cb.as_mut() {
-									f(&mut temp_buf, frame_count);
-									for (out, &sample) in data.iter_mut().zip(&temp_buf) {
-										*out = ((sample.clamp(-1.0, 1.0) * 32767.0) + 32768.0) as u16;
-									}
-									return;
+							if let Ok(mut cb) = callback_clone.lock()
+								&& let Some(f) = cb.as_mut()
+							{
+								f(&mut temp_buf, frame_count);
+								for (out, &sample) in data.iter_mut().zip(&temp_buf) {
+									*out = ((sample.clamp(-1.0, 1.0) * 32767.0) + 32768.0) as u16;
 								}
+								return;
 							}
 						}
 						data.fill(32768);
@@ -200,11 +200,11 @@ impl AhiDevice for CpalAudioDevice {
 	}
 
 	fn start(&mut self) -> bool {
-		if let Some(stream) = &self.stream {
-			if stream.play().is_ok() {
-				*self.is_playing.lock().unwrap() = true;
-				return true;
-			}
+		if let Some(stream) = &self.stream
+			&& stream.play().is_ok()
+		{
+			*self.is_playing.lock().unwrap() = true;
+			return true;
 		}
 		false
 	}
@@ -245,10 +245,10 @@ fn decode_media_source<R: MediaSource + 'static>(
 	hint_path: Option<&str>,
 ) -> AhiResult<AudioData> {
 	let mut hint = Hint::new();
-	if let Some(path) = hint_path {
-		if let Some(ext) = Path::new(path).extension().and_then(|e| e.to_str()) {
-			hint.with_extension(ext);
-		}
+	if let Some(path) = hint_path
+		&& let Some(ext) = Path::new(path).extension().and_then(|e| e.to_str())
+	{
+		hint.with_extension(ext);
 	}
 
 	let mss = MediaSourceStream::new(Box::new(source), Default::default());
@@ -265,7 +265,7 @@ fn decode_media_source<R: MediaSource + 'static>(
 			format
 				.tracks()
 				.iter()
-				.find(|t| t.codec_params.as_ref().map_or(false, |p| p.is_audio()))
+				.find(|t| t.codec_params.as_ref().is_some_and(|p| p.is_audio()))
 		})
 		.ok_or_else(|| AhiError::DecodeError("No supported audio tracks found".to_string()))?;
 

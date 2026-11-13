@@ -140,7 +140,7 @@ fn align_size(size: u64, alignment: u64) -> u64 {
 	if alignment == 0 {
 		size
 	} else {
-		((size + alignment - 1) / alignment) * alignment
+		size.div_ceil(alignment) * alignment
 	}
 }
 
@@ -244,6 +244,7 @@ impl<B: RhiBackend> Pipeline<B> {
 		GraphicsPipelineBuilder::new(device, meta)
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn new_graphics(
 		device: &Device<B>,
 		meta: &PipelineMeta<B>,

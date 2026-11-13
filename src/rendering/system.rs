@@ -333,6 +333,7 @@ impl RenderingSystem {
 		mochi_disp!("Anti-Aliasing mode set to: {}", mode.name());
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn ensure_offscreen_target(
 		&mut self,
 		device: &rhi::Device,
@@ -345,39 +346,38 @@ impl RenderingSystem {
 	) {
 		let needs_msaa = msaa_samples.count() > 1;
 
-		if let Some(target) = &mut self.offscreen_target {
-			if target.width == width
-				&& target.height == height
-				&& target.color_format == color_format
-				&& target.depth_format == depth_format
-			{
-				if target.msaa_samples == msaa_samples {
-					return;
-				}
-
-				target.msaa_samples = msaa_samples;
-				if needs_msaa {
-					let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
-						Self::create_msaa_attachments(
-							device,
-							alloc,
-							width,
-							height,
-							color_format,
-							depth_format,
-							msaa_samples,
-						);
-					target.msaa_attachments = Some(MsaaOffscreenAttachments {
-						color_image: msaa_col_img,
-						color_view: msaa_col_view,
-						depth_image: msaa_depth_img,
-						depth_view: msaa_depth_view,
-					});
-				} else {
-					target.msaa_attachments = None;
-				}
+		if let Some(target) = &mut self.offscreen_target
+			&& target.width == width
+			&& target.height == height
+			&& target.color_format == color_format
+			&& target.depth_format == depth_format
+		{
+			if target.msaa_samples == msaa_samples {
 				return;
 			}
+
+			target.msaa_samples = msaa_samples;
+			if needs_msaa {
+				let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
+					Self::create_msaa_attachments(
+						device,
+						alloc,
+						width,
+						height,
+						color_format,
+						depth_format,
+						msaa_samples,
+					);
+				target.msaa_attachments = Some(MsaaOffscreenAttachments {
+					color_image: msaa_col_img,
+					color_view: msaa_col_view,
+					depth_image: msaa_depth_img,
+					depth_view: msaa_depth_view,
+				});
+			} else {
+				target.msaa_attachments = None;
+			}
+			return;
 		}
 
 		let color_image = rhi::Image2::builder(width, height, color_format)
@@ -525,6 +525,7 @@ impl RenderingSystem {
 		&mut self.material_storage
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn render(
 		&mut self,
 		sync: &mut rhi::Synchronizer,
@@ -553,8 +554,9 @@ impl RenderingSystem {
 			.active_camera()
 			.map(|(_e, t, c)| (t, c))
 			.unwrap_or_else(|| {
-				let mut default_t = TransformComponent::default();
-				default_t.translation = mochi_math::Vec3::new(0.0, 1.0, 3.0);
+				let default_t = TransformComponent(mochi_math::Transform::from_translation(
+					mochi_math::Vec3::new(0.0, 1.0, 3.0),
+				));
 				(default_t, CameraComponent::default())
 			});
 
@@ -566,15 +568,13 @@ impl RenderingSystem {
 		let cascade_split_depths = [2.5, 8.0, 24.0, 80.0];
 
 		if let Some(sm) = &mut self.shadow_manager {
-			let mut light_idx = 0;
-			for (_e, (t, light)) in scene
+			for (light_idx, (_e, (t, light))) in scene
 				.world()
 				.query::<(&TransformComponent, &DirectionalLightComponent)>()
 				.iter()
+				.take(MAX_DIRECTIONAL_LIGHTS)
+				.enumerate()
 			{
-				if light_idx >= MAX_DIRECTIONAL_LIGHTS {
-					break;
-				}
 				if light.cast_shadows {
 					let dir = t.rotation * light.direction;
 					sm.ensure_cascade_set(device, alloc, light_idx).ok();
@@ -582,7 +582,6 @@ impl RenderingSystem {
 					cascade_view_proj[light_idx] = sm.cascade_view_proj(light_idx);
 					cascade_shadow_ids[light_idx] = sm.cascade_shadow_ids(light_idx);
 				}
-				light_idx += 1;
 			}
 		}
 
@@ -644,19 +643,17 @@ impl RenderingSystem {
 		self.material_storage.update_gpu(device, alloc);
 
 		let is_post_process = self.aa_mode.is_post_process();
-		if is_post_process {
-			if let Some(target) = display.render_target(0) {
-				let msaa_samples = self.aa_mode.required_msaa();
-				self.ensure_offscreen_target(
-					device,
-					alloc,
-					width,
-					height,
-					target.color_format(),
-					target.depth_format(),
-					msaa_samples,
-				);
-			}
+		if is_post_process && let Some(target) = display.render_target(0) {
+			let msaa_samples = self.aa_mode.required_msaa();
+			self.ensure_offscreen_target(
+				device,
+				alloc,
+				width,
+				height,
+				target.color_format(),
+				target.depth_format(),
+				msaa_samples,
+			);
 		}
 
 		let scene_addr = self.frame_buffer.address();
@@ -669,8 +666,7 @@ impl RenderingSystem {
 		if let Some(sm) = &self.shadow_manager {
 			for light_idx in 0..MAX_DIRECTIONAL_LIGHTS {
 				if let Some(set) = &sm.cascade_sets[light_idx] {
-					for c in 0..CASCADE_COUNT {
-						let cascade = &set.cascades[c];
+					for cascade in set.cascades.iter().take(CASCADE_COUNT) {
 						let cascade_target = rhi::RenderTarget::builder(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
 							.depth(&cascade.image, &cascade.view, rhi::Format::Depth32f)
 							.build(device);
@@ -799,157 +795,157 @@ impl RenderingSystem {
 							pass.draw(3, 1, 0, 0);
 						});
 					}
-				} else if self.aa_mode.is_smaa() {
-					if let Some(smaa) = &mut self.smaa_manager {
-						let needs_history = self.aa_mode.needs_history();
-						smaa.ensure_targets(device, alloc, width, height, needs_history);
-						if let Some(targets) = &smaa.targets {
-							let rt_metrics = [
-								1.0 / width as f32,
-								1.0 / height as f32,
-								width as f32,
-								height as f32,
-							];
+				} else if self.aa_mode.is_smaa()
+					&& let Some(smaa) = &mut self.smaa_manager
+				{
+					let needs_history = self.aa_mode.needs_history();
+					smaa.ensure_targets(device, alloc, width, height, needs_history);
+					if let Some(targets) = &smaa.targets {
+						let rt_metrics = [
+							1.0 / width as f32,
+							1.0 / height as f32,
+							width as f32,
+							height as f32,
+						];
 
-							// 1. Pass 1: SMAA Edge Detection (Color)
-							let edges_rt = rhi::RenderTarget::builder(width, height)
-								.color(
-									&targets.edges_image,
-									&targets.edges_view,
-									rhi::Format::V2Norm8U,
-								)
-								.build(device);
-							let edge_clear = [0.0, 0.0, 0.0, 0.0];
-							cmd.render_pass(&edges_rt, edge_clear, |pass| {
-								pass.set_viewport_and_scissor(width, height);
-								pass.bind_pipeline(&smaa.edge_pipeline);
+						// 1. Pass 1: SMAA Edge Detection (Color)
+						let edges_rt = rhi::RenderTarget::builder(width, height)
+							.color(
+								&targets.edges_image,
+								&targets.edges_view,
+								rhi::Format::V2Norm8U,
+							)
+							.build(device);
+						let edge_clear = [0.0, 0.0, 0.0, 0.0];
+						cmd.render_pass(&edges_rt, edge_clear, |pass| {
+							pass.set_viewport_and_scissor(width, height);
+							pass.bind_pipeline(&smaa.edge_pipeline);
 
-								let pc = SmaaEdgePushConstants {
-									rt_metrics,
-									color_tex_id: offscreen.descriptor_id,
-									_pad0: 0,
-									_pad1: 0,
-									_pad2: 0,
-								};
-								pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
-								pass.draw(3, 1, 0, 0);
-							});
+							let pc = SmaaEdgePushConstants {
+								rt_metrics,
+								color_tex_id: offscreen.descriptor_id,
+								_pad0: 0,
+								_pad1: 0,
+								_pad2: 0,
+							};
+							pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
+							pass.draw(3, 1, 0, 0);
+						});
 
-							// 2. Pass 2: SMAA Blending Weight Calculation
-							let blend_rt = rhi::RenderTarget::builder(width, height)
-								.color(
-									&targets.blend_image,
-									&targets.blend_view,
-									rhi::Format::V4Norm8U,
-								)
-								.build(device);
-							let blend_clear = [0.0, 0.0, 0.0, 0.0];
-							cmd.render_pass(&blend_rt, blend_clear, |pass| {
-								pass.set_viewport_and_scissor(width, height);
-								pass.bind_pipeline(&smaa.blend_pipeline);
+						// 2. Pass 2: SMAA Blending Weight Calculation
+						let blend_rt = rhi::RenderTarget::builder(width, height)
+							.color(
+								&targets.blend_image,
+								&targets.blend_view,
+								rhi::Format::V4Norm8U,
+							)
+							.build(device);
+						let blend_clear = [0.0, 0.0, 0.0, 0.0];
+						cmd.render_pass(&blend_rt, blend_clear, |pass| {
+							pass.set_viewport_and_scissor(width, height);
+							pass.bind_pipeline(&smaa.blend_pipeline);
 
-								let subsample_indices = match self.aa_mode {
-									AntiAliasingMode::SmaaT2x | AntiAliasingMode::Smaa4x => {
-										if (self.frame_index % 2) == 0 {
-											[1.0, 1.0, 1.0, 0.0]
-										} else {
-											[2.0, 2.0, 2.0, 0.0]
-										}
+							let subsample_indices = match self.aa_mode {
+								AntiAliasingMode::SmaaT2x | AntiAliasingMode::Smaa4x => {
+									if (self.frame_index % 2) == 0 {
+										[1.0, 1.0, 1.0, 0.0]
+									} else {
+										[2.0, 2.0, 2.0, 0.0]
 									}
-									_ => [0.0, 0.0, 0.0, 0.0],
-								};
-
-								let pc = SmaaBlendPushConstants {
-									rt_metrics,
-									subsample_indices,
-									edges_tex_id: targets.edges_descriptor_id,
-									area_tex_id: smaa.area_descriptor_id,
-									search_tex_id: smaa.search_descriptor_id,
-									_pad: 0,
-								};
-								pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
-								pass.draw(3, 1, 0, 0);
-							});
-
-							let velocity_tex_id = self
-								.velocity_manager
-								.as_ref()
-								.and_then(|v| v.target.as_ref())
-								.map(|vt| vt.descriptor_id)
-								.unwrap_or(0);
-
-							if needs_history {
-								if let (Some(history_images), Some(history_views), Some(history_descs)) = (
-									&targets.history_images,
-									&targets.history_views,
-									&targets.history_descriptor_ids,
-								) {
-									let curr_idx = (self.frame_index % 2) as usize;
-									let prev_idx = 1 - curr_idx;
-
-									// 3. Pass 3: SMAA Neighborhood Blending (Reprojected with Velocity in Alpha)
-									let history_rt = rhi::RenderTarget::builder(width, height)
-										.color(
-											&history_images[curr_idx],
-											&history_views[curr_idx],
-											smaa.swapchain_color_format,
-										)
-										.build(device);
-									let hist_clear = [0.0, 0.0, 0.0, 0.0];
-									cmd.render_pass(&history_rt, hist_clear, |pass| {
-										pass.set_viewport_and_scissor(width, height);
-										pass.bind_pipeline(&smaa.neighbor_reproject_pipeline);
-
-										let pc = SmaaNeighborPushConstants {
-											rt_metrics,
-											color_tex_id: offscreen.descriptor_id,
-											blend_tex_id: targets.blend_descriptor_id,
-											velocity_tex_id,
-											_pad: 0,
-										};
-										pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
-										pass.draw(3, 1, 0, 0);
-									});
-
-									// 4. Pass 4: SMAA Temporal Resolve
-									if let Some(swapchain_target) = display.render_target(img_idx) {
-										let target_no_depth = swapchain_target.without_depth();
-										cmd.render_pass(&target_no_depth, clear_color, |pass| {
-											pass.set_viewport_and_scissor(width, height);
-											pass.bind_pipeline(&smaa.resolve_pipeline);
-
-											let pc = SmaaResolvePushConstants {
-												rt_metrics,
-												current_color_tex_id: history_descs[curr_idx],
-												previous_color_tex_id: history_descs[prev_idx],
-												velocity_tex_id,
-												has_history: if smaa.has_history { 1 } else { 0 },
-											};
-											pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
-											pass.draw(3, 1, 0, 0);
-										});
-									}
-									smaa.has_history = true;
 								}
-							} else {
-								// 3. Pass 3: SMAA Neighborhood Blending (Direct to Swapchain)
+								_ => [0.0, 0.0, 0.0, 0.0],
+							};
+
+							let pc = SmaaBlendPushConstants {
+								rt_metrics,
+								subsample_indices,
+								edges_tex_id: targets.edges_descriptor_id,
+								area_tex_id: smaa.area_descriptor_id,
+								search_tex_id: smaa.search_descriptor_id,
+								_pad: 0,
+							};
+							pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
+							pass.draw(3, 1, 0, 0);
+						});
+
+						let velocity_tex_id = self
+							.velocity_manager
+							.as_ref()
+							.and_then(|v| v.target.as_ref())
+							.map(|vt| vt.descriptor_id)
+							.unwrap_or(0);
+
+						if needs_history {
+							if let (Some(history_images), Some(history_views), Some(history_descs)) = (
+								&targets.history_images,
+								&targets.history_views,
+								&targets.history_descriptor_ids,
+							) {
+								let curr_idx = (self.frame_index % 2) as usize;
+								let prev_idx = 1 - curr_idx;
+
+								// 3. Pass 3: SMAA Neighborhood Blending (Reprojected with Velocity in Alpha)
+								let history_rt = rhi::RenderTarget::builder(width, height)
+									.color(
+										&history_images[curr_idx],
+										&history_views[curr_idx],
+										smaa.swapchain_color_format,
+									)
+									.build(device);
+								let hist_clear = [0.0, 0.0, 0.0, 0.0];
+								cmd.render_pass(&history_rt, hist_clear, |pass| {
+									pass.set_viewport_and_scissor(width, height);
+									pass.bind_pipeline(&smaa.neighbor_reproject_pipeline);
+
+									let pc = SmaaNeighborPushConstants {
+										rt_metrics,
+										color_tex_id: offscreen.descriptor_id,
+										blend_tex_id: targets.blend_descriptor_id,
+										velocity_tex_id,
+										_pad: 0,
+									};
+									pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
+									pass.draw(3, 1, 0, 0);
+								});
+
+								// 4. Pass 4: SMAA Temporal Resolve
 								if let Some(swapchain_target) = display.render_target(img_idx) {
 									let target_no_depth = swapchain_target.without_depth();
 									cmd.render_pass(&target_no_depth, clear_color, |pass| {
 										pass.set_viewport_and_scissor(width, height);
-										pass.bind_pipeline(&smaa.neighbor_pipeline);
+										pass.bind_pipeline(&smaa.resolve_pipeline);
 
-										let pc = SmaaNeighborPushConstants {
+										let pc = SmaaResolvePushConstants {
 											rt_metrics,
-											color_tex_id: offscreen.descriptor_id,
-											blend_tex_id: targets.blend_descriptor_id,
-											velocity_tex_id: 0,
-											_pad: 0,
+											current_color_tex_id: history_descs[curr_idx],
+											previous_color_tex_id: history_descs[prev_idx],
+											velocity_tex_id,
+											has_history: if smaa.has_history { 1 } else { 0 },
 										};
-										pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
+										pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
 										pass.draw(3, 1, 0, 0);
 									});
 								}
+								smaa.has_history = true;
+							}
+						} else {
+							// 3. Pass 3: SMAA Neighborhood Blending (Direct to Swapchain)
+							if let Some(swapchain_target) = display.render_target(img_idx) {
+								let target_no_depth = swapchain_target.without_depth();
+								cmd.render_pass(&target_no_depth, clear_color, |pass| {
+									pass.set_viewport_and_scissor(width, height);
+									pass.bind_pipeline(&smaa.neighbor_pipeline);
+
+									let pc = SmaaNeighborPushConstants {
+										rt_metrics,
+										color_tex_id: offscreen.descriptor_id,
+										blend_tex_id: targets.blend_descriptor_id,
+										velocity_tex_id: 0,
+										_pad: 0,
+									};
+									pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);
+									pass.draw(3, 1, 0, 0);
+								});
 							}
 						}
 					}
@@ -994,11 +990,11 @@ impl RenderingSystem {
 			let template = packet.material.template();
 			let template_id = template.id();
 
-			if currently_bound_pipeline_id != Some(template_id) {
-				if let Some(pipeline) = template.pipeline(PassKind::ForwardLit) {
-					pass.bind_pipeline(&pipeline);
-					currently_bound_pipeline_id = Some(template_id);
-				}
+			if currently_bound_pipeline_id != Some(template_id)
+				&& let Some(pipeline) = template.pipeline(PassKind::ForwardLit)
+			{
+				pass.bind_pipeline(&pipeline);
+				currently_bound_pipeline_id = Some(template_id);
 			}
 
 			let pc = ObjectPushConstants {

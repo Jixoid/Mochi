@@ -110,7 +110,7 @@ impl Drop for DeviceInner {
 			if let Some(device) = self.device.take() {
 				device.destroy_device(None);
 			}
-			drop(self.surface_loader.take());
+			self.surface_loader = None;
 			if let Some(instance) = self.instance.take() {
 				instance.destroy_instance(None);
 			}
@@ -458,7 +458,7 @@ impl AshDevice {
 				"SPIR-V code length must be a multiple of 4 bytes".into(),
 			));
 		}
-		let words: Vec<u32> = if code.as_ptr() as usize % std::mem::align_of::<u32>() == 0 {
+		let words: Vec<u32> = if (code.as_ptr() as usize).is_multiple_of(std::mem::align_of::<u32>()) {
 			unsafe { std::slice::from_raw_parts(code.as_ptr() as *const u32, code.len() / 4).to_vec() }
 		} else {
 			let mut words = vec![0u32; code.len() / 4];
@@ -491,6 +491,7 @@ impl AshDevice {
 		)
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn create_graphics_pipeline(
 		&self,
 		meta: &AshPipelineMeta,
@@ -621,11 +622,11 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 
 	fn destroy_surface(&self, surface_handle: u64) {
 		let surface = vk::SurfaceKHR::from_raw(surface_handle);
-		if surface != vk::SurfaceKHR::null() {
-			if let Some(loader) = &self.inner.surface_loader {
-				unsafe {
-					loader.destroy_surface(surface, None);
-				}
+		if surface != vk::SurfaceKHR::null()
+			&& let Some(loader) = &self.inner.surface_loader
+		{
+			unsafe {
+				loader.destroy_surface(surface, None);
 			}
 		}
 	}

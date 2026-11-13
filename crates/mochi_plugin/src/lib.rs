@@ -77,7 +77,7 @@ impl PluginSystem {
 			let manifest = unsafe { getter() };
 
 			let manifest = if !manifest.is_null() && manifest.is_aligned() {
-				unsafe { *manifest }.clone()
+				unsafe { *manifest }
 			} else {
 				return Err(Error::PluginCrashed);
 			};
@@ -101,9 +101,9 @@ impl PluginSystem {
 
 
 			// Plugins
-			plugins
-				.insert(*idx, (manifest, lib.to_owned()))
-				.map(|_| panic!());
+			if plugins.insert(*idx, (manifest, lib.to_owned())).is_some() {
+				panic!()
+			}
 
 			Ok(())
 		};
@@ -141,7 +141,7 @@ impl PluginSystem {
 					let fkey = self
 						.libraries
 						.iter()
-						.find_map(|(key, it)| Rc::ptr_eq(&lib, &it).then(|| key))
+						.find_map(|(key, it)| Rc::ptr_eq(&lib, it).then_some(key))
 						.cloned();
 
 					if let Some(fkey) = fkey {
@@ -152,5 +152,11 @@ impl PluginSystem {
 				Ok(())
 			}
 		}
+	}
+}
+
+impl Default for PluginSystem {
+	fn default() -> Self {
+		Self::new()
 	}
 }

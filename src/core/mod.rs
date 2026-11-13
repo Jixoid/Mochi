@@ -272,13 +272,12 @@ impl ApplicationHandler for EngineApp {
 						crate::script::api::set_current_aa_mode(req_aa);
 						crate::script::api::set_current_msaa(req_aa.msaa_samples());
 					}
-				} else if let Some(req_msaa) = crate::script::api::take_requested_msaa() {
-					if let (Some(display), Some(rendering), Some(device)) =
+				} else if let Some(req_msaa) = crate::script::api::take_requested_msaa()
+					&& let (Some(display), Some(rendering), Some(device)) =
 						(&mut self.display, &mut self.rendering_system, &self.device)
-					{
-						rendering.set_msaa(device, display, req_msaa);
-						crate::script::api::set_current_msaa(req_msaa);
-					}
+				{
+					rendering.set_msaa(device, display, req_msaa);
+					crate::script::api::set_current_msaa(req_msaa);
 				}
 
 				self.fps_counter += 1;
@@ -320,14 +319,13 @@ impl ApplicationHandler for EngineApp {
 
 					self.frame_count += 1;
 
-					if let Ok(limit_str) = std::env::var("MOCHI_TEST_EXIT_FRAMES") {
-						if let Ok(limit) = limit_str.parse::<u64>() {
-							if self.frame_count >= limit {
-								mochi_log!("Reached test frame limit ({limit}), exiting");
-								event_loop.exit();
-								return;
-							}
-						}
+					if let Ok(limit_str) = std::env::var("MOCHI_TEST_EXIT_FRAMES")
+						&& let Ok(limit) = limit_str.parse::<u64>()
+						&& self.frame_count >= limit
+					{
+						mochi_log!("Reached test frame limit ({limit}), exiting");
+						event_loop.exit();
+						return;
 					}
 
 					display.request_redraw();

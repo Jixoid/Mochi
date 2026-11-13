@@ -81,10 +81,11 @@ impl VelocityManager {
 		width: u32,
 		height: u32,
 	) {
-		if let Some(target) = &self.target {
-			if target.width == width && target.height == height {
-				return;
-			}
+		if let Some(target) = &self.target
+			&& target.width == width
+			&& target.height == height
+		{
+			return;
 		}
 
 		let image = rhi::Image2::builder(width, height, rhi::Format::V2Float16)

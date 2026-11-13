@@ -59,7 +59,7 @@ impl<B: RhiBackend> Buffer<B> {
 		usage: BufferUsage,
 		data: &[T],
 	) -> Result<Self, crate::error::RhiError> {
-		let byte_size = (std::mem::size_of::<T>() * data.len()) as u64;
+		let byte_size = std::mem::size_of_val(data) as u64;
 		let mut buf = allocator.alloc_buffer(
 			byte_size,
 			usage,

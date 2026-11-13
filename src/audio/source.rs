@@ -158,14 +158,14 @@ impl AudioSource {
 				for i in 0..chunk_size {
 					let sample = clip.pcm_data[self.cursor + i];
 					let out_idx = (frames_mixed + i) * 2;
-					mix_buffer[out_idx + 0] += sample * vol_l;
+					mix_buffer[out_idx] += sample * vol_l;
 					mix_buffer[out_idx + 1] += sample * vol_r;
 				}
 			} else if channels == 2 {
 				for i in 0..chunk_size {
 					let src_idx = (self.cursor + i) * 2;
 					let out_idx = (frames_mixed + i) * 2;
-					mix_buffer[out_idx + 0] += clip.pcm_data[src_idx + 0] * vol_l;
+					mix_buffer[out_idx] += clip.pcm_data[src_idx] * vol_l;
 					mix_buffer[out_idx + 1] += clip.pcm_data[src_idx + 1] * vol_r;
 				}
 			}

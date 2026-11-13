@@ -219,6 +219,7 @@ unsafe impl Send for AshSwapchain {}
 unsafe impl Sync for AshSwapchain {}
 
 impl AshSwapchain {
+	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		instance: &ash::Instance,
 		device: &ash::Device,

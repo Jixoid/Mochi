@@ -168,6 +168,7 @@ impl SceneFrameBuffer {
 		}
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn update(
 		&mut self,
 		device: &rhi::Device,

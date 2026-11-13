@@ -153,6 +153,7 @@ impl AshPipeline {
 		}
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn create_graphics(
 		device: &ash::Device,
 		meta: &AshPipelineMeta,

@@ -224,8 +224,8 @@ mod tests {
 	fn test_subpixel_jitter_bounds() {
 		for frame in 0..64 {
 			let (jx, jy) = get_subpixel_jitter(AntiAliasingMode::Taa, frame);
-			assert!(jx >= -0.5 && jx <= 0.5);
-			assert!(jy >= -0.5 && jy <= 0.5);
+			assert!((-0.5..=0.5).contains(&jx));
+			assert!((-0.5..=0.5).contains(&jy));
 		}
 	}
 

@@ -33,6 +33,7 @@ pub struct MaterialTemplate {
 }
 
 impl MaterialTemplate {
+	#[allow(clippy::too_many_arguments)]
 	pub fn new_forward(
 		device: &rhi::Device,
 		vert_spv: &[u8],

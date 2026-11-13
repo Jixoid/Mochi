@@ -71,6 +71,7 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 		push_stages: ShaderStage,
 		push_size: u32,
 	) -> RhiResult<B::PipelineMeta>;
+	#[allow(clippy::too_many_arguments)]
 	fn create_graphics_pipeline(
 		&self,
 		meta: &B::PipelineMeta,
@@ -127,6 +128,7 @@ pub trait RhiAllocator<B: RhiBackend>: Send + Sync {
 		location: AllocationLocation,
 	) -> RhiResult<B::Buffer>;
 
+	#[allow(clippy::too_many_arguments)]
 	fn alloc_image2(
 		&self,
 		width: u32,

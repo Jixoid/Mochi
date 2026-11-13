@@ -71,7 +71,7 @@ impl MaterialStorage {
 		let needs_realloc = self
 			.gpu_buffer
 			.as_ref()
-			.map_or(true, |b| b.size() < required_size);
+			.is_none_or(|b| b.size() < required_size);
 
 		if needs_realloc {
 			let new_buffer = rhi::Buffer::new(
@@ -102,5 +102,11 @@ impl MaterialStorage {
 
 	pub fn buffer_address(&self) -> u64 {
 		self.gpu_buffer.as_ref().map_or(0, |b| b.address())
+	}
+}
+
+impl Default for MaterialStorage {
+	fn default() -> Self {
+		Self::new()
 	}
 }

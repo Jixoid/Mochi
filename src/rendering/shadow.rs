@@ -192,21 +192,21 @@ impl ShadowManager {
 			for i in 0..8 {
 				let world_pt = cam_pos + cam_rot * local_corners[i];
 				world_corners[i] = world_pt;
-				center = center + world_pt;
+				center += world_pt;
 			}
-			center = center * (1.0 / 8.0);
+			center *= 1.0 / 8.0;
 
 			// Compute bounding sphere radius
 			let mut radius: f32 = 0.0;
-			for i in 0..8 {
-				let d = world_corners[i].dist(&center);
+			for pt in &world_corners {
+				let d = pt.dist(&center);
 				if d > radius {
 					radius = d;
 				}
 			}
 
 			// Add small padding to radius to avoid frustum boundary artifacts
-			radius = radius * 1.02;
+			radius *= 1.02;
 
 			const FAR_OFFSET: f32 = 100.0;
 			let eye = center - dir * (radius + FAR_OFFSET);
@@ -236,15 +236,15 @@ impl ShadowManager {
 	}
 
 	pub fn cascade_view_proj(&self, light_idx: usize) -> [[f32; 16]; CASCADE_COUNT] {
-		if light_idx < MAX_DIRECTIONAL_LIGHTS {
-			if let Some(set) = &self.cascade_sets[light_idx] {
-				return [
-					set.cascades[0].view_proj,
-					set.cascades[1].view_proj,
-					set.cascades[2].view_proj,
-					set.cascades[3].view_proj,
-				];
-			}
+		if light_idx < MAX_DIRECTIONAL_LIGHTS
+			&& let Some(set) = &self.cascade_sets[light_idx]
+		{
+			return [
+				set.cascades[0].view_proj,
+				set.cascades[1].view_proj,
+				set.cascades[2].view_proj,
+				set.cascades[3].view_proj,
+			];
 		}
 		[Mat4x4::IDENTITY.to_array(); CASCADE_COUNT]
 	}
@@ -254,15 +254,15 @@ impl ShadowManager {
 	}
 
 	pub fn cascade_shadow_ids(&self, light_idx: usize) -> [u32; CASCADE_COUNT] {
-		if light_idx < MAX_DIRECTIONAL_LIGHTS {
-			if let Some(set) = &self.cascade_sets[light_idx] {
-				return [
-					set.cascades[0].descriptor_id,
-					set.cascades[1].descriptor_id,
-					set.cascades[2].descriptor_id,
-					set.cascades[3].descriptor_id,
-				];
-			}
+		if light_idx < MAX_DIRECTIONAL_LIGHTS
+			&& let Some(set) = &self.cascade_sets[light_idx]
+		{
+			return [
+				set.cascades[0].descriptor_id,
+				set.cascades[1].descriptor_id,
+				set.cascades[2].descriptor_id,
+				set.cascades[3].descriptor_id,
+			];
 		}
 		[0; CASCADE_COUNT]
 	}
