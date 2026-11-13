@@ -63,7 +63,7 @@ impl PluginSystem {
     // Worker
     let worker = |lib: &Rc<Library>, idx: &mut u32, plugins: &mut HashMap<u32, (MochiPlugin, Rc<Library>)>| -> Result<(), Error> {
       // Getter
-      let getter = unsafe { lib.get(MOCHI_PLUGIN_GET) }
+      let getter = unsafe { lib.get(MOCHI_PLUGIN_GET.as_bytes()) }
         .map_err(|_| Error::CorruptPlugin)?
         as Symbol<MochiPluginGet>;
       

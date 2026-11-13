@@ -144,7 +144,7 @@ impl ModelAsset {
 
 		if path.ends_with(".masset") {
 			let bytes = fs::read(path).map_err(|e| format!("Failed to read binary asset {path}: {e}"))?;
-			bincode::deserialize::<Self>(&bytes).map_err(|e| format!("Failed to deserialize binary asset {path}: {e}"))
+			postcard::from_bytes::<Self>(&bytes).map_err(|e| format!("Failed to deserialize binary asset {path}: {e}"))
 		} else {
 			let content = fs::read_to_string(path).map_err(|e| format!("Failed to read RON asset {path}: {e}"))?;
 			let desc = ron::from_str::<Self>(&content).map_err(|e| format!("Failed to deserialize RON asset {path}: {e}"))?;
@@ -330,7 +330,7 @@ impl ModelAsset {
 	}
 
 	pub fn save_binary(&self, path: &str) -> Result<(), String> {
-		let bytes = bincode::serialize(self)
+		let bytes = postcard::to_stdvec(self)
 			.map_err(|e| format!("Failed to serialize model to binary: {e}"))?;
 		fs::write(path, bytes).map_err(|e| format!("Failed to write binary file {path}: {e}"))
 	}

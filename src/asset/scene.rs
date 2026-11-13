@@ -157,7 +157,7 @@ impl SceneAsset {
 	pub fn load(path: &str) -> Result<Self, String> {
 		if path.ends_with(".mscene") {
 			let bytes = fs::read(path).map_err(|e| format!("Failed to read binary scene {path}: {e}"))?;
-			bincode::deserialize::<Self>(&bytes).map_err(|e| format!("Failed to deserialize binary scene {path}: {e}"))
+			postcard::from_bytes::<Self>(&bytes).map_err(|e| format!("Failed to deserialize binary scene {path}: {e}"))
 		} else {
 			let content = fs::read_to_string(path).map_err(|e| format!("Failed to read RON scene {path}: {e}"))?;
 			ron::from_str::<Self>(&content).map_err(|e| format!("Failed to deserialize RON scene {path}: {e}"))
@@ -171,7 +171,7 @@ impl SceneAsset {
 	}
 
 	pub fn save_binary(&self, path: &str) -> Result<(), String> {
-		let bytes = bincode::serialize(self)
+		let bytes = postcard::to_stdvec(self)
 			.map_err(|e| format!("Failed to serialize scene to binary: {e}"))?;
 		fs::write(path, bytes).map_err(|e| format!("Failed to write binary scene {path}: {e}"))
 	}
