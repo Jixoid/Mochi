@@ -94,6 +94,23 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 		width: u32,
 		height: u32,
 	) -> B::RenderTarget;
+
+	fn create_multisample_render_target(
+		&self,
+		color_image: &B::Image,
+		color_view: &B::ImageView,
+		resolve_image: &B::Image,
+		resolve_view: &B::ImageView,
+		color_format: Format,
+		depth_image: &B::Image,
+		depth_view: &B::ImageView,
+		resolve_depth_image: &B::Image,
+		resolve_depth_view: &B::ImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+		samples: MsaaSamples,
+	) -> B::RenderTarget;
 	fn create_depth_render_target(
 		&self,
 		depth_image: &B::Image,
@@ -141,6 +158,20 @@ pub trait RhiAllocator<B: RhiBackend>: Send + Sync {
 		create: AllocationCreate,
 		location: AllocationLocation,
 	) -> RhiResult<B::Image>;
+
+	fn alloc_multisample_image(
+		&self,
+		ext: Extent<2, u32>,
+		format: Format,
+		usage: ImageUsage,
+		tiling: ImageTiling,
+		create: AllocationCreate,
+		location: AllocationLocation,
+		samples: MsaaSamples,
+	) -> RhiResult<B::Image> {
+		let _ = samples;
+		self.alloc_image(ext, format, usage, tiling, create, location)
+	}
 
 	fn alloc_sampler(
 		&self,

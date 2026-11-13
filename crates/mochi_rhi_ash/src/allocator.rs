@@ -20,6 +20,7 @@ use crate::image::AshImage;
 use crate::sampler::AshSampler;
 use crate::types::{
 	to_vk_address_mode, to_vk_buffer_usage, to_vk_filter, to_vk_format, to_vk_image_tiling, to_vk_image_usage,
+	to_vk_sample_count,
 };
 use crate::AshVulkanBackend;
 use mochi_rhi::error::{RhiError, RhiResult};
@@ -190,6 +191,83 @@ impl RhiAllocator<AshVulkanBackend> for AshAllocator {
 			self.device
 				.bind_image_memory(image, allocation.memory(), allocation.offset())
 				.map_err(|e| RhiError::BackendError(format!("Failed to bind image memory: {e}")))?;
+		}
+
+		Ok(AshImage::new(
+			&self.device,
+			self.allocator.clone(),
+			image,
+			allocation,
+			ext,
+			format,
+		))
+	}
+
+	fn alloc_multisample_image(
+		&self,
+		ext: Extent<2, u32>,
+		format: Format,
+		usage: ImageUsage,
+		tiling: ImageTiling,
+		_create: AllocationCreate,
+		location: AllocationLocation,
+		samples: mochi_rhi::MsaaSamples,
+	) -> RhiResult<AshImage> {
+		let vk_format = to_vk_format(format);
+		let vk_usage = to_vk_image_usage(usage);
+		let vk_tiling = to_vk_image_tiling(tiling);
+		let vk_samples = to_vk_sample_count(samples);
+
+		let extent = vk::Extent3D {
+			width: ext[0],
+			height: ext[1],
+			depth: 1,
+		};
+
+		let image_info = vk::ImageCreateInfo::default()
+			.image_type(vk::ImageType::TYPE_2D)
+			.format(vk_format)
+			.extent(extent)
+			.mip_levels(1)
+			.array_layers(1)
+			.samples(vk_samples)
+			.tiling(vk_tiling)
+			.usage(vk_usage)
+			.sharing_mode(vk::SharingMode::EXCLUSIVE)
+			.initial_layout(vk::ImageLayout::UNDEFINED);
+
+		let image = unsafe {
+			self.device
+				.create_image(&image_info, None)
+				.map_err(|e| RhiError::ResourceCreation(format!("Failed to create multisample image: {e}")))?
+		};
+
+		let requirements = unsafe { self.device.get_image_memory_requirements(image) };
+
+		let mem_location = match location {
+			AllocationLocation::PreferHost => gpu_allocator::MemoryLocation::CpuToGpu,
+			_ => gpu_allocator::MemoryLocation::GpuOnly,
+		};
+
+		let alloc_desc = AllocationCreateDesc {
+			name: "AshMultisampleImage",
+			requirements,
+			location: mem_location,
+			linear: tiling == ImageTiling::Linear,
+			allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+		};
+
+		let allocation = self
+			.allocator
+			.lock()
+			.unwrap()
+			.allocate(&alloc_desc)
+			.map_err(|_e| RhiError::OutOfMemory)?;
+
+		unsafe {
+			self.device
+				.bind_image_memory(image, allocation.memory(), allocation.offset())
+				.map_err(|e| RhiError::BackendError(format!("Failed to bind multisample image memory: {e}")))?;
 		}
 
 		Ok(AshImage::new(

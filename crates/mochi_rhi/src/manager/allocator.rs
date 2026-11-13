@@ -17,8 +17,8 @@ use mochi_math::Extent;
 use crate::manager::device::Device;
 use crate::traits::{RhiAllocator, RhiBackend};
 use crate::{
-	Buffer, BufferUsage, Format, Image2, ImageTiling, ImageUsage, Sampler2, SamplerAddressMode,
-	SamplerFilter,
+	Buffer, BufferUsage, Format, Image2, ImageTiling, ImageUsage, MsaaSamples, Sampler2,
+	SamplerAddressMode, SamplerFilter,
 };
 
 
@@ -87,6 +87,23 @@ impl<B: RhiBackend> Allocator<B> {
 			.inner
 			.alloc_image(ext, format, usage, tiling, create, location)
 			.expect("Image allocation failed");
+		Image2::from_raw(img, ext)
+	}
+
+	pub fn alloc_multisample_image2(
+		&self,
+		ext: Extent<2, u32>,
+		format: Format,
+		usage: ImageUsage,
+		tiling: ImageTiling,
+		create: AllocationCreate,
+		location: AllocationLocation,
+		samples: MsaaSamples,
+	) -> Image2<B> {
+		let img = self
+			.inner
+			.alloc_multisample_image(ext, format, usage, tiling, create, location, samples)
+			.expect("Multisample image allocation failed");
 		Image2::from_raw(img, ext)
 	}
 

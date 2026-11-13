@@ -250,6 +250,26 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			barriers.push(depth_barrier);
 		}
 
+		if target.resolve_depth_image != vk::Image::null() {
+			let resolve_depth_barrier = vk::ImageMemoryBarrier2::default()
+				.src_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags2::FRAGMENT_SHADER)
+				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags2::SHADER_READ)
+				.dst_stage_mask(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
+				.dst_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
+				.old_layout(vk::ImageLayout::UNDEFINED)
+				.new_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
+				.image(target.resolve_depth_image)
+				.subresource_range(
+					vk::ImageSubresourceRange::default()
+						.aspect_mask(vk::ImageAspectFlags::DEPTH)
+						.base_mip_level(0)
+						.level_count(1)
+						.base_array_layer(0)
+						.layer_count(1),
+				);
+			barriers.push(resolve_depth_barrier);
+		}
+
 		let dep_info = vk::DependencyInfo::default()
 			.dependency_flags(vk::DependencyFlags::BY_REGION)
 			.image_memory_barriers(&barriers);
@@ -292,13 +312,14 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			Vec::new()
 		};
 
-		let depth_store_op = if is_depth_only {
+		let has_depth_resolve = target.resolve_depth_view != vk::ImageView::null();
+		let depth_store_op = if is_depth_only || (!has_depth_resolve && target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) {
 			vk::AttachmentStoreOp::STORE
 		} else {
 			vk::AttachmentStoreOp::DONT_CARE
 		};
 
-		let depth_attachment = vk::RenderingAttachmentInfo::default()
+		let mut depth_attachment = vk::RenderingAttachmentInfo::default()
 			.image_view(target.depth_view)
 			.image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
 			.load_op(vk::AttachmentLoadOp::CLEAR)
@@ -309,6 +330,13 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 					stencil: 0,
 				},
 			});
+
+		if has_depth_resolve {
+			depth_attachment = depth_attachment
+				.resolve_mode(vk::ResolveModeFlags::SAMPLE_ZERO)
+				.resolve_image_view(target.resolve_depth_view)
+				.resolve_image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL);
+		}
 
 		let render_area = vk::Rect2D {
 			offset: vk::Offset2D { x: 0, y: 0 },
@@ -371,7 +399,13 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 			barriers.push(color_barrier);
 		}
 
-		if target.depth_image != vk::Image::null() && (is_depth_only || target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) {
+		let depth_image_to_transition = if target.resolve_depth_image != vk::Image::null() {
+			target.resolve_depth_image
+		} else {
+			target.depth_image
+		};
+
+		if depth_image_to_transition != vk::Image::null() && (is_depth_only || target.final_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) {
 			let depth_barrier = vk::ImageMemoryBarrier2::default()
 				.src_stage_mask(vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS)
 				.src_access_mask(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE)
@@ -379,7 +413,7 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 				.dst_access_mask(vk::AccessFlags2::SHADER_READ)
 				.old_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
 				.new_layout(target.final_layout)
-				.image(target.depth_image)
+				.image(depth_image_to_transition)
 				.subresource_range(
 					vk::ImageSubresourceRange::default()
 						.aspect_mask(vk::ImageAspectFlags::DEPTH)

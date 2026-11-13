@@ -711,6 +711,39 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 		)
 	}
 
+	fn create_multisample_render_target(
+		&self,
+		color_image: &AshImage,
+		color_view: &AshImageView,
+		resolve_image: &AshImage,
+		resolve_view: &AshImageView,
+		color_format: Format,
+		depth_image: &AshImage,
+		depth_view: &AshImageView,
+		resolve_depth_image: &AshImage,
+		resolve_depth_view: &AshImageView,
+		depth_format: Format,
+		width: u32,
+		height: u32,
+		samples: mochi_rhi::MsaaSamples,
+	) -> AshRenderTarget {
+		AshRenderTarget::new_multisample_offscreen(
+			color_image.handle(),
+			color_view.handle(),
+			resolve_image.handle(),
+			resolve_view.handle(),
+			color_format,
+			depth_image.handle(),
+			depth_view.handle(),
+			resolve_depth_image.handle(),
+			resolve_depth_view.handle(),
+			depth_format,
+			width,
+			height,
+			samples,
+		)
+	}
+
 	fn create_depth_render_target(
 		&self,
 		depth_image: &AshImage,

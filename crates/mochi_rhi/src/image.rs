@@ -16,6 +16,7 @@ use mochi_math::Extent;
 use crate::format::Format;
 use crate::manager::allocator::{AllocationCreate, AllocationLocation, Allocator};
 use crate::traits::RhiBackend;
+use crate::types::MsaaSamples;
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -86,6 +87,19 @@ impl<B: RhiBackend> Image2<B> {
 		location: AllocationLocation,
 	) -> Self {
 		allocator.alloc_image2(ext, format, usage, tiling, create, location)
+	}
+
+	pub fn new_multisample(
+		allocator: &Allocator<B>,
+		ext: Extent<2, u32>,
+		format: Format,
+		usage: ImageUsage,
+		tiling: ImageTiling,
+		create: AllocationCreate,
+		location: AllocationLocation,
+		samples: MsaaSamples,
+	) -> Self {
+		allocator.alloc_multisample_image2(ext, format, usage, tiling, create, location, samples)
 	}
 
 	pub fn from_raw(inner: B::Image, ext: Extent<2, u32>) -> Self {

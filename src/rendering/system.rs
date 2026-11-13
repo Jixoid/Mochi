@@ -53,6 +53,13 @@ pub struct FxaaPushConstants {
 	pub _pad: f32,
 }
 
+pub struct MsaaOffscreenAttachments {
+	pub color_image: rhi::Image2,
+	pub color_view: rhi::ImageView2,
+	pub depth_image: rhi::Image2,
+	pub depth_view: rhi::ImageView2,
+}
+
 pub struct OffscreenSceneTarget {
 	pub color_image: rhi::Image2,
 	pub color_view: rhi::ImageView2,
@@ -64,6 +71,8 @@ pub struct OffscreenSceneTarget {
 	pub height: u32,
 	pub color_format: rhi::Format,
 	pub depth_format: rhi::Format,
+	pub msaa_samples: rhi::MsaaSamples,
+	pub msaa_attachments: Option<MsaaOffscreenAttachments>,
 }
 
 pub struct HistoryTarget {
@@ -290,8 +299,23 @@ impl RenderingSystem {
 
 		self.aa_mode = mode;
 
-		let msaa_samples = mode.msaa_samples();
-		self.set_msaa(device, display, msaa_samples);
+		let msaa_samples = mode.required_msaa();
+		let display_msaa = if mode.is_post_process() {
+			rhi::MsaaSamples::Off
+		} else {
+			msaa_samples
+		};
+
+		if display.msaa_samples() != display_msaa {
+			display.set_msaa(display_msaa);
+		}
+
+		if let Some(template) = &self.default_template {
+			template.set_msaa(device, msaa_samples);
+		}
+		if let Some(transparent_template) = &self.transparent_template {
+			transparent_template.set_msaa(device, msaa_samples);
+		}
 
 		if mode.is_post_process() {
 			let width = display.width();
@@ -304,6 +328,7 @@ impl RenderingSystem {
 					height,
 					target.color_format(),
 					target.depth_format(),
+					msaa_samples,
 				);
 			}
 		}
@@ -323,14 +348,38 @@ impl RenderingSystem {
 		height: u32,
 		color_format: rhi::Format,
 		depth_format: rhi::Format,
+		msaa_samples: rhi::MsaaSamples,
 	) {
-		if let Some(target) = &self.offscreen_target {
-			if target.width == width && target.height == height {
+		let ext = mochi_math::Extent::new([width, height]);
+		let needs_msaa = msaa_samples.count() > 1;
+
+		if let Some(target) = &mut self.offscreen_target {
+			if target.width == width
+				&& target.height == height
+				&& target.color_format == color_format
+				&& target.depth_format == depth_format
+			{
+				if target.msaa_samples == msaa_samples {
+					return;
+				}
+
+				target.msaa_samples = msaa_samples;
+				if needs_msaa {
+					let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
+						Self::create_msaa_attachments(device, alloc, ext, color_format, depth_format, msaa_samples);
+					target.msaa_attachments = Some(MsaaOffscreenAttachments {
+						color_image: msaa_col_img,
+						color_view: msaa_col_view,
+						depth_image: msaa_depth_img,
+						depth_view: msaa_depth_view,
+					});
+				} else {
+					target.msaa_attachments = None;
+				}
 				return;
 			}
 		}
 
-		let ext = mochi_math::Extent::new([width, height]);
 		let color_image = rhi::Image2::new(
 			alloc,
 			ext,
@@ -369,6 +418,19 @@ impl RenderingSystem {
 			0
 		};
 
+		let msaa_attachments = if needs_msaa {
+			let (msaa_col_img, msaa_col_view, msaa_depth_img, msaa_depth_view) =
+				Self::create_msaa_attachments(device, alloc, ext, color_format, depth_format, msaa_samples);
+			Some(MsaaOffscreenAttachments {
+				color_image: msaa_col_img,
+				color_view: msaa_col_view,
+				depth_image: msaa_depth_img,
+				depth_view: msaa_depth_view,
+			})
+		} else {
+			None
+		};
+
 		self.offscreen_target = Some(OffscreenSceneTarget {
 			color_image,
 			color_view,
@@ -380,7 +442,48 @@ impl RenderingSystem {
 			height,
 			color_format,
 			depth_format,
+			msaa_samples,
+			msaa_attachments,
 		});
+	}
+
+	fn create_msaa_attachments(
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		ext: mochi_math::Extent<2, u32>,
+		color_format: rhi::Format,
+		depth_format: rhi::Format,
+		samples: rhi::MsaaSamples,
+	) -> (rhi::Image2, rhi::ImageView2, rhi::Image2, rhi::ImageView2) {
+		let col_img = rhi::Image2::new_multisample(
+			alloc,
+			ext,
+			color_format,
+			rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::TransientAttachment,
+			rhi::ImageTiling::Optimal,
+			rhi::AllocationCreate::Dedicated,
+			rhi::AllocationLocation::PreferDevice,
+			samples,
+		);
+		let col_view = device
+			.create_image_view(&col_img, color_format)
+			.expect("Failed to create MSAA offscreen color view");
+
+		let depth_img = rhi::Image2::new_multisample(
+			alloc,
+			ext,
+			depth_format,
+			rhi::ImageUsage::DepthStencilAttachment | rhi::ImageUsage::TransientAttachment,
+			rhi::ImageTiling::Optimal,
+			rhi::AllocationCreate::Dedicated,
+			rhi::AllocationLocation::PreferDevice,
+			samples,
+		);
+		let depth_view = device
+			.create_image_view(&depth_img, depth_format)
+			.expect("Failed to create MSAA offscreen depth view");
+
+		(col_img, col_view, depth_img, depth_view)
 	}
 
 	pub fn set_msaa(
@@ -545,6 +648,7 @@ impl RenderingSystem {
 		let is_post_process = self.aa_mode.is_post_process();
 		if is_post_process {
 			if let Some(target) = display.render_target(0) {
+				let msaa_samples = self.aa_mode.required_msaa();
 				self.ensure_offscreen_target(
 					device,
 					alloc,
@@ -552,6 +656,7 @@ impl RenderingSystem {
 					height,
 					target.color_format(),
 					target.depth_format(),
+					msaa_samples,
 				);
 			}
 		}
@@ -625,16 +730,34 @@ impl RenderingSystem {
 
 		if is_post_process {
 			if let Some(offscreen) = &self.offscreen_target {
-				let scene_target = device.create_render_target(
-					&offscreen.color_image,
-					&offscreen.color_view,
-					offscreen.color_format,
-					&offscreen.depth_image,
-					&offscreen.depth_view,
-					offscreen.depth_format,
-					width,
-					height,
-				);
+				let scene_target = if let Some(msaa) = &offscreen.msaa_attachments {
+					device.create_multisample_render_target(
+						&msaa.color_image,
+						&msaa.color_view,
+						&offscreen.color_image,
+						&offscreen.color_view,
+						offscreen.color_format,
+						&msaa.depth_image,
+						&msaa.depth_view,
+						&offscreen.depth_image,
+						&offscreen.depth_view,
+						offscreen.depth_format,
+						width,
+						height,
+						offscreen.msaa_samples,
+					)
+				} else {
+					device.create_render_target(
+						&offscreen.color_image,
+						&offscreen.color_view,
+						offscreen.color_format,
+						&offscreen.depth_image,
+						&offscreen.depth_view,
+						offscreen.depth_format,
+						width,
+						height,
+					)
+				};
 
 				cmd.render_pass(&scene_target, clear_color, |pass| {
 					Self::record_scene_packets(
