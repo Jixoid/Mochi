@@ -61,10 +61,10 @@ ProjectConfig(
 
 ## Visuals
 
-![WaterBottle 3D Model](images/WaterBottle.png)  
+![Damaged Helmet 3D Model](images/DamagedHelmet.png)
 *PBR rendering test.*
 
-![Avacado 3D Model](images/Avacado.png)  
+![WaterBottle 3D Model](images/WaterBottle.png)  
 *PBR rendering test.*
 
 ![Suzanne 3D Model](images/Suzanne.png)  

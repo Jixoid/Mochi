@@ -61,10 +61,10 @@ ProjectConfig(
 
 ## Görseller
 
-![WaterBottle 3D Model](images/WaterBottle.png)  
+![Damaged Helmet 3D Model](images/DamagedHelmet.png)
 *PBR render testi.*
 
-![Avacado 3D Model](images/Avacado.png)  
+![WaterBottle 3D Model](images/WaterBottle.png)  
 *PBR render testi.*
 
 ![Suzanne 3D Model](images/Suzanne.png)  
