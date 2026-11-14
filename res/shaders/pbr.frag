@@ -80,7 +80,7 @@ layout(buffer_reference, scalar, row_major) readonly buffer SceneFrameData {
 	uint dir_light_count;
 	uint point_light_count;
 	uint spot_light_count;
-	uint _pad0;
+	float mip_bias;
 	uint _pad1_0;
 	uint _pad1_1;
 	DirectionalLight dir_lights[4];
@@ -248,7 +248,7 @@ void main() {
 
 	vec4 albedo = mat.base_color * in_color;
 	if (mat.albedo_texture_id != 0xFFFFFFFFu) {
-		vec4 tex_albedo = texture(u_textures[nonuniformEXT(mat.albedo_texture_id)], in_uv);
+		vec4 tex_albedo = texture(u_textures[nonuniformEXT(mat.albedo_texture_id)], in_uv, scene.mip_bias);
 		albedo *= tex_albedo;
 	}
 
@@ -261,7 +261,7 @@ void main() {
 	float occlusion = mat.occlusion;
 
 	if (mat.orm_texture_id != 0xFFFFFFFFu) {
-		vec3 orm = texture(u_textures[nonuniformEXT(mat.orm_texture_id)], in_uv).rgb;
+		vec3 orm = texture(u_textures[nonuniformEXT(mat.orm_texture_id)], in_uv, scene.mip_bias).rgb;
 		occlusion *= orm.r;
 		roughness *= orm.g;
 		metallic *= orm.b;
@@ -276,7 +276,7 @@ void main() {
 		vec3 B = cross(N, T) * in_tangent.w;
 		mat3 TBN = mat3(T, B, N);
 
-		vec3 raw_normal = texture(u_textures[nonuniformEXT(mat.normal_texture_id)], in_uv).rgb * 2.0 - 1.0;
+		vec3 raw_normal = texture(u_textures[nonuniformEXT(mat.normal_texture_id)], in_uv, scene.mip_bias).rgb * 2.0 - 1.0;
 		raw_normal.xy *= mat.normal_scale;
 		N = normalize(TBN * raw_normal);
 	}
@@ -443,7 +443,7 @@ void main() {
 
 	vec3 emissive = mat.emissive.rgb * mat.emissive.w;
 	if (mat.emissive_texture_id != 0xFFFFFFFFu) {
-		vec3 tex_emissive = texture(u_textures[nonuniformEXT(mat.emissive_texture_id)], in_uv).rgb;
+		vec3 tex_emissive = texture(u_textures[nonuniformEXT(mat.emissive_texture_id)], in_uv, scene.mip_bias).rgb;
 		emissive *= tex_emissive;
 	}
 

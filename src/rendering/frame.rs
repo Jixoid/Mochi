@@ -66,7 +66,7 @@ pub struct SceneFrameData {
 	pub dir_light_count: u32,
 	pub point_light_count: u32,
 	pub spot_light_count: u32,
-	pub _pad0: u32,
+	pub mip_bias: f32,
 	pub _pad1: [u32; 2],
 	pub dir_lights: [DirectionalLightGpuData; MAX_DIRECTIONAL_LIGHTS],
 	pub cascade_view_proj: [[[f32; 16]; 4]; MAX_DIRECTIONAL_LIGHTS],
@@ -127,7 +127,7 @@ impl Default for SceneFrameData {
 			dir_light_count: 0,
 			point_light_count: 0,
 			spot_light_count: 0,
-			_pad0: 0,
+			mip_bias: 0.0,
 			_pad1: [0; 2],
 			dir_lights: [DirectionalLightGpuData::default(); MAX_DIRECTIONAL_LIGHTS],
 			cascade_view_proj: [[identity_mat; 4]; MAX_DIRECTIONAL_LIGHTS],
@@ -188,6 +188,7 @@ impl SceneFrameBuffer {
 		cascade_split_depths: [f32; 4],
 		cascade_shadow_ids: [[u32; 4]; MAX_DIRECTIONAL_LIGHTS],
 		jitter: (f32, f32),
+		mip_bias: f32,
 	) {
 		let view = camera.view_matrix(camera_transform);
 		let mut proj = camera.projection_matrix(aspect);
@@ -371,7 +372,7 @@ impl SceneFrameBuffer {
 			dir_light_count: dir_idx as u32,
 			point_light_count: self.point_light_count,
 			spot_light_count: self.spot_light_count,
-			_pad0: 0,
+			mip_bias,
 			_pad1: [0; 2],
 			dir_lights,
 			cascade_view_proj,

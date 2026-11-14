@@ -106,6 +106,28 @@ impl AntiAliasingMode {
 		)
 	}
 
+	pub fn scale_factor(self) -> f32 {
+		match self {
+			Self::FsrNativeAa => 1.0,
+			Self::FsrQuality => 1.5,
+			Self::FsrBalanced => 1.7,
+			Self::FsrPerformance => 2.0,
+			Self::FsrUltraPerformance => 3.0,
+			_ => 1.0,
+		}
+	}
+
+	pub fn render_extent(self, display_w: u32, display_h: u32) -> (u32, u32) {
+		let scale = self.scale_factor();
+		if (scale - 1.0).abs() < 1e-4 {
+			(display_w.max(1), display_h.max(1))
+		} else {
+			let rw = ((display_w as f32 / scale).round() as u32).max(128);
+			let rh = ((display_h as f32 / scale).round() as u32).max(128);
+			(rw, rh)
+		}
+	}
+
 	pub fn needs_velocity(self) -> bool {
 		matches!(
 			self,
@@ -146,6 +168,16 @@ impl AntiAliasingMode {
 				| Self::FsrPerformance
 				| Self::FsrUltraPerformance
 		)
+	}
+
+	pub fn jitter_phase_count(self) -> u32 {
+		let scale = self.scale_factor();
+		if (scale - 1.0).abs() < 1e-4 {
+			16
+		} else {
+			// AMD FSR recommendation: 8 * (display / render)^2
+			((8.0 * scale * scale).round() as u32).clamp(16, 64)
+		}
 	}
 
 	pub fn name(&self) -> &'static str {
@@ -192,13 +224,13 @@ pub fn get_subpixel_jitter(mode: AntiAliasingMode, frame_index: u64) -> (f32, f3
 				(-0.25, 0.25)
 			}
 		}
-		AntiAliasingMode::Taa
-		| AntiAliasingMode::FsrNativeAa
-		| AntiAliasingMode::FsrQuality
-		| AntiAliasingMode::FsrBalanced
-		| AntiAliasingMode::FsrPerformance
-		| AntiAliasingMode::FsrUltraPerformance => {
+		AntiAliasingMode::Taa => {
 			let idx = ((frame_index % 16) + 1) as u32;
+			(halton(idx, 2) - 0.5, halton(idx, 3) - 0.5)
+		}
+		mode if mode.is_fsr() => {
+			let phases = mode.jitter_phase_count();
+			let idx = ((frame_index % phases as u64) + 1) as u32;
 			(halton(idx, 2) - 0.5, halton(idx, 3) - 0.5)
 		}
 		_ => (0.0, 0.0),
@@ -240,6 +272,7 @@ mod tests {
 		assert!(AntiAliasingMode::Smaa4x.needs_velocity());
 		assert!(AntiAliasingMode::Taa.needs_velocity());
 		assert!(AntiAliasingMode::FsrNativeAa.needs_velocity());
+		assert!(AntiAliasingMode::FsrQuality.needs_camera_jitter());
 
 		assert_eq!(AntiAliasingMode::Msaa2x.required_msaa(), MsaaSamples::X2);
 		assert_eq!(AntiAliasingMode::Msaa4x.required_msaa(), MsaaSamples::X4);
@@ -248,5 +281,28 @@ mod tests {
 		assert_eq!(AntiAliasingMode::SmaaS2x.required_msaa(), MsaaSamples::X2);
 		assert_eq!(AntiAliasingMode::Smaa4x.required_msaa(), MsaaSamples::X2);
 		assert_eq!(AntiAliasingMode::Taa.required_msaa(), MsaaSamples::Off);
+
+		assert_eq!(AntiAliasingMode::FsrNativeAa.scale_factor(), 1.0);
+		assert_eq!(AntiAliasingMode::FsrQuality.scale_factor(), 1.5);
+		assert_eq!(AntiAliasingMode::FsrBalanced.scale_factor(), 1.7);
+		assert_eq!(AntiAliasingMode::FsrPerformance.scale_factor(), 2.0);
+		assert_eq!(AntiAliasingMode::FsrUltraPerformance.scale_factor(), 3.0);
+
+		assert_eq!(
+			AntiAliasingMode::FsrNativeAa.render_extent(1920, 1080),
+			(1920, 1080)
+		);
+		assert_eq!(
+			AntiAliasingMode::FsrQuality.render_extent(1920, 1080),
+			(1280, 720)
+		);
+		assert_eq!(
+			AntiAliasingMode::FsrPerformance.render_extent(1920, 1080),
+			(960, 540)
+		);
+		assert_eq!(
+			AntiAliasingMode::FsrUltraPerformance.render_extent(1920, 1080),
+			(640, 360)
+		);
 	}
 }

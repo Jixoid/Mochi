@@ -23,6 +23,9 @@ use crate::rendering::smaa::{
 	SmaaBlendPushConstants, SmaaEdgePushConstants, SmaaManager, SmaaNeighborPushConstants,
 	SmaaResolvePushConstants,
 };
+use crate::rendering::fsr::{
+	Fsr3UpscalePushConstants, FsrManager, FsrRcasPushConstants,
+};
 use crate::rendering::taa::{TaaManager, TaaPushConstants, TaaSharpenPushConstants};
 use crate::rendering::velocity::{VelocityManager, VelocityPushConstants};
 use crate::rhi;
@@ -109,6 +112,7 @@ pub struct RenderingSystem {
 	smaa_manager: Option<SmaaManager>,
 	velocity_manager: Option<VelocityManager>,
 	taa_manager: Option<TaaManager>,
+	fsr_manager: Option<FsrManager>,
 	cluster_manager: Option<ClusterManager>,
 	shadow_manager: Option<ShadowManager>,
 	shadow_queue: RenderQueue,
@@ -145,6 +149,7 @@ impl RenderingSystem {
 			smaa_manager: None,
 			velocity_manager: None,
 			taa_manager: None,
+			fsr_manager: None,
 			cluster_manager: None,
 			shadow_manager: None,
 			shadow_queue: RenderQueue::new(),
@@ -237,6 +242,9 @@ impl RenderingSystem {
 		let taa_manager = TaaManager::new(device, color_format);
 		self.taa_manager = Some(taa_manager);
 
+		let fsr_manager = FsrManager::new(device, color_format);
+		self.fsr_manager = Some(fsr_manager);
+
 		match ClusterManager::new(device, alloc) {
 			Ok(cm) => {
 				mochi_disp!("Clustered Forward light manager initialized");
@@ -321,12 +329,13 @@ impl RenderingSystem {
 		if mode.is_post_process() {
 			let width = display.width();
 			let height = display.height();
+			let (render_w, render_h) = mode.render_extent(width, height);
 			if let Some(target) = display.render_target(0) {
 				self.ensure_offscreen_target(
 					device,
 					alloc,
-					width,
-					height,
+					render_w,
+					render_h,
 					target.color_format(),
 					target.depth_format(),
 					msaa_samples,
@@ -340,6 +349,10 @@ impl RenderingSystem {
 
 		if let Some(taa) = &mut self.taa_manager {
 			taa.has_history = false;
+		}
+
+		if let Some(fsr) = &mut self.fsr_manager {
+			fsr.free_targets();
 		}
 
 		mochi_disp!("Anti-Aliasing mode set to: {}", mode.name());
@@ -561,6 +574,10 @@ impl RenderingSystem {
 		} else {
 			1.0
 		};
+		let is_post_process = self.aa_mode.is_post_process();
+		let (render_w, render_h) = self.aa_mode.render_extent(width, height);
+		let target_w = if is_post_process { render_w } else { width };
+		let target_h = if is_post_process { render_h } else { height };
 
 		let (cam_transform, camera) = scene
 			.active_camera()
@@ -614,7 +631,14 @@ impl RenderingSystem {
 			(0.0, 0.0)
 		};
 
-		// Update frame scene buffer (Camera + Dynamic Lights + Shadows)
+		let mip_bias = if self.aa_mode.is_fsr() && render_w < width {
+			// AMD FSR recommendation: log2(render_width / display_width)
+			(render_w as f32 / width as f32).log2()
+		} else {
+			0.0
+		};
+
+		// Update frame scene buffer (Camera + Dynamic Lights + Shadows + MipBias)
 		self.frame_buffer.update(
 			device,
 			alloc,
@@ -627,12 +651,13 @@ impl RenderingSystem {
 			grid_addr,
 			pt_index_addr,
 			spot_index_addr,
-			width,
-			height,
+			target_w,
+			target_h,
 			cascade_view_proj,
 			cascade_split_depths,
 			cascade_shadow_ids,
 			jitter,
+			mip_bias,
 		);
 
 		// Extract packets for ShadowCaster pass
@@ -654,14 +679,13 @@ impl RenderingSystem {
 		// Update material storage GPU buffer
 		self.material_storage.update_gpu(device, alloc);
 
-		let is_post_process = self.aa_mode.is_post_process();
 		if is_post_process && let Some(target) = display.render_target(0) {
 			let msaa_samples = self.aa_mode.required_msaa();
 			self.ensure_offscreen_target(
 				device,
 				alloc,
-				width,
-				height,
+				target_w,
+				target_h,
 				target.color_format(),
 				target.depth_format(),
 				msaa_samples,
@@ -727,7 +751,7 @@ impl RenderingSystem {
 
 		if is_post_process {
 			if let Some(offscreen) = &self.offscreen_target {
-				let mut target_builder = rhi::RenderTarget::builder(width, height)
+				let mut target_builder = rhi::RenderTarget::builder(target_w, target_h)
 					.color(
 						&offscreen.color_image,
 						&offscreen.color_view,
@@ -751,8 +775,8 @@ impl RenderingSystem {
 				cmd.render_pass(&scene_target, clear_color, |pass| {
 					Self::record_scene_packets(
 						pass,
-						width,
-						height,
+						target_w,
+						target_h,
 						&self.render_queue,
 						scene_addr,
 						material_addr,
@@ -762,14 +786,14 @@ impl RenderingSystem {
 				// On-demand Velocity Buffer generation (only if active mode requires it)
 				if self.aa_mode.needs_velocity() {
 					if let Some(vm) = &mut self.velocity_manager {
-						vm.ensure_target(device, alloc, width, height);
+						vm.ensure_target(device, alloc, target_w, target_h);
 						if let Some(vt) = &vm.target {
-							let velocity_rt = rhi::RenderTarget::builder(width, height)
+							let velocity_rt = rhi::RenderTarget::builder(target_w, target_h)
 								.color(&vt.image, &vt.view, rhi::Format::V2Float16)
 								.build(device);
 							let vel_clear = [0.0, 0.0, 0.0, 0.0];
 							cmd.render_pass(&velocity_rt, vel_clear, |pass| {
-								pass.set_viewport_and_scissor(width, height);
+								pass.set_viewport_and_scissor(target_w, target_h);
 								pass.bind_pipeline(&vm.pipeline);
 
 								let pc = VelocityPushConstants {
@@ -1030,6 +1054,115 @@ impl RenderingSystem {
 						}
 
 						taa.has_history = true;
+					}
+				} else if self.aa_mode.is_fsr()
+					&& let Some(fsr) = &mut self.fsr_manager
+				{
+					if let Some(swapchain_target) = display.render_target(img_idx) {
+						let swapchain_format = swapchain_target.color_format();
+						fsr.update_swapchain_format(device, swapchain_format);
+					}
+
+					// AMD FidelityFX FSR Temporal Super Resolution
+					fsr.ensure_targets(device, alloc, width, height);
+					if let Some(targets) = &fsr.targets {
+						let curr_idx = (self.frame_index % 2) as usize;
+						let prev_idx = 1 - curr_idx;
+
+						let velocity_tex_id = self
+							.velocity_manager
+							.as_ref()
+							.and_then(|v| v.target.as_ref())
+							.map(|vt| vt.descriptor_id)
+							.unwrap_or(0);
+
+						let render_metrics = [
+							1.0 / render_w as f32,
+							1.0 / render_h as f32,
+							render_w as f32,
+							render_h as f32,
+						];
+						let display_metrics = [
+							1.0 / width as f32,
+							1.0 / height as f32,
+							width as f32,
+							height as f32,
+						];
+						let jitter_ndc_x = if jitter.0 != 0.0 {
+							2.0 * jitter.0 / render_w as f32
+						} else {
+							0.0
+						};
+						let jitter_ndc_y = if jitter.1 != 0.0 {
+							2.0 * jitter.1 / render_h as f32
+						} else {
+							0.0
+						};
+						let jitter_params = [
+							jitter_ndc_x,
+							jitter_ndc_y,
+							jitter.0,
+							jitter.1,
+						];
+
+						// Pass 1: FSR Temporal Super Resolution Reconstruction
+						let resolve_rt = rhi::RenderTarget::builder(width, height)
+							.color(
+								&targets.history_images[curr_idx],
+								&targets.history_views[curr_idx],
+								fsr.swapchain_color_format,
+							)
+							.build(device);
+						let resolve_clear = [0.0, 0.0, 0.0, 0.0];
+						cmd.render_pass(&resolve_rt, resolve_clear, |pass| {
+							pass.set_viewport_and_scissor(width, height);
+							pass.bind_pipeline(&fsr.upscale_pipeline);
+
+							let pc = Fsr3UpscalePushConstants {
+								render_metrics,
+								display_metrics,
+								jitter: jitter_params,
+								color_tex_id: offscreen.descriptor_id,
+								velocity_tex_id,
+								depth_tex_id: offscreen.depth_descriptor_id,
+								history_tex_id: targets.history_descriptor_ids[prev_idx],
+								has_history: if fsr.has_history { 1 } else { 0 },
+								blend_factor: fsr.blend_factor,
+								_pad0: 0.0,
+								_pad1: 0.0,
+							};
+							pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+							pass.draw(3, 1, 0, 0);
+						});
+
+						fsr.has_history = true;
+
+						// Pass 2: AMD RCAS (Robust Contrast Adaptive Sharpening) directly to swapchain
+						if let Some(swapchain_target) = display.render_target(img_idx) {
+							let target_no_depth = swapchain_target.without_depth();
+							cmd.render_pass(&target_no_depth, clear_color, |pass| {
+								pass.set_viewport_and_scissor(width, height);
+								pass.bind_pipeline(&fsr.rcas_pipeline);
+
+								let sharpness = match self.aa_mode {
+									AntiAliasingMode::FsrNativeAa => 0.25,
+									AntiAliasingMode::FsrQuality => 0.35,
+									AntiAliasingMode::FsrBalanced => 0.40,
+									AntiAliasingMode::FsrPerformance => 0.45,
+									AntiAliasingMode::FsrUltraPerformance => 0.55,
+									_ => fsr.sharpness,
+								};
+								let pc = FsrRcasPushConstants {
+									rt_metrics: display_metrics,
+									texture_id: targets.history_descriptor_ids[curr_idx],
+									sharpness,
+									_pad0: 0.0,
+									_pad1: 0.0,
+								};
+								pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+								pass.draw(3, 1, 0, 0);
+							});
+						}
 					}
 				}
 			}
