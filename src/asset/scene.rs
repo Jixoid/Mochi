@@ -239,58 +239,6 @@ impl SceneAsset {
 				.map(|t| TransformComponent(t.to_transform()))
 				.unwrap_or_default();
 
-			if let Some(cam) = &entity_desc.camera {
-				let mut camera_comp = CameraComponent::new(cam.fov_deg, cam.near, cam.far);
-				camera_comp.is_active = cam.is_active;
-				camera_comp.clear_color = Vec4::new_with(
-					cam.clear_color[0],
-					cam.clear_color[1],
-					cam.clear_color[2],
-					cam.clear_color[3],
-				);
-
-				if let Some(sc) = &entity_desc.script {
-					let script_comp = ScriptComponent {
-						path: sc.path.clone(),
-						is_active: sc.is_active,
-					};
-					scene.spawn((transform, camera_comp, script_comp));
-				} else {
-					scene.spawn((transform, camera_comp));
-				}
-			}
-
-			if let Some(dl) = &entity_desc.directional_light {
-				let dir_light = DirectionalLightComponent {
-					color: Vec3::new(dl.color[0], dl.color[1], dl.color[2]),
-					intensity: dl.intensity,
-					direction: Vec3::new(dl.direction[0], dl.direction[1], dl.direction[2]).normalize(),
-					cast_shadows: dl.cast_shadows,
-				};
-				scene.spawn((transform, dir_light));
-			}
-
-			if let Some(pl) = &entity_desc.point_light {
-				let pt_light = PointLightComponent {
-					color: Vec3::new(pl.color[0], pl.color[1], pl.color[2]),
-					intensity: pl.intensity,
-					radius: pl.radius,
-				};
-				scene.spawn((transform, pt_light));
-			}
-
-			if let Some(sl) = &entity_desc.spot_light {
-				let spot_light = SpotLightComponent {
-					color: Vec3::new(sl.color[0], sl.color[1], sl.color[2]),
-					intensity: sl.intensity,
-					radius: sl.radius,
-					inner_cone_angle_deg: sl.inner_cone_angle_deg,
-					outer_cone_angle_deg: sl.outer_cone_angle_deg,
-					cast_shadows: sl.cast_shadows,
-				};
-				scene.spawn((transform, spot_light));
-			}
-
 			if let Some(mr) = &entity_desc.mesh_renderer {
 				let submeshes = if let Some(cached) = loaded_models.get(&mr.asset) {
 					cached.clone()
@@ -331,12 +279,59 @@ impl SceneAsset {
 						scene.spawn((transform, renderer));
 					}
 				}
-			} else if let Some(sc) = &entity_desc.script {
-				let script_comp = ScriptComponent {
-					path: sc.path.clone(),
-					is_active: sc.is_active,
-				};
-				scene.spawn((transform, script_comp));
+			} else {
+				let entity = scene.spawn((transform,));
+
+				if let Some(cam) = &entity_desc.camera {
+					let mut camera_comp = CameraComponent::new(cam.fov_deg, cam.near, cam.far);
+					camera_comp.is_active = cam.is_active;
+					camera_comp.clear_color = Vec4::new_with(
+						cam.clear_color[0],
+						cam.clear_color[1],
+						cam.clear_color[2],
+						cam.clear_color[3],
+					);
+					let _ = scene.world_mut().insert_one(entity, camera_comp);
+				}
+
+				if let Some(dl) = &entity_desc.directional_light {
+					let dir_light = DirectionalLightComponent {
+						color: Vec3::new(dl.color[0], dl.color[1], dl.color[2]),
+						intensity: dl.intensity,
+						direction: Vec3::new(dl.direction[0], dl.direction[1], dl.direction[2]).normalize(),
+						cast_shadows: dl.cast_shadows,
+					};
+					let _ = scene.world_mut().insert_one(entity, dir_light);
+				}
+
+				if let Some(pl) = &entity_desc.point_light {
+					let pt_light = PointLightComponent {
+						color: Vec3::new(pl.color[0], pl.color[1], pl.color[2]),
+						intensity: pl.intensity,
+						radius: pl.radius,
+					};
+					let _ = scene.world_mut().insert_one(entity, pt_light);
+				}
+
+				if let Some(sl) = &entity_desc.spot_light {
+					let spot_light = SpotLightComponent {
+						color: Vec3::new(sl.color[0], sl.color[1], sl.color[2]),
+						intensity: sl.intensity,
+						radius: sl.radius,
+						inner_cone_angle_deg: sl.inner_cone_angle_deg,
+						outer_cone_angle_deg: sl.outer_cone_angle_deg,
+						cast_shadows: sl.cast_shadows,
+					};
+					let _ = scene.world_mut().insert_one(entity, spot_light);
+				}
+
+				if let Some(sc) = &entity_desc.script {
+					let script_comp = ScriptComponent {
+						path: sc.path.clone(),
+						is_active: sc.is_active,
+					};
+					let _ = scene.world_mut().insert_one(entity, script_comp);
+				}
 			}
 		}
 

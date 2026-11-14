@@ -29,11 +29,23 @@ pub struct Input {
 	last_mouse_position: Option<(f32, f32)>,
 	mouse_delta: (f32, f32),
 	mouse_wheel_delta: f32,
+	cursor_captured: bool,
 }
 
 impl Input {
 	pub fn new() -> Self {
 		Self::default()
+	}
+
+	pub fn is_cursor_captured(&self) -> bool {
+		self.cursor_captured
+	}
+
+	pub fn set_cursor_captured(&mut self, captured: bool) {
+		self.cursor_captured = captured;
+		if !captured {
+			self.last_mouse_position = None;
+		}
 	}
 
 	pub fn is_key_down(&self, keycode: u32) -> bool {
@@ -77,6 +89,15 @@ impl Input {
 		self.mouse_wheel_delta = 0.0;
 	}
 
+	pub fn handle_device_event(&mut self, event: &winit::event::DeviceEvent) {
+		if let winit::event::DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
+			if self.cursor_captured {
+				self.mouse_delta.0 += *dx as f32;
+				self.mouse_delta.1 += *dy as f32;
+			}
+		}
+	}
+
 	pub fn handle_window_event(&mut self, event: &WindowEvent) {
 		match event {
 			WindowEvent::KeyboardInput {
@@ -103,15 +124,19 @@ impl Input {
 			}
 			WindowEvent::CursorMoved { position, .. } => {
 				let current = (position.x as f32, position.y as f32);
-				if let Some(last) = self.last_mouse_position {
-					self.mouse_delta.0 += current.0 - last.0;
-					self.mouse_delta.1 += current.1 - last.1;
+				if !self.cursor_captured {
+					if let Some(last) = self.last_mouse_position {
+						self.mouse_delta.0 += current.0 - last.0;
+						self.mouse_delta.1 += current.1 - last.1;
+					}
+					self.last_mouse_position = Some(current);
 				}
-				self.last_mouse_position = Some(current);
 				self.mouse_position = current;
 			}
 			WindowEvent::CursorLeft { .. } => {
-				self.last_mouse_position = None;
+				if !self.cursor_captured {
+					self.last_mouse_position = None;
+				}
 			}
 			WindowEvent::MouseInput { state, button, .. } => {
 				let btn_id = match button {

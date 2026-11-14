@@ -15,7 +15,7 @@ pub mod input;
 
 use std::time::Instant;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
@@ -202,6 +202,8 @@ impl ApplicationHandler for EngineApp {
 						}
 					}
 					display.request_redraw();
+					self.input.set_cursor_captured(true);
+					crate::script::api::set_current_cursor_captured(true);
 					self.display = Some(display);
 					mochi_disp!("Display and Swapchain attached successfully");
 				}
@@ -213,6 +215,15 @@ impl ApplicationHandler for EngineApp {
 		}
 	}
 
+	fn device_event(
+		&mut self,
+		_event_loop: &ActiveEventLoop,
+		_device_id: DeviceId,
+		event: DeviceEvent,
+	) {
+		self.input.handle_device_event(&event);
+	}
+
 	fn window_event(
 		&mut self,
 		event_loop: &ActiveEventLoop,
@@ -222,6 +233,28 @@ impl ApplicationHandler for EngineApp {
 		self.input.handle_window_event(&event);
 
 		match event {
+			WindowEvent::Focused(focused) => {
+				if !focused {
+					if let Some(display) = &self.display {
+						display.set_cursor_captured(false);
+						self.input.set_cursor_captured(false);
+						crate::script::api::set_current_cursor_captured(false);
+					}
+				}
+			}
+			WindowEvent::MouseInput {
+				state: ElementState::Pressed,
+				button: MouseButton::Left,
+				..
+			} => {
+				if let Some(display) = &self.display {
+					if !display.is_cursor_captured() {
+						display.set_cursor_captured(true);
+						self.input.set_cursor_captured(true);
+						crate::script::api::set_current_cursor_captured(true);
+					}
+				}
+			}
 			WindowEvent::CloseRequested => {
 				mochi_log!("Window close requested, shutting down");
 				event_loop.exit();
@@ -235,6 +268,15 @@ impl ApplicationHandler for EngineApp {
 					},
 				..
 			} => {
+				if let Some(display) = &self.display {
+					if display.is_cursor_captured() {
+						mochi_log!("Escape pressed: releasing cursor capture");
+						display.set_cursor_captured(false);
+						self.input.set_cursor_captured(false);
+						crate::script::api::set_current_cursor_captured(false);
+						return;
+					}
+				}
 				mochi_log!("Escape pressed, shutting down");
 				event_loop.exit();
 			}
@@ -260,6 +302,14 @@ impl ApplicationHandler for EngineApp {
 				self
 					.script_system
 					.update(&mut self.scene, &self.input, dt, time);
+
+				if let Some(req_captured) = crate::script::api::take_requested_cursor_capture() {
+					if let Some(display) = &self.display {
+						display.set_cursor_captured(req_captured);
+						self.input.set_cursor_captured(req_captured);
+						crate::script::api::set_current_cursor_captured(req_captured);
+					}
+				}
 
 				if let Some(req_aa) = crate::script::api::take_requested_aa_mode() {
 					if let (Some(display), Some(rendering), Some(device), Some(alloc)) = (

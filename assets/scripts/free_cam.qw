@@ -7,18 +7,44 @@ pub fun on_start(entity: u64) {
 
 ![C, export]
 pub fun on_update(entity: u64, dt: f32) {
-	// 1. Mouse Look
-	var dx = 0.0;
-	var dy = 0.0;
-	mochi_get_mouse_delta(dx&mut, dy&mut);
+	// 1. Mouse Look (only when cursor is captured)
+	if mochi_is_cursor_captured() {
+		var dx = 0.0;
+		var dy = 0.0;
+		mochi_get_mouse_delta(dx&mut, dy&mut);
 
-	if dx != 0.0 || dy != 0.0 {
-		var sens = 0.002;
-		mochi_camera_look(entity, -dy * sens, -dx * sens);
+		if dx != 0.0 || dy != 0.0 {
+			var sens = 0.002;
+			mochi_camera_look(entity, -dy * sens, -dx * sens);
+		}
 	}
 
-	// 2. Flight Movement (WASD + Space/Shift)
-	var speed = 3.5 * dt;
+	// 2. Dynamic Speed Adjustment via Mouse Wheel (like Unreal Engine / Blender)
+	var base_speed = mochi_get_camera_speed();
+	var wheel = mochi_get_mouse_wheel();
+	if wheel > 0.0 {
+		base_speed *= 1.25;
+		if base_speed > 50.0 {
+			base_speed = 50.0;
+		}
+		mochi_set_camera_speed(base_speed);
+	}
+	if wheel < 0.0 {
+		base_speed *= 0.8;
+		if base_speed < 0.5 {
+			base_speed = 0.5;
+		}
+		mochi_set_camera_speed(base_speed);
+	}
+
+	// 3. Flight Movement (WASD + Space/C + Shift/Ctrl)
+	var speed = base_speed * dt;
+	if mochi_is_key_down(16) { // Shift - Sprint (Fast)
+		speed *= 3.0;
+	}
+	if mochi_is_key_down(17) { // Control - Precision Slow Mode
+		speed *= 0.35;
+	}
 
 	var forward = 0.0;
 	var right = 0.0;
@@ -36,10 +62,10 @@ pub fun on_update(entity: u64, dt: f32) {
 	if mochi_is_key_down(65) { // 'A' - Left
 		right -= speed;
 	}
-	if mochi_is_key_down(32) { // Space - Up
+	if mochi_is_key_down(32) || mochi_is_key_down(69) { // Space or 'E' - Up
 		up += speed;
 	}
-	if mochi_is_key_down(16) { // Shift - Down
+	if mochi_is_key_down(67) || mochi_is_key_down(81) { // 'C' or 'Q' - Down
 		up -= speed;
 	}
 
@@ -47,12 +73,28 @@ pub fun on_update(entity: u64, dt: f32) {
 		mochi_move_relative(entity, forward, right, up);
 	}
 
-	// 3. AA Mode Toggle (M or F4 key): Off (0) -> MSAA 2x (1) -> MSAA 4x (2) -> MSAA 8x (3) -> FXAA (4) -> SMAA 1x (5) -> SMAA T2x (6) -> SMAA S2x (7) -> SMAA 4x (8) -> TAA (9) -> FSR Native (10) -> FSR Quality (11) -> FSR Balanced (12) -> FSR Performance (13) -> FSR Ultra Perf (14) -> Off (0)
+	// 4. AA Mode Toggle (M or F4 key): Off (0) -> MSAA 2x (1) -> MSAA 4x (2) -> MSAA 8x (3) -> FXAA (4) -> SMAA 1x (5) -> SMAA T2x (6) -> SMAA S2x (7) -> SMAA 4x (8) -> TAA (9) -> FSR Native (10) -> FSR Quality (11) -> FSR Balanced (12) -> FSR Performance (13) -> FSR Ultra Perf (14) -> Off (0)
 	if mochi_is_key_just_pressed(77) || mochi_is_key_just_pressed(115) {
 		var next_mode = mochi_get_aa_mode() + 1;
 		if next_mode > 14 {
 			next_mode = 0;
 		}
 		mochi_set_aa_mode(next_mode);
+	}
+
+	// 5. Camera Spot Light Toggle ('F' key - keycode 70)
+	if mochi_is_key_just_pressed(70) {
+		var intensity = mochi_get_spot_light_intensity(entity);
+		if intensity > 0.001 {
+			mochi_set_spot_light_intensity(entity, 0.0);
+		}
+		if intensity <= 0.001 {
+			mochi_set_spot_light_intensity(entity, 16.0);
+		}
+	}
+
+	// 6. Cursor Capture Toggle ('Tab' key - keycode 9)
+	if mochi_is_key_just_pressed(9) {
+		mochi_toggle_cursor_capture();
 	}
 }

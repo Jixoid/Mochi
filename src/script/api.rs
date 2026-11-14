@@ -15,7 +15,7 @@
 use std::cell::RefCell;
 use std::ptr::NonNull;
 use crate::core::input::Input;
-use crate::scene::TransformComponent;
+use crate::scene::{PointLightComponent, SpotLightComponent, TransformComponent};
 
 
 #[repr(C)]
@@ -244,6 +244,34 @@ pub extern "C" fn mochi_get_mouse_delta(out_dx: *mut f32, out_dy: *mut f32) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_mouse_wheel() -> f32 {
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let input = unsafe { ctx.input.as_ref() };
+			input.mouse_wheel_delta()
+		} else {
+			0.0
+		}
+	})
+}
+
+static CAMERA_SPEED_BITS: std::sync::atomic::AtomicU32 =
+	std::sync::atomic::AtomicU32::new(5.5f32.to_bits());
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_camera_speed() -> f32 {
+	f32::from_bits(CAMERA_SPEED_BITS.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_camera_speed(speed: f32) {
+	CAMERA_SPEED_BITS.store(
+		speed.clamp(0.2, 100.0).to_bits(),
+		std::sync::atomic::Ordering::Relaxed,
+	);
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mochi_get_time() -> f32 {
 	CURRENT_CONTEXT.with(|ctx| ctx.borrow().as_ref().map(|c| c.time).unwrap_or(0.0))
 }
@@ -301,4 +329,258 @@ pub extern "C" fn mochi_set_aa_mode(mode: i32) {
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_get_aa_mode() -> i32 {
 	CURRENT_AA_MODE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+static REQUESTED_CURSOR_CAPTURE: std::sync::atomic::AtomicI32 =
+	std::sync::atomic::AtomicI32::new(-1);
+static CURRENT_CURSOR_CAPTURE: std::sync::atomic::AtomicBool =
+	std::sync::atomic::AtomicBool::new(true);
+
+pub fn take_requested_cursor_capture() -> Option<bool> {
+	let val = REQUESTED_CURSOR_CAPTURE.swap(-1, std::sync::atomic::Ordering::Relaxed);
+	if val < 0 {
+		None
+	} else {
+		Some(val != 0)
+	}
+}
+
+pub fn set_current_cursor_captured(captured: bool) {
+	CURRENT_CURSOR_CAPTURE.store(captured, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_cursor_captured(captured: bool) {
+	REQUESTED_CURSOR_CAPTURE.store(
+		if captured { 1 } else { 0 },
+		std::sync::atomic::Ordering::Relaxed,
+	);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_is_cursor_captured() -> bool {
+	CURRENT_CURSOR_CAPTURE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_toggle_cursor_capture() {
+	let current = CURRENT_CURSOR_CAPTURE.load(std::sync::atomic::Ordering::Relaxed);
+	REQUESTED_CURSOR_CAPTURE.store(
+		if !current { 1 } else { 0 },
+		std::sync::atomic::Ordering::Relaxed,
+	);
+}
+
+// Spot Light Component API
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_has_spot_light(entity_id: u64) -> bool {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return false,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &*ctx.world.as_ptr() };
+			world.get::<&SpotLightComponent>(entity).is_ok()
+		} else {
+			false
+		}
+	})
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_spot_light_intensity(entity_id: u64) -> f32 {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return 0.0,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &*ctx.world.as_ptr() };
+			if let Ok(light) = world.get::<&SpotLightComponent>(entity) {
+				return light.intensity;
+			}
+		}
+		0.0
+	})
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_spot_light_intensity(entity_id: u64, intensity: f32) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut light) = world.get::<&mut SpotLightComponent>(entity) {
+				light.intensity = intensity;
+			}
+		}
+	});
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_spot_light_radius(entity_id: u64) -> f32 {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return 0.0,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &*ctx.world.as_ptr() };
+			if let Ok(light) = world.get::<&SpotLightComponent>(entity) {
+				return light.radius;
+			}
+		}
+		0.0
+	})
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_spot_light_radius(entity_id: u64, radius: f32) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut light) = world.get::<&mut SpotLightComponent>(entity) {
+				light.radius = radius;
+			}
+		}
+	});
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_spot_light_cone(
+	entity_id: u64,
+	out_inner_deg: *mut f32,
+	out_outer_deg: *mut f32,
+) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &*ctx.world.as_ptr() };
+			if let Ok(light) = world.get::<&SpotLightComponent>(entity) {
+				if !out_inner_deg.is_null() {
+					unsafe { *out_inner_deg = light.inner_cone_angle_deg };
+				}
+				if !out_outer_deg.is_null() {
+					unsafe { *out_outer_deg = light.outer_cone_angle_deg };
+				}
+			}
+		}
+	});
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_spot_light_cone(
+	entity_id: u64,
+	inner_deg: f32,
+	outer_deg: f32,
+) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut light) = world.get::<&mut SpotLightComponent>(entity) {
+				light.inner_cone_angle_deg = inner_deg;
+				light.outer_cone_angle_deg = outer_deg;
+			}
+		}
+	});
+}
+
+// Point Light Component API
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_has_point_light(entity_id: u64) -> bool {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return false,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &*ctx.world.as_ptr() };
+			world.get::<&PointLightComponent>(entity).is_ok()
+		} else {
+			false
+		}
+	})
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_point_light_intensity(entity_id: u64) -> f32 {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return 0.0,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &*ctx.world.as_ptr() };
+			if let Ok(light) = world.get::<&PointLightComponent>(entity) {
+				return light.intensity;
+			}
+		}
+		0.0
+	})
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_point_light_intensity(entity_id: u64, intensity: f32) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut light) = world.get::<&mut PointLightComponent>(entity) {
+				light.intensity = intensity;
+			}
+		}
+	});
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_get_point_light_radius(entity_id: u64) -> f32 {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return 0.0,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &*ctx.world.as_ptr() };
+			if let Ok(light) = world.get::<&PointLightComponent>(entity) {
+				return light.radius;
+			}
+		}
+		0.0
+	})
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_point_light_radius(entity_id: u64, radius: f32) {
+	let entity = match hecs::Entity::from_bits(entity_id) {
+		Some(e) => e,
+		None => return,
+	};
+	CURRENT_CONTEXT.with(|ctx| {
+		if let Some(ctx) = ctx.borrow().as_ref() {
+			let world = unsafe { &mut *ctx.world.as_ptr() };
+			if let Ok(mut light) = world.get::<&mut PointLightComponent>(entity) {
+				light.radius = radius;
+			}
+		}
+	});
 }

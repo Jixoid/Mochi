@@ -13,7 +13,7 @@
 use std::sync::Arc;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::ActiveEventLoop;
-use winit::window::{Window, WindowAttributes};
+use winit::window::{CursorGrabMode, Window, WindowAttributes};
 
 use crate::rhi::{self as rhi, Device, Surface, Swapchain};
 use mochi_except::*;
@@ -25,6 +25,7 @@ pub struct Display {
 	window: Arc<Window>,
 	width: u32,
 	height: u32,
+	cursor_captured: std::sync::atomic::AtomicBool,
 }
 
 impl Display {
@@ -55,13 +56,39 @@ impl Display {
 			swapchain.image_count()
 		);
 
-		Ok(Self {
+		let display = Self {
 			swapchain,
 			surface,
 			window,
 			width,
 			height,
-		})
+			cursor_captured: std::sync::atomic::AtomicBool::new(false),
+		};
+
+		display.set_cursor_captured(true);
+
+		Ok(display)
+	}
+
+	pub fn is_cursor_captured(&self) -> bool {
+		self.cursor_captured.load(std::sync::atomic::Ordering::Relaxed)
+	}
+
+	pub fn set_cursor_captured(&self, captured: bool) {
+		if captured {
+			let res = self
+				.window
+				.set_cursor_grab(CursorGrabMode::Locked)
+				.or_else(|_| self.window.set_cursor_grab(CursorGrabMode::Confined));
+			if let Err(e) = res {
+				mochi_warn!("Could not grab cursor: {e}");
+			}
+			self.window.set_cursor_visible(false);
+		} else {
+			let _ = self.window.set_cursor_grab(CursorGrabMode::None);
+			self.window.set_cursor_visible(true);
+		}
+		self.cursor_captured.store(captured, std::sync::atomic::Ordering::Relaxed);
 	}
 
 

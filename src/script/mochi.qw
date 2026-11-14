@@ -45,6 +45,15 @@ pub fun mochi_is_mouse_button_down(button: i32) -> bool;
 pub fun mochi_get_mouse_delta(out_dx: &mut f32, out_dy: &mut f32);
 
 ![C, import]
+pub fun mochi_get_mouse_wheel() -> f32;
+
+![C, import]
+pub fun mochi_get_camera_speed() -> f32;
+
+![C, import]
+pub fun mochi_set_camera_speed(speed: f32);
+
+![C, import]
 pub fun mochi_get_time() -> f32;
 
 ![C, import]
@@ -58,3 +67,48 @@ pub fun mochi_set_aa_mode(mode: i32);
 
 ![C, import]
 pub fun mochi_get_aa_mode() -> i32;
+
+![C, import]
+pub fun mochi_has_spot_light(entity: u64) -> bool;
+
+![C, import]
+pub fun mochi_get_spot_light_intensity(entity: u64) -> f32;
+
+![C, import]
+pub fun mochi_set_spot_light_intensity(entity: u64, intensity: f32);
+
+![C, import]
+pub fun mochi_get_spot_light_radius(entity: u64) -> f32;
+
+![C, import]
+pub fun mochi_set_spot_light_radius(entity: u64, radius: f32);
+
+![C, import]
+pub fun mochi_get_spot_light_cone(entity: u64, out_inner_deg: &mut f32, out_outer_deg: &mut f32);
+
+![C, import]
+pub fun mochi_set_spot_light_cone(entity: u64, inner_deg: f32, outer_deg: f32);
+
+![C, import]
+pub fun mochi_has_point_light(entity: u64) -> bool;
+
+![C, import]
+pub fun mochi_get_point_light_intensity(entity: u64) -> f32;
+
+![C, import]
+pub fun mochi_set_point_light_intensity(entity: u64, intensity: f32);
+
+![C, import]
+pub fun mochi_get_point_light_radius(entity: u64) -> f32;
+
+![C, import]
+pub fun mochi_set_point_light_radius(entity: u64, radius: f32);
+
+![C, import]
+pub fun mochi_set_cursor_captured(captured: bool);
+
+![C, import]
+pub fun mochi_is_cursor_captured() -> bool;
+
+![C, import]
+pub fun mochi_toggle_cursor_capture();
