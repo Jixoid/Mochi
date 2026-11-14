@@ -1,0 +1,10 @@
+[package]
+name = "mochi_material"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
+mochi_math = { path = "../mochi_math" }
+mochi_except = { path = "../mochi_except" }

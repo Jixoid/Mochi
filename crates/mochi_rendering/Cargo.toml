@@ -1,0 +1,14 @@
+[package]
+name = "mochi_rendering"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_display = { path = "../mochi_display" }
+mochi_scene = { path = "../mochi_scene" }
+mochi_material = { path = "../mochi_material" }
+mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
+mochi_math = { path = "../mochi_math" }
+mochi_except = { path = "../mochi_except" }
+hecs = "0.10"

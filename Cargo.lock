@@ -3,29 +3,6 @@
 version = 4
 
 [[package]]
-name = "Mochi"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.13.2",
- "bytemuck",
- "gltf",
- "hecs",
- "image",
- "libloading",
- "mochi_ahi",
- "mochi_ahi_cpal",
- "mochi_except",
- "mochi_math",
- "mochi_rhi",
- "mochi_rhi_ash",
- "postcard",
- "raw-window-handle",
- "ron",
- "serde",
- "winit",
-]
-
-[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -219,20 +196,6 @@ name = "bytemuck"
 version = "1.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797"
-dependencies = [
- "bytemuck_derive",
-]
-
-[[package]]
-name = "bytemuck_derive"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.9",
-]
 
 [[package]]
 name = "byteorder"
@@ -953,6 +916,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "mochi"
+version = "0.1.0"
+dependencies = [
+ "mochi_ahi",
+ "mochi_ahi_cpal",
+ "mochi_asset",
+ "mochi_audio",
+ "mochi_core",
+ "mochi_display",
+ "mochi_except",
+ "mochi_input",
+ "mochi_material",
+ "mochi_math",
+ "mochi_rendering",
+ "mochi_rhi",
+ "mochi_rhi_ash",
+ "mochi_scene",
+ "mochi_script",
+]
+
+[[package]]
 name = "mochi_ahi"
 version = "0.1.0"
 
@@ -967,10 +951,81 @@ dependencies = [
 ]
 
 [[package]]
+name = "mochi_asset"
+version = "0.1.0"
+dependencies = [
+ "gltf",
+ "image",
+ "mochi_except",
+ "mochi_material",
+ "mochi_math",
+ "mochi_rendering",
+ "mochi_rhi_ash",
+ "mochi_scene",
+ "mochi_script",
+ "postcard",
+ "ron",
+ "serde",
+]
+
+[[package]]
+name = "mochi_audio"
+version = "0.1.0"
+dependencies = [
+ "mochi_ahi_cpal",
+ "mochi_except",
+ "mochi_math",
+]
+
+[[package]]
+name = "mochi_core"
+version = "0.1.0"
+dependencies = [
+ "mochi_asset",
+ "mochi_audio",
+ "mochi_display",
+ "mochi_except",
+ "mochi_input",
+ "mochi_material",
+ "mochi_rendering",
+ "mochi_rhi_ash",
+ "mochi_scene",
+ "mochi_script",
+ "ron",
+ "serde",
+ "winit",
+]
+
+[[package]]
+name = "mochi_display"
+version = "0.1.0"
+dependencies = [
+ "mochi_except",
+ "mochi_rhi_ash",
+ "winit",
+]
+
+[[package]]
 name = "mochi_except"
 version = "0.1.0"
 dependencies = [
  "owo-colors",
+]
+
+[[package]]
+name = "mochi_input"
+version = "0.1.0"
+dependencies = [
+ "winit",
+]
+
+[[package]]
+name = "mochi_material"
+version = "0.1.0"
+dependencies = [
+ "mochi_except",
+ "mochi_math",
+ "mochi_rhi_ash",
 ]
 
 [[package]]
@@ -983,6 +1038,19 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.13.2",
  "libloading",
+]
+
+[[package]]
+name = "mochi_rendering"
+version = "0.1.0"
+dependencies = [
+ "hecs",
+ "mochi_display",
+ "mochi_except",
+ "mochi_material",
+ "mochi_math",
+ "mochi_rhi_ash",
+ "mochi_scene",
 ]
 
 [[package]]
@@ -1006,6 +1074,32 @@ dependencies = [
  "mochi_math",
  "mochi_rhi",
  "raw-window-handle",
+]
+
+[[package]]
+name = "mochi_scene"
+version = "0.1.0"
+dependencies = [
+ "hecs",
+ "mochi_except",
+ "mochi_material",
+ "mochi_math",
+ "mochi_rhi_ash",
+]
+
+[[package]]
+name = "mochi_script"
+version = "0.1.0"
+dependencies = [
+ "hecs",
+ "libloading",
+ "mochi_except",
+ "mochi_input",
+ "mochi_math",
+ "mochi_rendering",
+ "mochi_rhi_ash",
+ "mochi_scene",
+ "serde",
 ]
 
 [[package]]

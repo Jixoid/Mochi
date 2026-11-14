@@ -16,3 +16,8 @@ pub mod device;
 
 pub use backend::*;
 pub use device::*;
+
+pub use mochi_ahi::*;
+
+pub type Backend = CpalAudioBackend;
+pub type Device = mochi_ahi::Device<Backend>;

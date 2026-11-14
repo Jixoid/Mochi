@@ -1,0 +1,10 @@
+[package]
+name = "mochi_display"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+winit = "0.30"
+mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
+mochi_except = { path = "../mochi_except" }

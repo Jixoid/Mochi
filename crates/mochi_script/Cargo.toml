@@ -1,0 +1,16 @@
+[package]
+name = "mochi_script"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_input = { path = "../mochi_input" }
+mochi_scene = { path = "../mochi_scene" }
+mochi_rendering = { path = "../mochi_rendering" }
+mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
+mochi_math = { path = "../mochi_math" }
+mochi_except = { path = "../mochi_except" }
+libloading = "0.8"
+hecs = "0.10"
+serde = { version = "1.0", features = ["derive"] }

@@ -1,5 +1,5 @@
 [package]
-name = "Mochi"
+name = "mochi"
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-only"
@@ -13,20 +13,18 @@ members = [
 ]
 
 [dependencies]
-bitflags = "2.13.2"
-raw-window-handle = "0.6"
-winit = "0.30"
+mochi_core = { path = "crates/mochi_core" }
+mochi_input = { path = "crates/mochi_input" }
+mochi_display = { path = "crates/mochi_display" }
+mochi_material = { path = "crates/mochi_material" }
+mochi_audio = { path = "crates/mochi_audio" }
+mochi_scene = { path = "crates/mochi_scene" }
+mochi_rendering = { path = "crates/mochi_rendering" }
+mochi_script = { path = "crates/mochi_script" }
+mochi_asset = { path = "crates/mochi_asset" }
 mochi_rhi = { path = "crates/mochi_rhi" }
 mochi_rhi_ash = { path = "crates/mochi_rhi_ash" }
 mochi_ahi = { path = "crates/mochi_ahi" }
 mochi_ahi_cpal = { path = "crates/mochi_ahi_cpal" }
 mochi_math = { path = "crates/mochi_math" }
 mochi_except = { path = "crates/mochi_except" }
-hecs = "0.10"
-bytemuck = { version = "1.25", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
-ron = "0.8"
-postcard = { version = "1.1", default-features = false, features = ["use-std"] }
-libloading = "0.8"
-gltf = { version = "1.4.1", features = ["image", "guess_mime_type", "KHR_materials_transmission"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

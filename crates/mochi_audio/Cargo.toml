@@ -1,0 +1,10 @@
+[package]
+name = "mochi_audio"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_ahi = { path = "../mochi_ahi_cpal", package = "mochi_ahi_cpal" }
+mochi_math = { path = "../mochi_math" }
+mochi_except = { path = "../mochi_except" }

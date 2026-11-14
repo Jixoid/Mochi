@@ -10,21 +10,9 @@
 */
 
 
-pub mod ahi;
-pub mod asset;
-pub mod audio;
-pub mod core;
-pub mod display;
-pub mod material;
-pub mod rendering;
-pub mod rhi;
-pub mod scene;
-pub mod script;
-
-pub use mochi_except::*;
-pub use mochi_math as math;
-
-use core::Engine;
+use mochi_audio::AudioClip;
+use mochi_core::Engine;
+use mochi_except::*;
 
 
 fn main() {
@@ -33,7 +21,7 @@ fn main() {
 
 	// Play a procedural startup chime to verify audio subsystem
 	if let Some(audio) = engine.audio_system() {
-		let startup_chime = std::sync::Arc::new(audio::AudioClip::sine_wave(523.25, 0.35, 44100));
+		let startup_chime = std::sync::Arc::new(AudioClip::sine_wave(523.25, 0.35, 44100));
 		audio.play_one_shot(startup_chime, 0.15);
 	}
 

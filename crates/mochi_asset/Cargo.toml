@@ -1,0 +1,19 @@
+[package]
+name = "mochi_asset"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_scene = { path = "../mochi_scene" }
+mochi_material = { path = "../mochi_material" }
+mochi_rendering = { path = "../mochi_rendering" }
+mochi_script = { path = "../mochi_script" }
+mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
+mochi_math = { path = "../mochi_math" }
+mochi_except = { path = "../mochi_except" }
+serde = { version = "1.0", features = ["derive"] }
+ron = "0.8"
+postcard = { version = "1.1", default-features = false, features = ["use-std"] }
+gltf = { version = "1.4.1", features = ["image", "guess_mime_type", "KHR_materials_transmission"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

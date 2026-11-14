@@ -35,8 +35,8 @@ pub use sync::*;
 pub use types::*;
 
 use ash::vk::Handle;
-use mochi_rhi::error::RhiResult;
-use mochi_rhi::traits::{RhiBackend, RhiDevice};
+pub use mochi_rhi::error::RhiResult;
+pub use mochi_rhi::traits::{RhiBackend, RhiDevice};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,3 +100,26 @@ impl RhiBackend for AshVulkanBackend {
 		)
 	}
 }
+
+pub use mochi_rhi::*;
+
+pub type Backend = AshVulkanBackend;
+
+pub type Device = mochi_rhi::Device<Backend>;
+pub type Allocator = mochi_rhi::Allocator<Backend>;
+pub type Buffer = mochi_rhi::Buffer<Backend>;
+pub type Image2 = mochi_rhi::Image2<Backend>;
+pub type ImageView2 = mochi_rhi::ImageView2<Backend>;
+pub type Sampler2 = mochi_rhi::Sampler2<Backend>;
+pub type CommandManager = mochi_rhi::CommandManager<Backend>;
+pub type Command = mochi_rhi::Command<Backend>;
+pub type Swapchain = mochi_rhi::Swapchain<Backend>;
+pub type Surface = mochi_rhi::Surface<Backend>;
+pub type Pipeline = mochi_rhi::Pipeline<Backend>;
+pub type PipelineMeta = mochi_rhi::PipelineMeta<Backend>;
+pub type Shader = mochi_rhi::Shader<Backend>;
+pub type Synchronizer = mochi_rhi::Synchronizer<Backend>;
+pub type Uploader = mochi_rhi::Uploader<Backend>;
+pub type RenderTarget<'a> = mochi_rhi::RenderTarget<'a, Backend>;
+pub type Semaphore = <Backend as mochi_rhi::RhiBackend>::Semaphore;
+pub type Fence = <Backend as mochi_rhi::RhiBackend>::Fence;
