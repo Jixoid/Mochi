@@ -17,6 +17,7 @@ pub mod queue;
 pub mod shadow;
 pub mod smaa;
 pub mod system;
+pub mod taa;
 pub mod velocity;
 
 
@@ -27,4 +28,5 @@ pub use queue::*;
 pub use shadow::*;
 pub use smaa::*;
 pub use system::*;
+pub use taa::*;
 pub use velocity::*;

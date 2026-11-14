@@ -23,6 +23,7 @@ use crate::rendering::smaa::{
 	SmaaBlendPushConstants, SmaaEdgePushConstants, SmaaManager, SmaaNeighborPushConstants,
 	SmaaResolvePushConstants,
 };
+use crate::rendering::taa::{TaaManager, TaaPushConstants, TaaSharpenPushConstants};
 use crate::rendering::velocity::{VelocityManager, VelocityPushConstants};
 use crate::rhi;
 use crate::scene::{CameraComponent, DirectionalLightComponent, Scene, TransformComponent};
@@ -107,6 +108,7 @@ pub struct RenderingSystem {
 	point_sampler: Option<rhi::Sampler2>,
 	smaa_manager: Option<SmaaManager>,
 	velocity_manager: Option<VelocityManager>,
+	taa_manager: Option<TaaManager>,
 	cluster_manager: Option<ClusterManager>,
 	shadow_manager: Option<ShadowManager>,
 	shadow_queue: RenderQueue,
@@ -142,6 +144,7 @@ impl RenderingSystem {
 			point_sampler: None,
 			smaa_manager: None,
 			velocity_manager: None,
+			taa_manager: None,
 			cluster_manager: None,
 			shadow_manager: None,
 			shadow_queue: RenderQueue::new(),
@@ -231,6 +234,9 @@ impl RenderingSystem {
 		let velocity_manager = VelocityManager::new(device);
 		self.velocity_manager = Some(velocity_manager);
 
+		let taa_manager = TaaManager::new(device, color_format);
+		self.taa_manager = Some(taa_manager);
+
 		match ClusterManager::new(device, alloc) {
 			Ok(cm) => {
 				mochi_disp!("Clustered Forward light manager initialized");
@@ -290,6 +296,8 @@ impl RenderingSystem {
 			return;
 		}
 
+		device.wait_idle();
+
 		self.aa_mode = mode;
 
 		let msaa_samples = mode.required_msaa();
@@ -328,6 +336,10 @@ impl RenderingSystem {
 
 		if let Some(smaa) = &mut self.smaa_manager {
 			smaa.has_history = false;
+		}
+
+		if let Some(taa) = &mut self.taa_manager {
+			taa.has_history = false;
 		}
 
 		mochi_disp!("Anti-Aliasing mode set to: {}", mode.name());
@@ -948,6 +960,76 @@ impl RenderingSystem {
 								});
 							}
 						}
+					}
+				} else if self.aa_mode.is_taa()
+					&& let Some(taa) = &mut self.taa_manager
+				{
+					taa.ensure_targets(device, alloc, width, height);
+					if let Some(targets) = &taa.targets {
+						let rt_metrics = [
+							1.0 / width as f32,
+							1.0 / height as f32,
+							width as f32,
+							height as f32,
+						];
+
+						let curr_idx = (self.frame_index % 2) as usize;
+						let prev_idx = 1 - curr_idx;
+
+						let velocity_tex_id = self
+							.velocity_manager
+							.as_ref()
+							.and_then(|v| v.target.as_ref())
+							.map(|vt| vt.descriptor_id)
+							.unwrap_or(0);
+
+						// 1. Pass 1: TAA Resolve (Scene Color + Previous History + Velocity + Depth -> Current History)
+						let resolve_rt = rhi::RenderTarget::builder(width, height)
+							.color(
+								&targets.history_images[curr_idx],
+								&targets.history_views[curr_idx],
+								taa.swapchain_color_format,
+							)
+							.build(device);
+						let resolve_clear = [0.0, 0.0, 0.0, 0.0];
+						cmd.render_pass(&resolve_rt, resolve_clear, |pass| {
+							pass.set_viewport_and_scissor(width, height);
+							pass.bind_pipeline(&taa.resolve_pipeline);
+
+							let pc = TaaPushConstants {
+								rt_metrics,
+								color_tex_id: offscreen.descriptor_id,
+								history_tex_id: targets.history_descriptor_ids[prev_idx],
+								velocity_tex_id,
+								depth_tex_id: offscreen.depth_descriptor_id,
+								has_history: if taa.has_history { 1 } else { 0 },
+								blend_factor: taa.blend_factor,
+								_pad: 0.0,
+							};
+							pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+							pass.draw(3, 1, 0, 0);
+						});
+
+						// 2. Pass 2: TAA Sharpen / Present (Current History -> Swapchain RenderTarget)
+						if let Some(swapchain_target) = display.render_target(img_idx) {
+							let target_no_depth = swapchain_target.without_depth();
+							cmd.render_pass(&target_no_depth, clear_color, |pass| {
+								pass.set_viewport_and_scissor(width, height);
+								pass.bind_pipeline(&taa.sharpen_pipeline);
+
+								let pc = TaaSharpenPushConstants {
+									rt_metrics,
+									texture_id: targets.history_descriptor_ids[curr_idx],
+									sharpness: taa.sharpness,
+									_pad0: 0.0,
+									_pad1: 0.0,
+								};
+								pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+								pass.draw(3, 1, 0, 0);
+							});
+						}
+
+						taa.has_history = true;
 					}
 				}
 			}

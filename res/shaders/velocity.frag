@@ -53,11 +53,6 @@ layout(push_constant) uniform VelocityPushConstants {
 void main() {
 	float depth = texture(u_textures[nonuniformEXT(pc.depth_tex_id)], in_uv).r;
 
-	if (depth >= 1.0) {
-		out_velocity = vec2(0.0);
-		return;
-	}
-
 	SceneFrameData scene = SceneFrameData(pc.scene_addr);
 
 	vec2 ndc_xy = in_uv * 2.0 - 1.0;
@@ -68,7 +63,10 @@ void main() {
 	vec4 prev_clip = scene.prev_view_proj * world_pos;
 	vec2 prev_ndc = prev_clip.xy / prev_clip.w;
 
-	vec2 velocity = (ndc_xy - prev_ndc) * 0.5;
+	// Remove subpixel camera jitter so that static geometry yields exactly zero velocity
+	vec2 curr_unjittered_ndc = ndc_xy - scene.jitter.xy;
+	vec2 prev_unjittered_ndc = prev_ndc - scene.jitter.zw;
+	vec2 velocity = (curr_unjittered_ndc - prev_unjittered_ndc) * 0.5;
 
 	out_velocity = velocity;
 }

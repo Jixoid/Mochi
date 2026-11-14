@@ -14,12 +14,13 @@ layout(push_constant) uniform FxaaPushConstants {
 } pc;
 
 // NVIDIA FXAA 3.11 Quality Tuning Constants:
-// FXAA_EDGE_THRESHOLD: Edge detection sensitivity (0.166 gives crisp, sharp edges without blurring textures)
-#define FXAA_EDGE_THRESHOLD      0.166
-// FXAA_EDGE_THRESHOLD_MIN: Minimum contrast in dark regions
-#define FXAA_EDGE_THRESHOLD_MIN  0.0625
+// FXAA_EDGE_THRESHOLD: Edge detection sensitivity (0.125 default, 1/8 standard high quality)
+#define FXAA_EDGE_THRESHOLD      0.125
+// FXAA_EDGE_THRESHOLD_MIN: Minimum contrast in dark regions (0.0312 default, 1/32 standard)
+#define FXAA_EDGE_THRESHOLD_MIN  0.0312
 // FXAA_SUBPIX: Controls sub-pixel aliasing removal.
-// 0.00 gives native pixel sharpness (zero texture blurring, only geometric silhouette edges are smoothed).
+// 0.00 preserves 100% native pixel sharpness on PBR textures (zero texture smearing/vaseline effect).
+// Geometric silhouette edges are cleanly anti-aliased by the edge search pass.
 #define FXAA_SUBPIX              0.00
 
 float rgb_to_luma(vec3 rgb) {
@@ -110,9 +111,10 @@ void main() {
 	bool reached1 = abs(lumaEnd1) >= gradientScaled;
 	bool reached2 = abs(lumaEnd2) >= gradientScaled;
 
-	const float steps[4] = float[4](1.5, 2.0, 2.0, 4.0);
+	const int ITERATIONS = 12;
+	const float steps[12] = float[12](1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0);
 
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ITERATIONS; i++) {
 		if (!reached1) {
 			uv1 -= offset * steps[i];
 			lumaEnd1 = rgb_to_luma(texture(u_textures[nonuniformEXT(pc.texture_id)], uv1).rgb) - lumaEdgeCenter;
@@ -132,7 +134,10 @@ void main() {
 	float dist1 = isHorizontal ? (in_uv.x - uv1.x) : (in_uv.y - uv1.y);
 	float dist2 = isHorizontal ? (uv2.x - in_uv.x) : (uv2.y - in_uv.y);
 
-	bool isDirection1 = (dist1 < dist2);
+	// Direction selection: prefer the reached side, or the closer side if both reached
+	bool isDirection1 = reached1 && (!reached2 || dist1 < dist2);
+	bool reachedClosest = isDirection1 ? reached1 : reached2;
+
 	float distMin = min(dist1, dist2);
 	float edgeThickness = dist1 + dist2;
 
@@ -140,7 +145,7 @@ void main() {
 
 	bool isLumaCenterSmaller = lumaM < lumaEdgeCenter;
 	bool correctVariation = ((isDirection1 ? lumaEnd1 : lumaEnd2) < 0.0) != isLumaCenterSmaller;
-	float finalOffset = correctVariation ? pixelOffset : 0.0;
+	float finalOffset = (correctVariation && reachedClosest) ? pixelOffset : 0.0;
 
 	// 10. Blend edge offset with subpixel antialiasing
 	float finalBlend = max(finalOffset, subpixBlend);
