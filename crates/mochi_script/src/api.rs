@@ -333,6 +333,32 @@ pub extern "C" fn mochi_get_aa_mode() -> i32 {
 	CURRENT_AA_MODE.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+static REQUESTED_FRAME_GEN: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+static CURRENT_FRAME_GEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn take_requested_frame_gen() -> Option<bool> {
+	let val = REQUESTED_FRAME_GEN.swap(-1, std::sync::atomic::Ordering::Relaxed);
+	if val < 0 {
+		None
+	} else {
+		Some(val != 0)
+	}
+}
+
+pub fn set_current_frame_gen(enabled: bool) {
+	CURRENT_FRAME_GEN.store(enabled, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_set_frame_generation(enabled: bool) {
+	REQUESTED_FRAME_GEN.store(if enabled { 1 } else { 0 }, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mochi_is_frame_generation_enabled() -> bool {
+	CURRENT_FRAME_GEN.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 static REQUESTED_CURSOR_CAPTURE: std::sync::atomic::AtomicI32 =
 	std::sync::atomic::AtomicI32::new(-1);
 static CURRENT_CURSOR_CAPTURE: std::sync::atomic::AtomicBool =

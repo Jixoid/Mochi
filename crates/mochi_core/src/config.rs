@@ -41,12 +41,15 @@ impl Default for WindowConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RenderingConfig {
 	pub clear_color: [f32; 4],
+	#[serde(default)]
+	pub frame_generation: bool,
 }
 
 impl Default for RenderingConfig {
 	fn default() -> Self {
 		Self {
 			clear_color: [0.1, 0.15, 0.25, 1.0],
+			frame_generation: false,
 		}
 	}
 }

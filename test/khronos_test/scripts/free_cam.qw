@@ -97,4 +97,10 @@ pub fun on_update(entity: u64, dt: f32) {
 	if mochi_is_key_just_pressed(9) {
 		mochi_toggle_cursor_capture();
 	}
+
+	// 7. FSR 3.1 Frame Generation Toggle ('G' key - keycode 71)
+	if mochi_is_key_just_pressed(71) {
+		var fg = mochi_is_frame_generation_enabled();
+		mochi_set_frame_generation(!fg);
+	}
 }

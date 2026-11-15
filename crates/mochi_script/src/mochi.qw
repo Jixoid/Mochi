@@ -69,6 +69,12 @@ pub fun mochi_set_aa_mode(mode: i32);
 pub fun mochi_get_aa_mode() -> i32;
 
 ![C, import]
+pub fun mochi_set_frame_generation(enabled: bool);
+
+![C, import]
+pub fun mochi_is_frame_generation_enabled() -> bool;
+
+![C, import]
 pub fun mochi_has_spot_light(entity: u64) -> bool;
 
 ![C, import]

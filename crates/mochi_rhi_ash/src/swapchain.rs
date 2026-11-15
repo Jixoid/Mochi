@@ -138,6 +138,8 @@ pub struct SwapchainInner {
 	queue: vk::Queue,
 	surface: vk::SurfaceKHR,
 	swapchain: vk::SwapchainKHR,
+	present_mode: vk::PresentModeKHR,
+	vsync: bool,
 	color_format: vk::Format,
 	depth_format: vk::Format,
 	extent: vk::Extent2D,
@@ -230,6 +232,7 @@ impl AshSwapchain {
 		surface: vk::SurfaceKHR,
 		width: u32,
 		height: u32,
+		vsync: bool,
 	) -> RhiResult<Self> {
 		let swapchain_loader = ash::khr::swapchain::Device::new(instance, device);
 
@@ -263,7 +266,7 @@ impl AshSwapchain {
 			}
 		};
 
-		let mut image_count = caps.min_image_count.max(3);
+		let mut image_count = caps.min_image_count.max(4);
 		if caps.max_image_count > 0 && image_count > caps.max_image_count {
 			image_count = caps.max_image_count;
 		}
@@ -275,10 +278,29 @@ impl AshSwapchain {
 		};
 
 		let mut present_mode = vk::PresentModeKHR::FIFO;
-		for mode in &present_modes {
-			if *mode == vk::PresentModeKHR::MAILBOX {
-				present_mode = *mode;
-				break;
+		if !vsync {
+			// Uncapped / Immediate mode preferred when VSync is disabled
+			for mode in &present_modes {
+				if *mode == vk::PresentModeKHR::IMMEDIATE {
+					present_mode = *mode;
+					break;
+				}
+			}
+			if present_mode != vk::PresentModeKHR::IMMEDIATE {
+				for mode in &present_modes {
+					if *mode == vk::PresentModeKHR::MAILBOX {
+						present_mode = *mode;
+						break;
+					}
+				}
+			}
+		} else {
+			// When VSync is enabled, prefer MAILBOX (triple buffering) to avoid strict FIFO stalls if supported
+			for mode in &present_modes {
+				if *mode == vk::PresentModeKHR::MAILBOX {
+					present_mode = *mode;
+					break;
+				}
 			}
 		}
 
@@ -319,6 +341,8 @@ impl AshSwapchain {
 			queue,
 			surface,
 			swapchain,
+			present_mode,
+			vsync,
 			color_format: selected_format.format,
 			depth_format,
 			extent,
@@ -605,7 +629,7 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 		};
 		inner.extent = extent;
 
-		let mut image_count = caps.min_image_count.max(3);
+		let mut image_count = caps.min_image_count.max(4);
 		if caps.max_image_count > 0 && image_count > caps.max_image_count {
 			image_count = caps.max_image_count;
 		}
@@ -621,7 +645,7 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 			.image_sharing_mode(vk::SharingMode::EXCLUSIVE)
 			.pre_transform(caps.current_transform)
 			.composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-			.present_mode(vk::PresentModeKHR::FIFO)
+			.present_mode(inner.present_mode)
 			.clipped(true)
 			.old_swapchain(old_swapchain);
 
@@ -728,5 +752,9 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 
 	fn render_finished_semaphore(&self, index: u32) -> &AshSemaphore {
 		&self.render_finished_semaphores[index as usize]
+	}
+
+	fn vsync(&self) -> bool {
+		self.inner.lock().unwrap().vsync
 	}
 }

@@ -35,6 +35,7 @@ impl Display {
 		title: &str,
 		width: u32,
 		height: u32,
+		vsync: bool,
 	) -> Result<Self, String> {
 		let attributes = WindowAttributes::default()
 			.with_title(title)
@@ -47,7 +48,7 @@ impl Display {
 		);
 
 		let surface = device.create_surface(&*window)?;
-		let swapchain = Swapchain::new(device, &surface, width, height);
+		let swapchain = Swapchain::new(device, &surface, width, height, vsync);
 
 		mochi_disp!(
 			"Native window created ({}x{}) with swapchain ({} images)",
@@ -140,6 +141,10 @@ impl Display {
 
 	pub fn render_finished_semaphore(&self, index: u32) -> rhi::Semaphore {
 		self.swapchain.render_finished_semaphore(index)
+	}
+
+	pub fn vsync(&self) -> bool {
+		self.swapchain.vsync()
 	}
 
 	pub fn request_redraw(&self) {

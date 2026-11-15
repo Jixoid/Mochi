@@ -38,7 +38,10 @@ pub struct EngineApp {
 	start_time: Instant,
 	last_frame_time: Option<Instant>,
 	fps_timer: Instant,
-	fps_counter: u32,
+	real_fps_counter: u32,
+	display_fps_counter: u32,
+	last_real_fps: u32,
+	last_display_fps: u32,
 	frame_count: u64,
 	idle_cb: Option<Box<dyn FnMut(f32)>>,
 
@@ -91,7 +94,10 @@ impl EngineApp {
 			config,
 			last_frame_time: None,
 			fps_timer: Instant::now(),
-			fps_counter: 0,
+			real_fps_counter: 0,
+			display_fps_counter: 0,
+			last_real_fps: 0,
+			last_display_fps: 0,
 			frame_count: 0,
 			idle_cb: None,
 		}
@@ -159,8 +165,9 @@ impl ApplicationHandler for EngineApp {
 				&self.title,
 				self.width,
 				self.height,
+				self.config.window.vsync,
 			) {
-				Ok(display) => {
+				Ok(mut display) => {
 					if let (Some(rendering), Some(target)) =
 						(&mut self.rendering_system, display.render_target(0))
 					{
@@ -174,6 +181,11 @@ impl ApplicationHandler for EngineApp {
 							target.depth_format(),
 							display.msaa_samples(),
 						);
+
+						if self.config.rendering.frame_generation {
+							rendering.set_frame_generation(device, alloc, &mut display, true);
+							mochi_script::api::set_current_frame_gen(true);
+						}
 
 						let resolved_scene_path = self.config.resolve_path(&self.config.scene.start_scene);
 						let scene_dir = resolved_scene_path.parent();
@@ -295,14 +307,21 @@ impl ApplicationHandler for EngineApp {
 				self.last_frame_time = Some(now);
 				let time = self.start_time.elapsed().as_secs_f32();
 
-				if let Some(cb) = &mut self.idle_cb {
-					cb(dt);
-				}
+				let is_fg_present = self
+					.rendering_system
+					.as_ref()
+					.is_some_and(|r| r.is_frame_gen_present_phase());
 
-				// Execute QW scripts on active entities
-				self
-					.script_system
-					.update(&mut self.scene, &self.input, dt, time);
+				if !is_fg_present {
+					if let Some(cb) = &mut self.idle_cb {
+						cb(dt);
+					}
+
+					// Execute QW scripts on active entities
+					self
+						.script_system
+						.update(&mut self.scene, &self.input, dt, time);
+				}
 
 				if let Some(req_captured) = mochi_script::api::take_requested_cursor_capture()
 					&& let Some(display) = &self.display
@@ -311,6 +330,8 @@ impl ApplicationHandler for EngineApp {
 					self.input.set_cursor_captured(req_captured);
 					mochi_script::api::set_current_cursor_captured(req_captured);
 				}
+
+				let mut title_dirty = false;
 
 				if let Some(req_aa) = mochi_script::api::take_requested_aa_mode() {
 					if let (Some(display), Some(rendering), Some(device), Some(alloc)) = (
@@ -322,29 +343,65 @@ impl ApplicationHandler for EngineApp {
 						rendering.set_aa_mode(device, alloc, display, req_aa);
 						mochi_script::api::set_current_aa_mode(req_aa);
 						mochi_script::api::set_current_msaa(req_aa.msaa_samples());
+						title_dirty = true;
 					}
 				} else if let Some(req_msaa) = mochi_script::api::take_requested_msaa()
-					&& let (Some(display), Some(rendering), Some(device)) =
-						(&mut self.display, &mut self.rendering_system, &self.device)
+					&& let (Some(display), Some(rendering), Some(device), Some(alloc)) =
+						(&mut self.display, &mut self.rendering_system, &self.device, &self.alloca)
 				{
-					rendering.set_msaa(device, display, req_msaa);
+					rendering.set_msaa(device, alloc, display, req_msaa);
 					mochi_script::api::set_current_msaa(req_msaa);
+					title_dirty = true;
 				}
 
-				self.fps_counter += 1;
+				if let Some(req_fg) = mochi_script::api::take_requested_frame_gen()
+					&& let (Some(display), Some(rendering), Some(device), Some(alloc)) = (
+						&mut self.display,
+						&mut self.rendering_system,
+						&self.device,
+						&self.alloca,
+					) {
+					rendering.set_frame_generation(device, alloc, display, req_fg);
+					mochi_script::api::set_current_frame_gen(req_fg);
+					title_dirty = true;
+				}
+
+				if !is_fg_present {
+					self.real_fps_counter += 1;
+				}
+				self.display_fps_counter += 1;
+
 				if self.fps_timer.elapsed().as_secs() >= 1 {
-					let fps = self.fps_counter;
-					self.fps_counter = 0;
+					self.last_real_fps = self.real_fps_counter;
+					self.last_display_fps = self.display_fps_counter;
+					self.real_fps_counter = 0;
+					self.display_fps_counter = 0;
 					self.fps_timer = Instant::now();
-					if let (Some(display), Some(rendering)) = (&self.display, &self.rendering_system) {
-						display.window().set_title(&format!(
-							"{} - [{} FPS] Frame: {} | AA: {}",
+					title_dirty = true;
+				}
+
+				if title_dirty
+					&& let (Some(display), Some(rendering)) = (&self.display, &self.rendering_system)
+				{
+					let title = if rendering.frame_gen_enabled() {
+						format!(
+							"{} - [{}/{} FPS] Frame: {} (FG: ON) | AA: {}",
 							self.title,
-							fps,
+							self.last_real_fps,
+							self.last_display_fps,
 							self.frame_count,
 							rendering.aa_mode().name()
-						));
-					}
+						)
+					} else {
+						format!(
+							"{} - [{} FPS] Frame: {} | AA: {}",
+							self.title,
+							self.last_real_fps,
+							self.frame_count,
+							rendering.aa_mode().name()
+						)
+					};
+					display.window().set_title(&title);
 				}
 
 				if let Some(audio) = &self.audio_system {
@@ -368,7 +425,9 @@ impl ApplicationHandler for EngineApp {
 				) {
 					rendering.render(sync, cmdmng, display, device, alloc, &self.scene, time, dt);
 
-					self.frame_count += 1;
+					if !is_fg_present {
+						self.frame_count += 1;
+					}
 
 					if let Ok(limit_str) = std::env::var("MOCHI_TEST_EXIT_FRAMES")
 						&& let Ok(limit) = limit_str.parse::<u64>()
@@ -382,7 +441,9 @@ impl ApplicationHandler for EngineApp {
 					display.request_redraw();
 				}
 
-				self.input.reset_frame();
+				if !is_fg_present {
+					self.input.reset_frame();
+				}
 			}
 			_ => {}
 		}

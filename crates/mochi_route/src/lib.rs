@@ -67,9 +67,13 @@ pub enum MainCommands {
 		#[arg(long)]
 		title: Option<String>,
 
-		/// VSync
-		#[arg(long)]
-		vsync: Option<bool>,
+		/// Enable VSync
+		#[arg(long, conflicts_with = "no_vsync")]
+		vsync: bool,
+
+		/// Disable VSync
+		#[arg(long = "no-vsync", conflicts_with = "vsync")]
+		no_vsync: bool,
 
 		/// Anti-aliasing mode
 		#[arg(long)]
@@ -78,6 +82,14 @@ pub enum MainCommands {
 		/// MSAA samples
 		#[arg(long)]
 		msaa: Option<u32>,
+
+		/// Enable FSR 3.1 Frame Generation (2x display present)
+		#[arg(long = "fg", alias = "frame-gen", conflicts_with = "no_fg")]
+		fg: bool,
+
+		/// Disable FSR 3.1 Frame Generation
+		#[arg(long = "no-fg", alias = "no-frame-gen", conflicts_with = "fg")]
+		no_fg: bool,
 
 		/// Mute audio
 		#[arg(short, long)]
@@ -161,8 +173,11 @@ fn main_cmd(cli: Cli) {
 			height,
 			title,
 			vsync,
+			no_vsync,
 			aa,
 			msaa,
+			fg,
+			no_fg,
 			mute,
 		} => run::run(run::RunInfo {
 			path: &path,
@@ -171,9 +186,17 @@ fn main_cmd(cli: Cli) {
 			width,
 			height,
 			title,
-			vsync,
+			vsync: if vsync {
+				Some(true)
+			} else if no_vsync {
+				Some(false)
+			} else {
+				None
+			},
 			aa,
 			msaa,
+			frame_gen: fg,
+			no_frame_gen: no_fg,
 			mute,
 		}),
 

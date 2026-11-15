@@ -10,6 +10,7 @@
 */
 
 
+pub use winit;
 use std::collections::HashSet;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
@@ -54,6 +55,11 @@ impl Input {
 
 	pub fn is_key_just_pressed(&self, keycode: u32) -> bool {
 		self.keys_just_pressed.contains(&keycode)
+	}
+
+	pub fn press_key_for_test(&mut self, keycode: u32) {
+		self.keys_just_pressed.insert(keycode);
+		self.keys_down.insert(keycode);
 	}
 
 	pub fn is_key_just_released(&self, keycode: u32) -> bool {

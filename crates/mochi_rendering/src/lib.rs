@@ -13,6 +13,7 @@
 pub mod aa;
 pub mod cluster;
 pub mod frame;
+pub mod frame_gen;
 pub mod fsr;
 pub mod queue;
 pub mod shadow;
@@ -25,6 +26,7 @@ pub mod velocity;
 pub use aa::*;
 pub use cluster::*;
 pub use frame::*;
+pub use frame_gen::*;
 pub use fsr::*;
 pub use queue::*;
 pub use shadow::*;

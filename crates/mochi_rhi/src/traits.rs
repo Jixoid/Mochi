@@ -48,6 +48,7 @@ pub trait RhiBackend: 'static + Sized + Send + Sync {
 		surface: u64,
 		width: u32,
 		height: u32,
+		vsync: bool,
 	) -> RhiResult<Self::Swapchain>;
 }
 
@@ -211,6 +212,7 @@ pub trait RhiSwapchain<B: RhiBackend>: Send + Sync {
 	fn image_count(&self) -> u32;
 	fn render_target(&self, index: u32) -> Option<&B::RenderTarget>;
 	fn render_finished_semaphore(&self, index: u32) -> &B::Semaphore;
+	fn vsync(&self) -> bool;
 }
 
 

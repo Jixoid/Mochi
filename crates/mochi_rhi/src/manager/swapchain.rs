@@ -54,8 +54,8 @@ unsafe impl<B: RhiBackend> Send for Swapchain<B> {}
 unsafe impl<B: RhiBackend> Sync for Swapchain<B> {}
 
 impl<B: RhiBackend> Swapchain<B> {
-	pub fn new(device: &Device<B>, surface: &Surface<B>, width: u32, height: u32) -> Self {
-		let sw = B::create_swapchain(device.raw(), surface.handle(), width, height)
+	pub fn new(device: &Device<B>, surface: &Surface<B>, width: u32, height: u32, vsync: bool) -> Self {
+		let sw = B::create_swapchain(device.raw(), surface.handle(), width, height, vsync)
 			.expect("Failed to create swapchain");
 		Self {
 			inner: Arc::new(Mutex::new(sw)),
@@ -135,5 +135,9 @@ impl<B: RhiBackend> Swapchain<B> {
 			.unwrap()
 			.render_finished_semaphore(index)
 			.clone()
+	}
+
+	pub fn vsync(&self) -> bool {
+		self.inner.lock().unwrap().vsync()
 	}
 }

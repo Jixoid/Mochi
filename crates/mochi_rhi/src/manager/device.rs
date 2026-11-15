@@ -199,6 +199,10 @@ impl<B: RhiBackend> Device<B> {
 		self.inner.descriptor_heap().map(Buffer::from_raw)
 	}
 
+	pub fn create_semaphore(&self) -> Result<B::Semaphore, String> {
+		self.inner.create_semaphore().map_err(|e| format!("{e}"))
+	}
+
 	pub fn sampler_heap(&self) -> Option<Buffer<B>> {
 		self.inner.sampler_heap().map(Buffer::from_raw)
 	}

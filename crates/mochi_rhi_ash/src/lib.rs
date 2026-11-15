@@ -85,6 +85,7 @@ impl RhiBackend for AshVulkanBackend {
 		surface: u64,
 		width: u32,
 		height: u32,
+		vsync: bool,
 	) -> RhiResult<Self::Swapchain> {
 		let surface_khr = ash::vk::SurfaceKHR::from_raw(surface);
 		AshSwapchain::new(
@@ -97,6 +98,7 @@ impl RhiBackend for AshVulkanBackend {
 			surface_khr,
 			width,
 			height,
+			vsync,
 		)
 	}
 }

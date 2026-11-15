@@ -24,6 +24,7 @@ use crate::smaa::{
 	SmaaResolvePushConstants,
 };
 use crate::fsr::{Fsr3UpscalePushConstants, FsrManager, FsrRcasPushConstants};
+use crate::frame_gen::*;
 use crate::taa::{TaaManager, TaaPushConstants, TaaSharpenPushConstants};
 use crate::velocity::{VelocityManager, VelocityPushConstants};
 use mochi_rhi as rhi;
@@ -112,10 +113,23 @@ pub struct RenderingSystem {
 	velocity_manager: Option<VelocityManager>,
 	taa_manager: Option<TaaManager>,
 	fsr_manager: Option<FsrManager>,
+	frame_gen_manager: Option<FsrFrameGenManager>,
+	frame_gen_enabled: bool,
+	frame_gen_phase: FrameGenPhase,
+	fg_curr_idx: usize,
+	fg_prev_idx: usize,
+	last_phase_a_time: Option<std::time::Instant>,
+	phase_a_duration: std::time::Duration,
 	cluster_manager: Option<ClusterManager>,
 	shadow_manager: Option<ShadowManager>,
 	shadow_queue: RenderQueue,
 	frame_index: u64,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FrameGenPhase {
+	Generate,
+	PresentReal,
 }
 
 impl RenderingSystem {
@@ -149,6 +163,13 @@ impl RenderingSystem {
 			velocity_manager: None,
 			taa_manager: None,
 			fsr_manager: None,
+			frame_gen_manager: None,
+			frame_gen_enabled: false,
+			frame_gen_phase: FrameGenPhase::Generate,
+			fg_curr_idx: 0,
+			fg_prev_idx: 1,
+			last_phase_a_time: None,
+			phase_a_duration: std::time::Duration::from_millis(16),
 			cluster_manager: None,
 			shadow_manager: None,
 			shadow_queue: RenderQueue::new(),
@@ -244,6 +265,9 @@ impl RenderingSystem {
 		let fsr_manager = FsrManager::new(device, color_format);
 		self.fsr_manager = Some(fsr_manager);
 
+		let frame_gen_manager = FsrFrameGenManager::new(device, color_format);
+		self.frame_gen_manager = Some(frame_gen_manager);
+
 		match ClusterManager::new(device, alloc) {
 			Ok(cm) => {
 				mochi_disp!("Clustered Forward light manager initialized");
@@ -281,6 +305,72 @@ impl RenderingSystem {
 		self.aa_mode
 	}
 
+	pub fn frame_gen_enabled(&self) -> bool {
+		self.frame_gen_enabled
+	}
+
+	pub fn is_frame_gen_present_phase(&self) -> bool {
+		self.frame_gen_enabled && self.frame_gen_phase == FrameGenPhase::PresentReal
+	}
+
+	pub fn set_frame_generation(
+		&mut self,
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		display: &mut Display,
+		enabled: bool,
+	) {
+		if self.frame_gen_enabled != enabled {
+			self.frame_gen_enabled = enabled;
+			self.frame_gen_phase = FrameGenPhase::Generate;
+			self.fg_curr_idx = 0;
+			self.fg_prev_idx = 1;
+			if let Some(fg) = &mut self.frame_gen_manager {
+				fg.has_history = false;
+			}
+
+			let msaa_samples = self.aa_mode.required_msaa();
+			let display_msaa = if self.aa_mode.is_post_process() || self.frame_gen_enabled {
+				rhi::MsaaSamples::Off
+			} else {
+				msaa_samples
+			};
+
+			if display.msaa_samples() != display_msaa {
+				display.set_msaa(display_msaa);
+			}
+
+			if let Some(template) = &self.default_template {
+				template.set_msaa(device, msaa_samples);
+			}
+			if let Some(transparent_template) = &self.transparent_template {
+				transparent_template.set_msaa(device, msaa_samples);
+			}
+
+			if self.frame_gen_enabled || self.aa_mode.is_post_process() {
+				let width = display.width();
+				let height = display.height();
+				let (render_w, render_h) = self.aa_mode.render_extent(width, height);
+				if let Some(target) = display.render_target(0) {
+					self.ensure_offscreen_target(
+						device,
+						alloc,
+						render_w,
+						render_h,
+						target.color_format(),
+						target.depth_format(),
+						msaa_samples,
+					);
+				}
+			}
+
+			mochi_disp!(
+				"FSR 3.1 Frame Generation toggled: {}",
+				if enabled { "ENABLED (Paced 2-Phase)" } else { "DISABLED" }
+			);
+		}
+	}
+
 	pub fn velocity_target(&self) -> Option<&crate::velocity::VelocityTarget> {
 		self
 			.velocity_manager
@@ -308,7 +398,7 @@ impl RenderingSystem {
 		self.aa_mode = mode;
 
 		let msaa_samples = mode.required_msaa();
-		let display_msaa = if mode.is_post_process() {
+		let display_msaa = if mode.is_post_process() || self.frame_gen_enabled {
 			rhi::MsaaSamples::Off
 		} else {
 			msaa_samples
@@ -325,7 +415,7 @@ impl RenderingSystem {
 			transparent_template.set_msaa(device, msaa_samples);
 		}
 
-		if mode.is_post_process() {
+		if mode.is_post_process() || self.frame_gen_enabled {
 			let width = display.width();
 			let height = display.height();
 			let (render_w, render_h) = mode.render_extent(width, height);
@@ -352,6 +442,10 @@ impl RenderingSystem {
 
 		if let Some(fsr) = &mut self.fsr_manager {
 			fsr.free_targets();
+		}
+
+		if let Some(fg) = &mut self.frame_gen_manager {
+			fg.free_targets();
 		}
 
 		mochi_disp!("Anti-Aliasing mode set to: {}", mode.name());
@@ -498,20 +592,42 @@ impl RenderingSystem {
 	pub fn set_msaa(
 		&mut self,
 		device: &rhi::Device,
+		alloc: &rhi::Allocator,
 		display: &mut Display,
 		samples: rhi::MsaaSamples,
 	) {
-		if display.msaa_samples() == samples {
-			return;
-		}
+		let display_msaa = if self.frame_gen_enabled || self.aa_mode.is_post_process() {
+			rhi::MsaaSamples::Off
+		} else {
+			samples
+		};
 
-		display.set_msaa(samples);
+		if display.msaa_samples() != display_msaa {
+			display.set_msaa(display_msaa);
+		}
 
 		if let Some(template) = &self.default_template {
 			template.set_msaa(device, samples);
 		}
 		if let Some(transparent_template) = &self.transparent_template {
 			transparent_template.set_msaa(device, samples);
+		}
+
+		if self.frame_gen_enabled || self.aa_mode.is_post_process() {
+			let width = display.width();
+			let height = display.height();
+			let (render_w, render_h) = self.aa_mode.render_extent(width, height);
+			if let Some(target) = display.render_target(0) {
+				self.ensure_offscreen_target(
+					device,
+					alloc,
+					render_w,
+					render_h,
+					target.color_format(),
+					target.depth_format(),
+					samples,
+				);
+			}
 		}
 
 		mochi_disp!("MSAA changed to {:?}", samples);
@@ -561,6 +677,68 @@ impl RenderingSystem {
 		time: f32,
 		delta_time: f32,
 	) {
+		if self.frame_gen_enabled && self.frame_gen_phase == FrameGenPhase::PresentReal {
+			// Optional pacing when VSync is disabled: wait until half of Phase A's duration has elapsed
+			if !display.vsync() && let Some(last_time) = self.last_phase_a_time {
+				let target_half = self.phase_a_duration / 2;
+				let elapsed = last_time.elapsed();
+				if elapsed < target_half {
+					let wait_time = target_half - elapsed;
+					if wait_time.as_micros() > 500 {
+						std::thread::sleep(wait_time - std::time::Duration::from_micros(200));
+					}
+					while last_time.elapsed() < target_half {
+						std::hint::spin_loop();
+					}
+				}
+			}
+
+			sync.begin_frame();
+			let frame = sync.current_frame() as usize;
+			let wait_sem = sync.image_available_semaphore();
+			let img_idx = display.acquire_next_image_with_semaphore(&wait_sem);
+			let width = display.width();
+			let height = display.height();
+
+			let cmd = &mut self.cmd_buffers[frame];
+			cmd.begin();
+
+			if let (Some(fg), Some(swapchain_target)) = (&self.frame_gen_manager, display.render_target(img_idx))
+				&& let Some(fg_targets) = &fg.targets
+			{
+				let target_no_depth = swapchain_target.without_depth();
+				cmd.render_pass(&target_no_depth, [0.0, 0.0, 0.0, 1.0], |pass| {
+					pass.set_viewport_and_scissor(width, height);
+					pass.bind_pipeline(&fg.blit_pipeline);
+
+					let pc = FullscreenBlitPushConstants {
+						texture_id: fg_targets.color_descriptor_ids[self.fg_curr_idx],
+						_pad0: 0,
+						_pad1: 0,
+						_pad2: 0,
+					};
+					pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+					pass.draw(3, 1, 0, 0);
+				});
+			}
+
+			cmd.end();
+
+			let sig_sem = display.render_finished_semaphore(img_idx);
+			let fence = sync.in_flight_fence();
+			cmdmng.submit_with_sync(cmd, Some(&wait_sem), Some(&sig_sem), Some(&fence));
+			sync.end_frame();
+			display.present_with_semaphore(img_idx, &sig_sem);
+
+			// Transition back to Generate phase for next frame
+			self.frame_gen_phase = FrameGenPhase::Generate;
+			self.fg_prev_idx = self.fg_curr_idx;
+			self.fg_curr_idx = 1 - self.fg_curr_idx;
+			return;
+		}
+
+		let phase_a_start = std::time::Instant::now();
+
 		sync.begin_frame();
 		let frame = sync.current_frame() as usize;
 		let wait_sem = sync.image_available_semaphore();
@@ -573,10 +751,12 @@ impl RenderingSystem {
 		} else {
 			1.0
 		};
-		let is_post_process = self.aa_mode.is_post_process();
+		let is_post_process = self.aa_mode.is_post_process() || self.frame_gen_enabled;
 		let (render_w, render_h) = self.aa_mode.render_extent(width, height);
 		let target_w = if is_post_process { render_w } else { width };
 		let target_h = if is_post_process { render_h } else { height };
+		let fg_curr_idx = self.fg_curr_idx;
+		let fg_prev_idx = self.fg_prev_idx;
 
 		let (cam_transform, camera) = scene
 			.active_camera()
@@ -782,8 +962,8 @@ impl RenderingSystem {
 					);
 				});
 
-				// On-demand Velocity Buffer generation (only if active mode requires it)
-				if self.aa_mode.needs_velocity() {
+				// On-demand Velocity Buffer generation (only if active mode or Frame Gen requires it)
+				if self.aa_mode.needs_velocity() || self.frame_gen_enabled {
 					if let Some(vm) = &mut self.velocity_manager {
 						vm.ensure_target(device, alloc, target_w, target_h);
 						if let Some(vt) = &vm.target {
@@ -809,11 +989,36 @@ impl RenderingSystem {
 					vm.free_target();
 				}
 
+				if self.frame_gen_enabled && let Some(fg) = &mut self.frame_gen_manager {
+					if let Some(swapchain_target) = display.render_target(img_idx) {
+						let swapchain_format = swapchain_target.color_format();
+						fg.update_swapchain_format(device, swapchain_format);
+					}
+					fg.ensure_targets(device, alloc, width, height);
+				}
+
+				let final_output_target = if self.frame_gen_enabled
+					&& let Some(fg) = &self.frame_gen_manager
+					&& let Some(fg_targets) = &fg.targets
+				{
+					Some(
+						rhi::RenderTarget::builder(width, height)
+							.color(
+								&fg_targets.color_images[fg_curr_idx],
+								&fg_targets.color_views[fg_curr_idx],
+								fg.swapchain_color_format,
+							)
+							.build(device),
+					)
+				} else {
+					display.render_target(img_idx)
+				};
+
 				if self.aa_mode.is_fxaa() {
-					if let (Some(swapchain_target), Some(fxaa_pipeline)) =
-						(display.render_target(img_idx), &self.fxaa_pipeline)
+					if let (Some(target), Some(fxaa_pipeline)) =
+						(&final_output_target, &self.fxaa_pipeline)
 					{
-						let target_no_depth = swapchain_target.without_depth();
+						let target_no_depth = target.without_depth();
 						cmd.render_pass(&target_no_depth, clear_color, |pass| {
 							pass.set_viewport_and_scissor(width, height);
 							pass.bind_pipeline(fxaa_pipeline);
@@ -944,8 +1149,8 @@ impl RenderingSystem {
 								});
 
 								// 4. Pass 4: SMAA Temporal Resolve
-								if let Some(swapchain_target) = display.render_target(img_idx) {
-									let target_no_depth = swapchain_target.without_depth();
+								if let Some(target) = &final_output_target {
+									let target_no_depth = target.without_depth();
 									cmd.render_pass(&target_no_depth, clear_color, |pass| {
 										pass.set_viewport_and_scissor(width, height);
 										pass.bind_pipeline(&smaa.resolve_pipeline);
@@ -964,9 +1169,9 @@ impl RenderingSystem {
 								smaa.has_history = true;
 							}
 						} else {
-							// 3. Pass 3: SMAA Neighborhood Blending (Direct to Swapchain)
-							if let Some(swapchain_target) = display.render_target(img_idx) {
-								let target_no_depth = swapchain_target.without_depth();
+							// 3. Pass 3: SMAA Neighborhood Blending
+							if let Some(target) = &final_output_target {
+								let target_no_depth = target.without_depth();
 								cmd.render_pass(&target_no_depth, clear_color, |pass| {
 									pass.set_viewport_and_scissor(width, height);
 									pass.bind_pipeline(&smaa.neighbor_pipeline);
@@ -1033,9 +1238,9 @@ impl RenderingSystem {
 							pass.draw(3, 1, 0, 0);
 						});
 
-						// 2. Pass 2: TAA Sharpen / Present (Current History -> Swapchain RenderTarget)
-						if let Some(swapchain_target) = display.render_target(img_idx) {
-							let target_no_depth = swapchain_target.without_depth();
+						// 2. Pass 2: TAA Sharpen / Present
+						if let Some(target) = &final_output_target {
+							let target_no_depth = target.without_depth();
 							cmd.render_pass(&target_no_depth, clear_color, |pass| {
 								pass.set_viewport_and_scissor(width, height);
 								pass.bind_pipeline(&taa.sharpen_pipeline);
@@ -1131,9 +1336,9 @@ impl RenderingSystem {
 
 						fsr.has_history = true;
 
-						// Pass 2: AMD RCAS (Robust Contrast Adaptive Sharpening) directly to swapchain
-						if let Some(swapchain_target) = display.render_target(img_idx) {
-							let target_no_depth = swapchain_target.without_depth();
+						// Pass 2: AMD RCAS (Robust Contrast Adaptive Sharpening)
+						if let Some(target) = &final_output_target {
+							let target_no_depth = target.without_depth();
 							cmd.render_pass(&target_no_depth, clear_color, |pass| {
 								pass.set_viewport_and_scissor(width, height);
 								pass.bind_pipeline(&fsr.rcas_pipeline);
@@ -1158,6 +1363,24 @@ impl RenderingSystem {
 							});
 						}
 					}
+				} else if self.frame_gen_enabled
+					&& let Some(target) = &final_output_target
+					&& let (Some(fg), Some(offscreen)) = (&self.frame_gen_manager, &self.offscreen_target)
+				{
+					let target_no_depth = target.without_depth();
+					cmd.render_pass(&target_no_depth, clear_color, |pass| {
+						pass.set_viewport_and_scissor(width, height);
+						pass.bind_pipeline(&fg.blit_pipeline);
+
+						let pc = FullscreenBlitPushConstants {
+							texture_id: offscreen.descriptor_id,
+							_pad0: 0,
+							_pad1: 0,
+							_pad2: 0,
+						};
+						pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+						pass.draw(3, 1, 0, 0);
+					});
 				}
 			}
 		} else if let Some(target) = display.render_target(img_idx) {
@@ -1173,14 +1396,104 @@ impl RenderingSystem {
 			});
 		}
 
-		cmd.end();
+		let offscreen_depth_id = self
+			.offscreen_target
+			.as_ref()
+			.map(|o| o.depth_descriptor_id)
+			.unwrap_or(0);
+		let velocity_tex_id = self
+			.velocity_manager
+			.as_ref()
+			.and_then(|v| v.target.as_ref())
+			.map(|vt| vt.descriptor_id)
+			.unwrap_or(0);
+		let display_metrics = [
+			1.0 / width as f32,
+			1.0 / height as f32,
+			width as f32,
+			height as f32,
+		];
 
-		let sig_sem = display.render_finished_semaphore(img_idx);
-		let fence = sync.in_flight_fence();
-		cmdmng.submit_with_sync(cmd, Some(&wait_sem), Some(&sig_sem), Some(&fence));
-		sync.end_frame();
+		if self.frame_gen_enabled
+			&& let Some(fg) = &mut self.frame_gen_manager
+			&& let Some(fg_targets) = &fg.targets
+		{
+			if fg.has_history {
+				// Pass 1: Render Generated Frame into img_idx
+				if let Some(swapchain_target) = display.render_target(img_idx) {
+					let target_no_depth = swapchain_target.without_depth();
+					cmd.render_pass(&target_no_depth, clear_color, |pass| {
+						pass.set_viewport_and_scissor(width, height);
+						pass.bind_pipeline(&fg.frame_gen_pipeline);
 
-		display.present_with_semaphore(img_idx, &sig_sem);
+						let pc = Fsr3FrameGenPushConstants {
+							display_metrics,
+							prev_color_tex_id: fg_targets.color_descriptor_ids[fg_prev_idx],
+							curr_color_tex_id: fg_targets.color_descriptor_ids[fg_curr_idx],
+							velocity_tex_id,
+							depth_tex_id: offscreen_depth_id,
+							interpolation_factor: fg.interpolation_factor,
+							disocclusion_threshold: fg.disocclusion_threshold,
+							has_history: 1,
+							_pad0: 0.0,
+						};
+						pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+						pass.draw(3, 1, 0, 0);
+					});
+				}
+
+				cmd.end();
+
+				let sig_sem = display.render_finished_semaphore(img_idx);
+				let fence = sync.in_flight_fence();
+				cmdmng.submit_with_sync(cmd, Some(&wait_sem), Some(&sig_sem), Some(&fence));
+				sync.end_frame();
+				display.present_with_semaphore(img_idx, &sig_sem);
+
+				self.last_phase_a_time = Some(std::time::Instant::now());
+				self.phase_a_duration = phase_a_start.elapsed();
+				self.frame_gen_phase = FrameGenPhase::PresentReal;
+			} else {
+				// First frame after initialization/reset: blit curr_idx directly to img_idx
+				if let Some(swapchain_target) = display.render_target(img_idx) {
+					let target_no_depth = swapchain_target.without_depth();
+					cmd.render_pass(&target_no_depth, clear_color, |pass| {
+						pass.set_viewport_and_scissor(width, height);
+						pass.bind_pipeline(&fg.blit_pipeline);
+
+						let pc = FullscreenBlitPushConstants {
+							texture_id: fg_targets.color_descriptor_ids[fg_curr_idx],
+							_pad0: 0,
+							_pad1: 0,
+							_pad2: 0,
+						};
+						pass.push_constant(rhi::ShaderStage::Pixel, 0, &pc);
+						pass.draw(3, 1, 0, 0);
+					});
+				}
+
+				cmd.end();
+
+				let sig_sem = display.render_finished_semaphore(img_idx);
+				let fence = sync.in_flight_fence();
+				cmdmng.submit_with_sync(cmd, Some(&wait_sem), Some(&sig_sem), Some(&fence));
+				sync.end_frame();
+				display.present_with_semaphore(img_idx, &sig_sem);
+
+				fg.has_history = true;
+				self.fg_prev_idx = self.fg_curr_idx;
+				self.fg_curr_idx = 1 - self.fg_curr_idx;
+			}
+		} else {
+			cmd.end();
+
+			let sig_sem = display.render_finished_semaphore(img_idx);
+			let fence = sync.in_flight_fence();
+			cmdmng.submit_with_sync(cmd, Some(&wait_sem), Some(&sig_sem), Some(&fence));
+			sync.end_frame();
+
+			display.present_with_semaphore(img_idx, &sig_sem);
+		}
 	}
 
 	fn record_scene_packets(

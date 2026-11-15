@@ -29,6 +29,8 @@ pub struct RunInfo<'a> {
 	pub vsync: Option<bool>,
 	pub aa: Option<String>,
 	pub msaa: Option<u32>,
+	pub frame_gen: bool,
+	pub no_frame_gen: bool,
 	pub mute: bool,
 }
 
@@ -56,7 +58,7 @@ pub fn run(info: RunInfo) -> Result<(), Error> {
 	// If a specific scene is passed (via info.scene or info.path being a .mscene file)
 	if let Some(scene) = info.scene {
 		config.scene.start_scene = scene.to_string_lossy().to_string();
-	} else if info.path.is_file() && info.path.file_name().map_or(true, |n| n != "mochi.ron") {
+	} else if info.path.is_file() && info.path.file_name().is_none_or(|n| n != "mochi.ron") {
 		config.scene.start_scene = info.path.to_string_lossy().to_string();
 	}
 
@@ -88,16 +90,24 @@ pub fn run(info: RunInfo) -> Result<(), Error> {
 		mochi_script::api::mochi_set_msaa(msaa as i32);
 	}
 
+	if info.frame_gen {
+		config.rendering.frame_generation = true;
+		mochi_script::api::mochi_set_frame_generation(true);
+	} else if info.no_frame_gen {
+		config.rendering.frame_generation = false;
+		mochi_script::api::mochi_set_frame_generation(false);
+	}
+
 	// QW style execution message
 	eprintln!("{:>12} {}", "Running".green().bold(), config.scene.start_scene);
 
 	let mut engine = Engine::with_config(config);
 
-	if !info.mute {
-		if let Some(audio) = engine.audio_system() {
-			let startup_chime = std::sync::Arc::new(AudioClip::sine_wave(523.25, 0.35, 44100));
-			audio.play_one_shot(startup_chime, 0.15);
-		}
+	if !info.mute
+		&& let Some(audio) = engine.audio_system()
+	{
+		let startup_chime = std::sync::Arc::new(AudioClip::sine_wave(523.25, 0.35, 44100));
+		audio.play_one_shot(startup_chime, 0.15);
 	}
 
 	engine.set_idle(|_dt| {});
