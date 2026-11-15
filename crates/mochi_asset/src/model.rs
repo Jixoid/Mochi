@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use mochi_material::{MaterialInstance, MaterialTemplate, PbrProperties, TextureManager};
@@ -143,34 +143,25 @@ pub struct ModelAsset {
 }
 
 impl ModelAsset {
-	pub fn load(path: &str) -> Result<Self, String> {
-		if path.ends_with(".glb") || path.ends_with(".gltf") {
+	pub fn load_file(path: &Path, project_root: Option<&Path>) -> Result<Self, String> {
+		let path_str = path.to_string_lossy();
+		if path_str.ends_with(".glb") || path_str.ends_with(".gltf") {
 			return Self::load_gltf(path);
 		}
 
-		if path.ends_with(".masset") {
-			let bytes = fs::read(path).map_err(|e| format!("Failed to read binary asset {path}: {e}"))?;
+		if path_str.ends_with(".masset") || path_str.ends_with(".masset.bin") {
+			let bytes = fs::read(path)
+				.map_err(|e| format!("Failed to read binary asset {}: {e}", path.display()))?;
 			postcard::from_bytes::<Self>(&bytes)
-				.map_err(|e| format!("Failed to deserialize binary asset {path}: {e}"))
+				.map_err(|e| format!("Failed to deserialize binary asset {}: {e}", path.display()))
 		} else {
-			let content =
-				fs::read_to_string(path).map_err(|e| format!("Failed to read RON asset {path}: {e}"))?;
+			let content = fs::read_to_string(path)
+				.map_err(|e| format!("Failed to read asset {}: {e}", path.display()))?;
 			let desc = ron::from_str::<Self>(&content)
-				.map_err(|e| format!("Failed to deserialize RON asset {path}: {e}"))?;
+				.map_err(|e| format!("Failed to deserialize asset {}: {e}", path.display()))?;
 
 			if let Some(src) = &desc.source {
-				let resolved_source = if Path::new(src).is_absolute() {
-					PathBuf::from(src)
-				} else {
-					let parent = Path::new(path).parent().unwrap_or(Path::new(""));
-					let rel = parent.join(src);
-					if rel.exists() {
-						rel
-					} else {
-						PathBuf::from(src)
-					}
-				};
-
+				let resolved_source = crate::resolve_relative(src, path.parent(), project_root);
 				let mut imported = Self::load_gltf(&resolved_source)?;
 				if !desc.name.is_empty() {
 					imported.name = desc.name;
@@ -192,6 +183,10 @@ impl ModelAsset {
 				Ok(desc)
 			}
 		}
+	}
+
+	pub fn load(path: &str) -> Result<Self, String> {
+		Self::load_file(Path::new(path), None)
 	}
 
 	pub fn load_gltf(path: impl AsRef<Path>) -> Result<Self, String> {

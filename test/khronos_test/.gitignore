@@ -1,0 +1,6 @@
+target/
+scripts/build/
+*.so
+*.o
+*.qwu
+

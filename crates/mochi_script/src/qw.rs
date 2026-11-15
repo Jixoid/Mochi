@@ -49,7 +49,9 @@ impl LoadedQwScript {
 			.modified()
 			.map_err(|e| format!("Failed to get mtime for {}: {e}", source_path.display()))?;
 
-		let cache_dir = PathBuf::from("target/qw_cache");
+		let cache_dir = find_project_root(source_path)
+			.map(|r| r.join("target/qw_cache"))
+			.unwrap_or_else(|| PathBuf::from("target/qw_cache"));
 		fs::create_dir_all(&cache_dir)
 			.map_err(|e| format!("Failed to create cache dir {}: {e}", cache_dir.display()))?;
 
@@ -192,7 +194,7 @@ pub fn ensure_engine_unit() -> Result<PathBuf, String> {
 	Ok(canonical)
 }
 
-fn compile_qw_script(source_path: &Path, output_so_path: &Path) -> Result<(), String> {
+pub fn compile_qw_script(source_path: &Path, output_so_path: &Path) -> Result<(), String> {
 	let mochi_dep_dir = ensure_engine_unit()?;
 
 	let output = Command::new("qw.debug")
@@ -225,4 +227,19 @@ fn compile_qw_script(source_path: &Path, output_so_path: &Path) -> Result<(), St
 	}
 
 	Ok(())
+}
+
+fn find_project_root(start: &Path) -> Option<PathBuf> {
+	let mut current = if start.is_file() {
+		start.parent()
+	} else {
+		Some(start)
+	};
+	while let Some(dir) = current {
+		if dir.join("mochi.ron").exists() {
+			return Some(dir.to_path_buf());
+		}
+		current = dir.parent();
+	}
+	None
 }

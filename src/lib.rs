@@ -21,5 +21,6 @@ pub use mochi_rendering as rendering;
 pub use mochi_script as script;
 pub use mochi_asset as asset;
 pub use mochi_core as core;
+pub use mochi_route as route;
 pub use mochi_except::*;
 pub use mochi_math as math;

@@ -42,6 +42,7 @@ impl ScriptComponent {
 pub struct ScriptSystem {
 	loaded_scripts: HashMap<String, LoadedQwScript>,
 	started_entities: HashSet<Entity>,
+	missing_reported: HashSet<String>,
 }
 
 impl ScriptSystem {
@@ -49,6 +50,7 @@ impl ScriptSystem {
 		Self {
 			loaded_scripts: HashMap::new(),
 			started_entities: HashSet::new(),
+			missing_reported: HashSet::new(),
 		}
 	}
 
@@ -71,6 +73,9 @@ impl ScriptSystem {
 		for (entity, path_str) in script_entities {
 			let path = Path::new(&path_str);
 			if !path.exists() {
+				if self.missing_reported.insert(path_str.clone()) {
+					mochi_error!("Script file not found: '{}'", path_str);
+				}
 				continue;
 			}
 

@@ -10,26 +10,9 @@
 */
 
 
-use mochi_audio::AudioClip;
-use mochi_core::Engine;
-use mochi_except::*;
+use mochi_route::route;
 
 
 fn main() {
-	mochi_except::start();
-	let mut engine = Engine::from_config("mochi.ron");
-
-	// Play a procedural startup chime to verify audio subsystem
-	if let Some(audio) = engine.audio_system() {
-		let startup_chime = std::sync::Arc::new(AudioClip::sine_wave(523.25, 0.35, 44100));
-		audio.play_one_shot(startup_chime, 0.15);
-	}
-
-	engine.set_idle(|_dt| {
-		// Frame update
-	});
-
-	if let Err(err) = engine.run() {
-		mochi_error!("Runtime error: {err}");
-	}
+	route();
 }

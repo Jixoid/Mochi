@@ -23,7 +23,7 @@ use mochi_audio::AudioSystem;
 use mochi_display::Display;
 use mochi_rendering::RenderingSystem;
 use mochi_rhi as rhi;
-use mochi_scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
+use mochi_scene::Scene;
 use mochi_script::ScriptSystem;
 use mochi_except::*;
 
@@ -175,28 +175,32 @@ impl ApplicationHandler for EngineApp {
 							display.msaa_samples(),
 						);
 
-						let scene_path = &self.config.scene.start_scene;
-						match SceneAsset::load(scene_path) {
+						let resolved_scene_path = self.config.resolve_path(&self.config.scene.start_scene);
+						let scene_dir = resolved_scene_path.parent();
+						let project_root = &self.config.root_dir;
+						match SceneAsset::load_file(&resolved_scene_path) {
 							Ok(scene_asset) => {
 								mochi_disp!(
 									"Loaded scene asset '{}' from {}",
 									scene_asset.name,
-									scene_path
+									resolved_scene_path.display()
 								);
-								if let Err(err) = scene_asset.instantiate(device, alloc, rendering, &mut self.scene)
-								{
+								if let Err(err) = scene_asset.instantiate(
+									device,
+									alloc,
+									rendering,
+									&mut self.scene,
+									scene_dir,
+									Some(project_root),
+								) {
 									mochi_error!("Failed to instantiate scene: {err}");
 								}
 							}
 							Err(err) => {
-								mochi_warn!("Could not load scene '{scene_path}': {err}. Spawning fallback cube.");
-								if let Some(mat) = rendering.default_material() {
-									let cube_mesh = Mesh::create_cube(device, alloc, 1.2);
-									let cube_transform = TransformComponent::default();
-									self
-										.scene
-										.spawn((cube_transform, MeshRendererComponent::new(cube_mesh, mat)));
-								}
+								mochi_error!(
+									"Could not load scene '{}': {err}",
+									resolved_scene_path.display()
+								);
 							}
 						}
 					}
@@ -412,6 +416,12 @@ pub struct Engine {
 impl Engine {
 	pub fn from_config(config_path: &str) -> Self {
 		let config = ProjectConfig::load_or_default(config_path);
+		Self {
+			app: EngineApp::from_config(config),
+		}
+	}
+
+	pub fn with_config(config: ProjectConfig) -> Self {
 		Self {
 			app: EngineApp::from_config(config),
 		}

@@ -14,7 +14,7 @@ SceneAsset(
 				clear_color: (0.04, 0.05, 0.08, 1.0),
 			)),
 			script: Some(ScriptDesc(
-				path: "assets/scripts/free_cam.qw",
+				path: "scripts/free_cam.qw",
 				is_active: true,
 			)),
 		),
@@ -97,7 +97,7 @@ SceneAsset(
 				scale: (20.0, 1.0, 20.0),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/floor.masset.ron",
+				asset: "models/floor.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -109,7 +109,7 @@ SceneAsset(
 				scale: (1.5, 0.8, 1.5),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/pedestal.masset.ron",
+				asset: "models/pedestal.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -121,7 +121,7 @@ SceneAsset(
 				scale: (0.65, 0.65, 0.65),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/helmet.masset.ron",
+				asset: "models/helmet.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -133,7 +133,7 @@ SceneAsset(
 				scale: (2.4, 0.5, 3.8),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/pedestal.masset.ron",
+				asset: "models/pedestal.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -146,7 +146,7 @@ SceneAsset(
 				scale: (0.007, 0.007, 0.007),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/toy_car.masset.ron",
+				asset: "models/toy_car.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -158,7 +158,7 @@ SceneAsset(
 				scale: (1.5, 0.8, 1.5),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/pedestal.masset.ron",
+				asset: "models/pedestal.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -171,7 +171,7 @@ SceneAsset(
 				scale: (0.006, 0.006, 0.006),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/duck.masset.ron",
+				asset: "models/duck.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -183,7 +183,7 @@ SceneAsset(
 				scale: (0.8, 0.6, 0.8),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/pedestal.masset.ron",
+				asset: "models/pedestal.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -195,7 +195,7 @@ SceneAsset(
 				scale: (0.3, 0.3, 0.3),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/gold_sphere.masset.ron",
+				asset: "models/gold_sphere.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -207,7 +207,7 @@ SceneAsset(
 				scale: (0.8, 0.6, 0.8),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/pedestal.masset.ron",
+				asset: "models/pedestal.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -219,7 +219,7 @@ SceneAsset(
 				scale: (0.3, 0.3, 0.3),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/ruby_sphere.masset.ron",
+				asset: "models/ruby_sphere.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -231,7 +231,7 @@ SceneAsset(
 				scale: (0.8, 0.5, 0.8),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/pedestal.masset.ron",
+				asset: "models/pedestal.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),
@@ -243,7 +243,7 @@ SceneAsset(
 				scale: (0.3, 0.3, 0.3),
 			)),
 			mesh_renderer: Some(MeshRendererDesc(
-				asset: "assets/models/chrome_sphere.masset.ron",
+				asset: "models/chrome_sphere.masset.ron",
 				is_visible: true,
 				cast_shadows: true,
 			)),

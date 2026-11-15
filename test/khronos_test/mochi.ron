@@ -11,6 +11,6 @@ ProjectConfig(
 		clear_color: (0.1, 0.15, 0.25, 1.0),
 	),
 	scene: SceneConfig(
-		start_scene: "assets/scenes/main.mscene.ron",
+		start_scene: "scenes/main.mscene.ron",
 	),
 )

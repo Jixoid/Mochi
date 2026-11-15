@@ -186,23 +186,29 @@ pub struct SceneAsset {
 }
 
 impl SceneAsset {
-	pub fn load(path: &str) -> Result<Self, String> {
-		if path.ends_with(".mscene") {
-			let bytes = fs::read(path).map_err(|e| format!("Failed to read binary scene {path}: {e}"))?;
+	pub fn load_file(path: &std::path::Path) -> Result<Self, String> {
+		let path_str = path.to_string_lossy();
+		if path_str.ends_with(".mscene") || path_str.ends_with(".mscene.bin") {
+			let bytes = fs::read(path)
+				.map_err(|e| format!("Failed to read binary scene {}: {e}", path.display()))?;
 			postcard::from_bytes::<Self>(&bytes)
-				.map_err(|e| format!("Failed to deserialize binary scene {path}: {e}"))
+				.map_err(|e| format!("Failed to deserialize binary scene {}: {e}", path.display()))
 		} else {
-			let content =
-				fs::read_to_string(path).map_err(|e| format!("Failed to read RON scene {path}: {e}"))?;
+			let content = fs::read_to_string(path)
+				.map_err(|e| format!("Failed to read scene {}: {e}", path.display()))?;
 			ron::from_str::<Self>(&content)
-				.map_err(|e| format!("Failed to deserialize RON scene {path}: {e}"))
+				.map_err(|e| format!("Failed to deserialize scene {}: {e}", path.display()))
 		}
+	}
+
+	pub fn load(path: &str) -> Result<Self, String> {
+		Self::load_file(std::path::Path::new(path))
 	}
 
 	pub fn save_ron(&self, path: &str) -> Result<(), String> {
 		let s = ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::default())
-			.map_err(|e| format!("Failed to serialize scene to RON: {e}"))?;
-		fs::write(path, s).map_err(|e| format!("Failed to write RON file {path}: {e}"))
+			.map_err(|e| format!("Failed to serialize scene: {e}"))?;
+		fs::write(path, s).map_err(|e| format!("Failed to write file {path}: {e}"))
 	}
 
 	pub fn save_binary(&self, path: &str) -> Result<(), String> {
@@ -217,6 +223,8 @@ impl SceneAsset {
 		alloc: &rhi::Allocator,
 		rendering: &mut RenderingSystem,
 		scene: &mut Scene,
+		scene_dir: Option<&std::path::Path>,
+		project_root: Option<&std::path::Path>,
 	) -> Result<(), String> {
 		let template = rendering
 			.default_template()
@@ -240,10 +248,13 @@ impl SceneAsset {
 				.unwrap_or_default();
 
 			if let Some(mr) = &entity_desc.mesh_renderer {
-				let submeshes = if let Some(cached) = loaded_models.get(&mr.asset) {
+				let resolved_model_path = crate::resolve_relative(&mr.asset, scene_dir, project_root);
+				let model_key = resolved_model_path.to_string_lossy().to_string();
+
+				let submeshes = if let Some(cached) = loaded_models.get(&model_key) {
 					cached.clone()
 				} else {
-					match ModelAsset::load(&mr.asset) {
+					match ModelAsset::load_file(&resolved_model_path, project_root) {
 						Ok(model) => {
 							let cmdmng = rendering.cmdmng().clone();
 							let built = model.build_runtime(
@@ -254,11 +265,11 @@ impl SceneAsset {
 								&template,
 								&transparent_template,
 							);
-							loaded_models.insert(mr.asset.clone(), built.clone());
+							loaded_models.insert(model_key, built.clone());
 							built
 						}
 						Err(err) => {
-							mochi_error!("Failed to load model asset '{}': {err}", mr.asset);
+							mochi_error!("Failed to load model asset '{}': {err}", resolved_model_path.display());
 							Vec::new()
 						}
 					}
@@ -270,8 +281,9 @@ impl SceneAsset {
 					renderer.cast_shadows = mr.cast_shadows;
 
 					if let Some(sc) = &entity_desc.script {
+						let resolved_script_path = crate::resolve_relative(&sc.path, scene_dir, project_root);
 						let script_comp = ScriptComponent {
-							path: sc.path.clone(),
+							path: resolved_script_path.to_string_lossy().to_string(),
 							is_active: sc.is_active,
 						};
 						scene.spawn((transform, renderer, script_comp));
@@ -326,8 +338,9 @@ impl SceneAsset {
 				}
 
 				if let Some(sc) = &entity_desc.script {
+					let resolved_script_path = crate::resolve_relative(&sc.path, scene_dir, project_root);
 					let script_comp = ScriptComponent {
-						path: sc.path.clone(),
+						path: resolved_script_path.to_string_lossy().to_string(),
 						is_active: sc.is_active,
 					};
 					let _ = scene.world_mut().insert_one(entity, script_comp);

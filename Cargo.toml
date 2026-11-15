@@ -28,3 +28,4 @@ mochi_ahi = { path = "crates/mochi_ahi" }
 mochi_ahi_cpal = { path = "crates/mochi_ahi_cpal" }
 mochi_math = { path = "crates/mochi_math" }
 mochi_except = { path = "crates/mochi_except" }
+mochi_route = { path = "crates/mochi_route" }
