@@ -36,6 +36,7 @@ struct SpotLight {
 	vec4 color_intensity;
 	vec4 direction_cos_inner;
 	vec4 params;
+	mat4 shadow_view_proj;
 };
 
 struct ClusterRecord {
@@ -57,7 +58,7 @@ layout(buffer_reference, scalar) readonly buffer PointLightBuffer {
 	PointLight lights[];
 };
 
-layout(buffer_reference, scalar) readonly buffer SpotLightBuffer {
+layout(buffer_reference, scalar, row_major) readonly buffer SpotLightBuffer {
 	SpotLight lights[];
 };
 
@@ -258,6 +259,46 @@ float evaluate_csm_shadow(SceneFrameData scene, uint light_idx, vec3 world_pos, 
 	return shadow;
 }
 
+float evaluate_spot_shadow(SpotLight spot, vec3 world_pos, vec3 N) {
+	uint shadow_tex_id = floatBitsToUint(spot.params.z);
+	if (shadow_tex_id == 0u) {
+		return 1.0;
+	}
+
+	vec3 light_vec = spot.position_radius.xyz - world_pos;
+	vec3 L = normalize(light_vec);
+	float NdotL = max(dot(N, L), 0.0);
+
+	// Slope-scaled normal offset bias to eliminate shadow acne
+	float normal_bias = max(0.005, 0.02 * (1.0 - NdotL));
+	vec3 biased_pos = world_pos + N * normal_bias;
+
+	vec4 shadow_clip = spot.shadow_view_proj * vec4(biased_pos, 1.0);
+	if (shadow_clip.w <= 0.001) {
+		return 0.0;
+	}
+
+	vec3 proj_coords = shadow_clip.xyz / shadow_clip.w;
+	vec2 shadow_uv = proj_coords.xy * 0.5 + 0.5;
+	float current_depth = proj_coords.z;
+
+	if (current_depth > 1.0 || current_depth < 0.0 || shadow_uv.x < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y < 0.0 || shadow_uv.y > 1.0) {
+		return 1.0;
+	}
+
+	float bias = max(0.0002, 0.0012 * (1.0 - NdotL));
+	vec2 inv_size = vec2(1.0 / 1024.0);
+
+	// 4-tap bilinear PCF filter (equivalent to continuous 16-tap filtered shadow)
+	float shadow = 0.0;
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75, -0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75, -0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75,  0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75,  0.75) * inv_size, current_depth, bias);
+
+	return shadow * 0.25;
+}
+
 
 void main() {
 	SceneFrameData scene = SceneFrameData(pc.scene_address);
@@ -438,6 +479,11 @@ void main() {
 				dist_atten = (dist_atten * dist_atten) / (distance * distance + 1.0);
 
 				vec3 radiance = spot.color_intensity.rgb * spot.color_intensity.w * dist_atten * spot_atten;
+
+				if (spot.params.y > 0.5) {
+					float shadow = evaluate_spot_shadow(spot, in_world_pos, N);
+					radiance *= shadow;
+				}
 
 				vec3 H = normalize(V + L);
 				float NDF = distribution_ggx(N, H, roughness);

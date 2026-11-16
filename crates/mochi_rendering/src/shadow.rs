@@ -21,8 +21,10 @@ use mochi_scene::{CameraComponent, TransformComponent};
 
 
 pub const SHADOW_MAP_SIZE: u32 = 2048;
+pub const SPOT_SHADOW_MAP_SIZE: u32 = 1024;
 pub const CASCADE_COUNT: usize = 4;
 pub const CASCADE_SPLITS: [f32; CASCADE_COUNT] = [2.5, 8.0, 24.0, 80.0];
+pub const MAX_SHADOW_CASTING_SPOT_LIGHTS: usize = 4;
 
 pub const SHADOW_VERT_SPV: &[u8] = include_bytes!("../../../res/shaders/shadow.vert.spv");
 
@@ -44,8 +46,17 @@ pub struct CascadeSet {
 	pub cascades: [CascadeData; CASCADE_COUNT],
 }
 
+pub struct SpotShadowData {
+	pub image: rhi::Image2,
+	pub view: rhi::ImageView2,
+	pub descriptor_id: u32,
+	pub view_proj: [f32; 16],
+}
+
 pub struct ShadowManager {
 	pub cascade_sets: [[Option<CascadeSet>; MAX_DIRECTIONAL_LIGHTS]; 2],
+	pub spot_shadow_sets: [[Option<SpotShadowData>; MAX_SHADOW_CASTING_SPOT_LIGHTS]; 2],
+	pub active_spot_counts: [usize; 2],
 	pub sampler: rhi::Sampler2,
 	pub pipeline: rhi::Pipeline,
 	pub meta: rhi::PipelineMeta,
@@ -72,6 +83,8 @@ impl ShadowManager {
 
 		Ok(Self {
 			cascade_sets: [[None, None, None, None], [None, None, None, None]],
+			spot_shadow_sets: [[None, None, None, None], [None, None, None, None]],
+			active_spot_counts: [0, 0],
 			sampler,
 			pipeline,
 			meta,
@@ -251,6 +264,101 @@ impl ShadowManager {
 		}
 		[0; CASCADE_COUNT]
 	}
+
+	pub fn ensure_spot_shadow_set(
+		&mut self,
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		frame_idx: usize,
+		slot: usize,
+	) -> Result<(), String> {
+		if slot >= MAX_SHADOW_CASTING_SPOT_LIGHTS {
+			return Err(format!(
+				"Spot shadow slot {slot} exceeds MAX_SHADOW_CASTING_SPOT_LIGHTS"
+			));
+		}
+
+		if self.spot_shadow_sets[frame_idx][slot].is_some() {
+			return Ok(());
+		}
+
+		let image = rhi::Image2::builder(SPOT_SHADOW_MAP_SIZE, SPOT_SHADOW_MAP_SIZE, Format::Depth32f)
+			.usage(ImageUsage::DepthStencilAttachment | ImageUsage::Sampled)
+			.build(alloc);
+
+		let view = device
+			.create_image_view(&image, Format::Depth32f)
+			.map_err(|e| format!("Failed to create spot shadow depth image view: {e}"))?;
+
+		let descriptor_id = device.write_texture_descriptor(&view, &self.sampler);
+
+		self.spot_shadow_sets[frame_idx][slot] = Some(SpotShadowData {
+			image,
+			view,
+			descriptor_id,
+			view_proj: Mat4x4::IDENTITY.to_array(),
+		});
+
+		Ok(())
+	}
+
+	pub fn update_spot_shadow(
+		&mut self,
+		frame_idx: usize,
+		slot: usize,
+		pos: Vec3<f32>,
+		dir: Vec3<f32>,
+		outer_cone_angle_deg: f32,
+		radius: f32,
+	) {
+		if slot >= MAX_SHADOW_CASTING_SPOT_LIGHTS {
+			return;
+		}
+
+		let spot = match &mut self.spot_shadow_sets[frame_idx][slot] {
+			Some(s) => s,
+			None => return,
+		};
+
+		let dir_norm = if dir.dot(&dir) < 1e-4 {
+			Vec3::new(0.0, 0.0, -1.0)
+		} else {
+			dir.normalize()
+		};
+
+		let up = if dir_norm.y.abs() > 0.99 {
+			Vec3::new(0.0, 0.0, 1.0)
+		} else {
+			Vec3::new(0.0, 1.0, 0.0)
+		};
+
+		let light_view = Mat4x4::look_at(pos, pos + dir_norm, up);
+		let near_z = 0.05_f32;
+		let far_z = radius.max(near_z + 0.1);
+		let fov = outer_cone_angle_deg.clamp(1.0, 170.0);
+		let light_proj = Mat4x4::perspective(fov, 1.0, near_z, far_z);
+
+		let view_proj = light_proj * light_view;
+		spot.view_proj = view_proj.to_array();
+	}
+
+	pub fn spot_shadow_view_proj(&self, frame_idx: usize, slot: usize) -> [f32; 16] {
+		if slot < MAX_SHADOW_CASTING_SPOT_LIGHTS
+			&& let Some(spot) = &self.spot_shadow_sets[frame_idx][slot]
+		{
+			return spot.view_proj;
+		}
+		Mat4x4::IDENTITY.to_array()
+	}
+
+	pub fn spot_shadow_id(&self, frame_idx: usize, slot: usize) -> u32 {
+		if slot < MAX_SHADOW_CASTING_SPOT_LIGHTS
+			&& let Some(spot) = &self.spot_shadow_sets[frame_idx][slot]
+		{
+			return spot.descriptor_id;
+		}
+		0
+	}
 }
 
 #[cfg(test)]
@@ -316,5 +424,60 @@ mod tests {
 				frac_y
 			);
 		}
+	}
+
+	#[test]
+	fn test_spot_shadow_projection_bounds() {
+		let pos = Vec3::new(0.0_f32, 5.0, 0.0);
+		let dir = Vec3::new(0.0_f32, -1.0, 0.0); // shines straight down
+		let up = Vec3::new(0.0_f32, 0.0, 1.0);
+		let outer_cone_deg = 60.0_f32;
+		let radius = 10.0_f32;
+		let near_z = 0.05_f32;
+
+		let view = Mat4x4::look_at(pos, pos + dir, up);
+		let proj = Mat4x4::perspective(outer_cone_deg, 1.0, near_z, radius);
+		let vp = proj * view;
+
+		// 1. Center point at near_z: (0, 5 - 0.05, 0) -> clip z/w should be near 0
+		let p_near = Vec4::new_with(0.0, 5.0 - near_z, 0.0, 1.0);
+		let clip_near = vp * p_near;
+		let z_near_ndc = clip_near.z / clip_near.w;
+		assert!(
+			(z_near_ndc - 0.0).abs() < 1e-3,
+			"Near depth should be ~0.0, got {z_near_ndc}"
+		);
+
+		// 2. Center point at far_z (radius): (0, 5 - 10, 0) -> clip z/w should be near 1.0
+		let p_far = Vec4::new_with(0.0, 5.0 - radius, 0.0, 1.0);
+		let clip_far = vp * p_far;
+		let z_far_ndc = clip_far.z / clip_far.w;
+		assert!(
+			(z_far_ndc - 1.0).abs() < 1e-3,
+			"Far depth should be ~1.0, got {z_far_ndc}"
+		);
+
+		// 3. Center point in middle: UV should be center (0.5, 0.5)
+		let p_mid = Vec4::new_with(0.0, 2.0, 0.0, 1.0);
+		let clip_mid = vp * p_mid;
+		let uv_x = (clip_mid.x / clip_mid.w) * 0.5 + 0.5;
+		let uv_y = (clip_mid.y / clip_mid.w) * 0.5 + 0.5;
+		assert!(
+			(uv_x - 0.5).abs() < 1e-4,
+			"Center point UV X should be 0.5, got {uv_x}"
+		);
+		assert!(
+			(uv_y - 0.5).abs() < 1e-4,
+			"Center point UV Y should be 0.5, got {uv_y}"
+		);
+
+		// 4. Point behind light: w should be negative or <= 0
+		let p_behind = Vec4::new_with(0.0, 10.0, 0.0, 1.0);
+		let clip_behind = vp * p_behind;
+		assert!(
+			clip_behind.w < 0.0,
+			"Point behind light must have w < 0, got {}",
+			clip_behind.w
+		);
 	}
 }

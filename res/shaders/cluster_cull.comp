@@ -56,13 +56,14 @@ struct SpotLight {
 	vec4 color_intensity;
 	vec4 direction_cos_inner;
 	vec4 params;
+	mat4 shadow_view_proj;
 };
 
 layout(buffer_reference, scalar) readonly buffer PointLightBuffer {
 	PointLight lights[];
 };
 
-layout(buffer_reference, scalar) readonly buffer SpotLightBuffer {
+layout(buffer_reference, scalar, row_major) readonly buffer SpotLightBuffer {
 	SpotLight lights[];
 };
 

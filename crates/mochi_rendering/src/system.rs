@@ -18,7 +18,10 @@ use crate::aa::AntiAliasingMode;
 use crate::cluster::ClusterManager;
 use crate::frame::{MAX_DIRECTIONAL_LIGHTS, SceneFrameBuffer};
 use crate::queue::RenderQueue;
-use crate::shadow::{CASCADE_COUNT, SHADOW_MAP_SIZE, ShadowManager, ShadowPushConstants};
+use crate::shadow::{
+	CASCADE_COUNT, MAX_SHADOW_CASTING_SPOT_LIGHTS, SHADOW_MAP_SIZE, SPOT_SHADOW_MAP_SIZE,
+	ShadowManager, ShadowPushConstants,
+};
 use crate::smaa::{
 	SmaaBlendPushConstants, SmaaEdgePushConstants, SmaaManager, SmaaNeighborPushConstants,
 	SmaaResolvePushConstants,
@@ -28,7 +31,9 @@ use crate::frame_gen::*;
 use crate::taa::{TaaManager, TaaPushConstants, TaaSharpenPushConstants};
 use crate::velocity::{VelocityManager, VelocityPushConstants};
 use mochi_rhi as rhi;
-use mochi_scene::{CameraComponent, DirectionalLightComponent, Scene, TransformComponent};
+use mochi_scene::{
+	CameraComponent, DirectionalLightComponent, Scene, SpotLightComponent, TransformComponent,
+};
 use mochi_display::Display;
 use mochi_except::*;
 
@@ -793,6 +798,9 @@ impl RenderingSystem {
 			[[[mochi_math::Mat4x4::IDENTITY.to_array(); 4]; MAX_DIRECTIONAL_LIGHTS]; 1][0];
 		let mut cascade_shadow_ids = [[0u32; 4]; MAX_DIRECTIONAL_LIGHTS];
 		let cascade_split_depths = [2.5, 8.0, 24.0, 80.0];
+		let mut spot_shadow_view_proj =
+			[[mochi_math::Mat4x4::IDENTITY.to_array(); MAX_SHADOW_CASTING_SPOT_LIGHTS]; 1][0];
+		let mut spot_shadow_ids = [0u32; MAX_SHADOW_CASTING_SPOT_LIGHTS];
 
 		if let Some(sm) = &mut self.shadow_manager {
 			for (light_idx, (_e, (t, light))) in scene
@@ -810,6 +818,32 @@ impl RenderingSystem {
 					cascade_shadow_ids[light_idx] = sm.cascade_shadow_ids(frame, light_idx);
 				}
 			}
+
+			let mut spot_slot = 0;
+			for (_e, (t, light)) in scene
+				.world()
+				.query::<(&TransformComponent, &SpotLightComponent)>()
+				.iter()
+			{
+				if light.cast_shadows && spot_slot < MAX_SHADOW_CASTING_SPOT_LIGHTS {
+					let pos = t.translation;
+					let dir = t.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
+					sm.ensure_spot_shadow_set(device, alloc, frame, spot_slot)
+						.ok();
+					sm.update_spot_shadow(
+						frame,
+						spot_slot,
+						pos,
+						dir,
+						light.outer_cone_angle_deg,
+						light.radius,
+					);
+					spot_shadow_view_proj[spot_slot] = sm.spot_shadow_view_proj(frame, spot_slot);
+					spot_shadow_ids[spot_slot] = sm.spot_shadow_id(frame, spot_slot);
+					spot_slot += 1;
+				}
+			}
+			sm.active_spot_counts[frame] = spot_slot;
 		}
 
 		let (grid_addr, pt_index_addr, spot_index_addr) = if let Some(cm) = &self.cluster_manager {
@@ -854,6 +888,8 @@ impl RenderingSystem {
 			cascade_view_proj,
 			cascade_split_depths,
 			cascade_shadow_ids,
+			spot_shadow_view_proj,
+			spot_shadow_ids,
 			jitter,
 			mip_bias,
 			self.prev_view_proj,
@@ -940,6 +976,45 @@ impl RenderingSystem {
 							}
 						});
 					}
+				}
+			}
+
+			// Spot Light Shadow Map render passes for all active shadow-casting spot lights
+			for slot in 0..sm.active_spot_counts[frame] {
+				if let Some(spot) = &sm.spot_shadow_sets[frame][slot] {
+					let spot_target = rhi::RenderTarget::builder(SPOT_SHADOW_MAP_SIZE, SPOT_SHADOW_MAP_SIZE)
+						.depth(&spot.image, &spot.view, rhi::Format::Depth32f)
+						.build(device);
+
+					cmd.render_pass(&spot_target, clear_color, |pass| {
+						pass.set_viewport_and_scissor(SPOT_SHADOW_MAP_SIZE, SPOT_SHADOW_MAP_SIZE);
+						pass.bind_pipeline(&sm.pipeline);
+
+						let view_proj = mochi_math::Mat4x4::from_array(spot.view_proj);
+
+						for packet in &self.shadow_queue.packets {
+							let model = mochi_math::Mat4x4::from_array(packet.model_matrix);
+							let mvp = (view_proj * model).to_array();
+
+							let pc = ShadowPushConstants {
+								mvp,
+								vertex_addr: packet.vertex_buffer_addr,
+							};
+
+							pass.push_constant(rhi::ShaderStage::Vertex, 0, &pc);
+
+							if packet.is_indexed && packet.index_count > 0 {
+								if let Some(index_buf) = packet.mesh.index_buffer() {
+									pass.bind_index_buffer(index_buf, 0, rhi::IndexType::Uint32);
+									pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
+								} else {
+									pass.draw(packet.vertex_count, 1, 0, 0);
+								}
+							} else {
+								pass.draw(packet.vertex_count, 1, 0, 0);
+							}
+						}
+					});
 				}
 			}
 		}

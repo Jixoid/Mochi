@@ -11,6 +11,7 @@
 
 
 use crate::cluster::{CLUSTER_DIM_X, CLUSTER_DIM_Y, CLUSTER_DIM_Z, MAX_POINT_LIGHTS_PER_CLUSTER};
+use crate::shadow::MAX_SHADOW_CASTING_SPOT_LIGHTS;
 use mochi_rhi::{self as rhi, AllocationCreate, AllocationLocation, BufferUsage, TransferTime};
 use mochi_scene::{
 	CameraComponent, DirectionalLightComponent, PointLightComponent, Scene, SpotLightComponent,
@@ -41,7 +42,12 @@ pub struct SpotLightGpuData {
 	pub color_intensity: [f32; 4],
 	pub direction_cos_inner: [f32; 4],
 	pub params: [f32; 4],
+	pub shadow_view_proj: [f32; 16],
 }
+
+const _: () = {
+	assert!(std::mem::size_of::<SpotLightGpuData>() == 128);
+};
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
@@ -181,6 +187,8 @@ impl SceneFrameBuffer {
 		cascade_view_proj: [[[f32; 16]; 4]; MAX_DIRECTIONAL_LIGHTS],
 		cascade_split_depths: [f32; 4],
 		cascade_shadow_ids: [[u32; 4]; MAX_DIRECTIONAL_LIGHTS],
+		spot_shadow_view_proj: [[f32; 16]; MAX_SHADOW_CASTING_SPOT_LIGHTS],
+		spot_shadow_ids: [u32; MAX_SHADOW_CASTING_SPOT_LIGHTS],
 		jitter: (f32, f32),
 		mip_bias: f32,
 		prev_view_proj: Option<[f32; 16]>,
@@ -284,6 +292,7 @@ impl SceneFrameBuffer {
 
 		// 3. Query Dynamic Spot Lights
 		let mut spot_lights_vec = Vec::new();
+		let mut shadow_slot = 0;
 		for (_e, (t, light)) in scene
 			.world()
 			.query::<(&TransformComponent, &SpotLightComponent)>()
@@ -294,16 +303,24 @@ impl SceneFrameBuffer {
 			let inner_cos = (light.inner_cone_angle_deg.to_radians() * 0.5).cos();
 			let outer_cos = (light.outer_cone_angle_deg.to_radians() * 0.5).cos();
 
+			let (cast_flag, shadow_desc_bits, shadow_vp) = if light.cast_shadows
+				&& shadow_slot < MAX_SHADOW_CASTING_SPOT_LIGHTS
+				&& spot_shadow_ids[shadow_slot] != 0
+			{
+				let id = spot_shadow_ids[shadow_slot];
+				let vp = spot_shadow_view_proj[shadow_slot];
+				shadow_slot += 1;
+				(1.0, f32::from_bits(id), vp)
+			} else {
+				(0.0, 0.0, mochi_math::Mat4x4::IDENTITY.to_array())
+			};
+
 			spot_lights_vec.push(SpotLightGpuData {
 				position_radius: [pos.x, pos.y, pos.z, light.radius],
 				color_intensity: [light.color.x, light.color.y, light.color.z, light.intensity],
 				direction_cos_inner: [dir.x, dir.y, dir.z, inner_cos],
-				params: [
-					outer_cos,
-					if light.cast_shadows { 1.0 } else { 0.0 },
-					0.0,
-					0.0,
-				],
+				params: [outer_cos, cast_flag, shadow_desc_bits, 0.0],
+				shadow_view_proj: shadow_vp,
 			});
 		}
 		self.spot_light_count = spot_lights_vec.len() as u32;
