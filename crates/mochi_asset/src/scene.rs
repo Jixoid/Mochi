@@ -269,7 +269,10 @@ impl SceneAsset {
 							built
 						}
 						Err(err) => {
-							mochi_error!("Failed to load model asset '{}': {err}", resolved_model_path.display());
+							mochi_error!(
+								"Failed to load model asset '{}': {err}",
+								resolved_model_path.display()
+							);
 							Vec::new()
 						}
 					}

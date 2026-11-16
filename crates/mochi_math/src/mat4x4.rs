@@ -124,7 +124,7 @@ impl<T: Float> Mat4x4<T> {
 		res.rows[0].w = -(right + left) / (right - left);
 
 		res.rows[1].y = -two / (top - bottom); // Inverted Y for Vulkan
-		res.rows[1].w = -(top + bottom) / (top - bottom);
+		res.rows[1].w = (top + bottom) / (top - bottom);
 
 		res.rows[2].z = -T::ONE / (far_z - near_z);
 		res.rows[2].w = -near_z / (far_z - near_z);
@@ -340,5 +340,58 @@ impl<T: Number> From<Mat4x4<T>> for [T; 16] {
 impl<T: Number> From<Mat3x4<T>> for Mat4x4<T> {
 	fn from(m: Mat3x4<T>) -> Self {
 		m.to_mat4()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_orthographic_ndc_mapping() {
+		// Asymmetric bounds
+		let left = -2.0_f32;
+		let right = 8.0_f32;
+		let bottom = -1.0_f32;
+		let top = 5.0_f32;
+		let near = 0.5_f32;
+		let far = 100.0_f32;
+
+		let proj = Mat4x4::orthographic(left, right, bottom, top, near, far);
+
+		// In Vulkan:
+		// x = left -> -1.0, x = right -> +1.0
+		// y = top -> -1.0 (top is -1 in Vulkan NDC), y = bottom -> +1.0 (bottom is +1 in Vulkan NDC)
+		// z_cam = -near -> 0.0, z_cam = -far -> 1.0
+
+		let top_left = proj * Vec4::new_with(left, top, -near, 1.0);
+		assert!(
+			(top_left.x - (-1.0)).abs() < 1e-5,
+			"top_left.x was {}",
+			top_left.x
+		);
+		assert!(
+			(top_left.y - (-1.0)).abs() < 1e-5,
+			"top_left.y was {}",
+			top_left.y
+		);
+		assert!(top_left.z.abs() < 1e-5, "top_left.z was {}", top_left.z);
+
+		let bottom_right = proj * Vec4::new_with(right, bottom, -far, 1.0);
+		assert!(
+			(bottom_right.x - 1.0).abs() < 1e-5,
+			"bottom_right.x was {}",
+			bottom_right.x
+		);
+		assert!(
+			(bottom_right.y - 1.0).abs() < 1e-5,
+			"bottom_right.y was {}",
+			bottom_right.y
+		);
+		assert!(
+			(bottom_right.z - 1.0).abs() < 1e-5,
+			"bottom_right.z was {}",
+			bottom_right.z
+		);
 	}
 }

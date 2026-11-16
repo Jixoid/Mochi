@@ -196,6 +196,42 @@ float sample_shadow_bilinear(uint tex_id, vec2 uv, float current_depth, float bi
 	return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
 }
 
+float sample_single_cascade_shadow(SceneFrameData scene, uint light_idx, int cascade_idx, vec3 world_pos, vec3 N) {
+	uint shadow_tex_id = scene.cascade_shadow_ids[light_idx][cascade_idx];
+	if (shadow_tex_id == 0u) {
+		return 1.0;
+	}
+
+	vec3 L = normalize(-scene.dir_lights[light_idx].direction.xyz);
+	float NdotL = max(dot(N, L), 0.0);
+
+	// Normal offset bias scaled by cascade index to eliminate shadow acne
+	float normal_bias = 0.005 * float(cascade_idx + 1);
+	vec3 biased_pos = world_pos + N * normal_bias;
+
+	vec4 shadow_clip = scene.cascade_view_proj[light_idx][cascade_idx] * vec4(biased_pos, 1.0);
+	vec3 proj_coords = shadow_clip.xyz / shadow_clip.w;
+
+	vec2 shadow_uv = proj_coords.xy * 0.5 + 0.5;
+	float current_depth = proj_coords.z;
+
+	if (current_depth > 1.0 || current_depth < 0.0 || shadow_uv.x < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y < 0.0 || shadow_uv.y > 1.0) {
+		return 1.0;
+	}
+
+	float bias = max(0.0002, 0.0008 * (1.0 - NdotL)) * float(cascade_idx + 1);
+	vec2 inv_size = vec2(1.0 / 2048.0);
+
+	// 4-tap bilinear PCF filter (equivalent to continuous 16-tap filtered shadow)
+	float shadow = 0.0;
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75, -0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75, -0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75,  0.75) * inv_size, current_depth, bias);
+	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75,  0.75) * inv_size, current_depth, bias);
+
+	return shadow * 0.25;
+}
+
 float evaluate_csm_shadow(SceneFrameData scene, uint light_idx, vec3 world_pos, vec3 N, float view_z) {
 	int cascade_idx = -1;
 	for (int c = 0; c < 4; ++c) {
@@ -208,36 +244,18 @@ float evaluate_csm_shadow(SceneFrameData scene, uint light_idx, vec3 world_pos, 
 		return 1.0;
 	}
 
-	uint shadow_tex_id = scene.cascade_shadow_ids[light_idx][cascade_idx];
-	if (shadow_tex_id == 0u) {
-		return 1.0;
+	float shadow = sample_single_cascade_shadow(scene, light_idx, cascade_idx, world_pos, N);
+
+	// Smooth blend across cascade boundaries (last 15% of the cascade range) to eliminate popping
+	float split_val = scene.cascade_split_depths[cascade_idx];
+	float blend_start = split_val * 0.85;
+	if (cascade_idx < 3 && view_z > blend_start) {
+		float blend_factor = clamp((view_z - blend_start) / (split_val - blend_start), 0.0, 1.0);
+		float next_shadow = sample_single_cascade_shadow(scene, light_idx, cascade_idx + 1, world_pos, N);
+		shadow = mix(shadow, next_shadow, blend_factor);
 	}
 
-	// Normal offset bias scaled by cascade index to eliminate shadow acne
-	float normal_bias = 0.005 * float(cascade_idx + 1);
-	vec3 biased_pos = world_pos + N * normal_bias;
-
-	vec4 shadow_clip = scene.cascade_view_proj[light_idx][cascade_idx] * vec4(biased_pos, 1.0);
-	vec3 proj_coords = shadow_clip.xyz / shadow_clip.w;
-
-	vec2 shadow_uv = proj_coords.xy * 0.5 + 0.5;
-	float current_depth = proj_coords.z;
-
-	if (current_depth > 1.0 || shadow_uv.x < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y < 0.0 || shadow_uv.y > 1.0) {
-		return 1.0;
-	}
-
-	float bias = 0.0004;
-	vec2 inv_size = vec2(1.0 / 2048.0);
-
-	// 4-tap bilinear PCF filter (equivalent to continuous 16-tap filtered shadow)
-	float shadow = 0.0;
-	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75, -0.75) * inv_size, current_depth, bias);
-	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75, -0.75) * inv_size, current_depth, bias);
-	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2(-0.75,  0.75) * inv_size, current_depth, bias);
-	shadow += sample_shadow_bilinear(shadow_tex_id, shadow_uv + vec2( 0.75,  0.75) * inv_size, current_depth, bias);
-
-	return shadow * 0.25;
+	return shadow;
 }
 
 

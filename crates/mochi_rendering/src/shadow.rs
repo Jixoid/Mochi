@@ -45,7 +45,7 @@ pub struct CascadeSet {
 }
 
 pub struct ShadowManager {
-	pub cascade_sets: [Option<CascadeSet>; MAX_DIRECTIONAL_LIGHTS],
+	pub cascade_sets: [[Option<CascadeSet>; MAX_DIRECTIONAL_LIGHTS]; 2],
 	pub sampler: rhi::Sampler2,
 	pub pipeline: rhi::Pipeline,
 	pub meta: rhi::PipelineMeta,
@@ -71,7 +71,7 @@ impl ShadowManager {
 			.build();
 
 		Ok(Self {
-			cascade_sets: [None, None, None, None],
+			cascade_sets: [[None, None, None, None], [None, None, None, None]],
 			sampler,
 			pipeline,
 			meta,
@@ -83,6 +83,7 @@ impl ShadowManager {
 		&mut self,
 		device: &rhi::Device,
 		alloc: &rhi::Allocator,
+		frame_idx: usize,
 		light_idx: usize,
 	) -> Result<(), String> {
 		if light_idx >= MAX_DIRECTIONAL_LIGHTS {
@@ -91,7 +92,7 @@ impl ShadowManager {
 			));
 		}
 
-		if self.cascade_sets[light_idx].is_some() {
+		if self.cascade_sets[frame_idx][light_idx].is_some() {
 			return Ok(());
 		}
 
@@ -120,12 +121,13 @@ impl ShadowManager {
 			.try_into()
 			.map_err(|_| "Failed to collect 4 cascades".to_string())?;
 
-		self.cascade_sets[light_idx] = Some(CascadeSet { cascades });
+		self.cascade_sets[frame_idx][light_idx] = Some(CascadeSet { cascades });
 		Ok(())
 	}
 
 	pub fn update_cascades(
 		&mut self,
+		frame_idx: usize,
 		light_idx: usize,
 		camera: &CameraComponent,
 		camera_transform: &TransformComponent,
@@ -136,7 +138,7 @@ impl ShadowManager {
 			return;
 		}
 
-		let set = match &mut self.cascade_sets[light_idx] {
+		let set = match &mut self.cascade_sets[frame_idx][light_idx] {
 			Some(s) => s,
 			None => return,
 		};
@@ -158,6 +160,7 @@ impl ShadowManager {
 
 		let cam_pos = camera_transform.translation;
 		let cam_rot = camera_transform.rotation;
+		let cam_forward = cam_rot * Vec3::new(0.0, 0.0, -1.0);
 
 		for c in 0..CASCADE_COUNT {
 			let z_near = if c == 0 {
@@ -167,75 +170,59 @@ impl ShadowManager {
 			};
 			let z_far = CASCADE_SPLITS[c].min(camera.far);
 
-			// Frustum corners in camera space
+			// Frustum slice dimensions at near and far split depths
 			let near_h = z_near * tan_half_fov;
 			let near_w = near_h * aspect;
+			let r_near_sq = near_w * near_w + near_h * near_h;
+
 			let far_h = z_far * tan_half_fov;
 			let far_w = far_h * aspect;
+			let r_far_sq = far_w * far_w + far_h * far_h;
 
-			let local_corners = [
-				Vec3::new(-near_w, -near_h, -z_near),
-				Vec3::new(near_w, -near_h, -z_near),
-				Vec3::new(-near_w, near_h, -z_near),
-				Vec3::new(near_w, near_h, -z_near),
-				Vec3::new(-far_w, -far_h, -z_far),
-				Vec3::new(far_w, -far_h, -z_far),
-				Vec3::new(-far_w, far_h, -z_far),
-				Vec3::new(far_w, far_h, -z_far),
-			];
+			// Optimal circumscribed sphere center along view axis:
+			// d = (z_far + z_near)/2 + (r_far^2 - r_near^2) / (2 * (z_far - z_near))
+			let d = 0.5 * (z_far + z_near) + (r_far_sq - r_near_sq) / (2.0 * (z_far - z_near));
+			let radius = (r_far_sq + (z_far - d) * (z_far - d)).sqrt() * 1.02;
 
-			// Transform corners to world space
-			let mut center = Vec3::ZERO;
-			let mut world_corners = [Vec3::ZERO; 8];
-			for i in 0..8 {
-				let world_pt = cam_pos + cam_rot * local_corners[i];
-				world_corners[i] = world_pt;
-				center += world_pt;
-			}
-			center *= 1.0 / 8.0;
-
-			// Compute bounding sphere radius
-			let mut radius: f32 = 0.0;
-			for pt in &world_corners {
-				let d = pt.dist(&center);
-				if d > radius {
-					radius = d;
-				}
-			}
-
-			// Add small padding to radius to avoid frustum boundary artifacts
-			radius *= 1.02;
+			// Circumcenter in world space
+			let center = cam_pos + cam_forward * d;
 
 			const FAR_OFFSET: f32 = 100.0;
 			let eye = center - dir * (radius + FAR_OFFSET);
 			let light_view = Mat4x4::look_at(eye, center, up);
 
-			// Transform sphere center into light view space
-			let center_view = light_view * Vec4::new_with(center.x, center.y, center.z, 1.0);
-
-			// Texel snapping to eliminate sub-pixel crawling
-			let world_units_per_texel = (2.0 * radius) / (SHADOW_MAP_SIZE as f32);
-			let mut min_x = center_view.x - radius;
-			let mut min_y = center_view.y - radius;
-
-			min_x = (min_x / world_units_per_texel).floor() * world_units_per_texel;
-			min_y = (min_y / world_units_per_texel).floor() * world_units_per_texel;
-			let max_x = min_x + 2.0 * radius;
-			let max_y = min_y + 2.0 * radius;
-
 			let near_z = 0.0;
 			let far_z = 2.0 * radius + FAR_OFFSET + 50.0;
+			let mut light_proj = Mat4x4::orthographic(-radius, radius, -radius, radius, near_z, far_z);
 
-			let light_proj = Mat4x4::orthographic(min_x, max_x, min_y, max_y, near_z, far_z);
+			// Michal Valient / Stable CSM Stabilization:
+			let shadow_matrix = light_proj * light_view;
+			let shadow_origin = shadow_matrix * Vec4::new_with(0.0, 0.0, 0.0, 1.0);
+
+			let half_size = SHADOW_MAP_SIZE as f32 * 0.5;
+			let texel_origin_x = shadow_origin.x * half_size;
+			let texel_origin_y = shadow_origin.y * half_size;
+
+			let round_offset_x =
+				(texel_origin_x.round() - texel_origin_x) * (2.0 / SHADOW_MAP_SIZE as f32);
+			let round_offset_y =
+				(texel_origin_y.round() - texel_origin_y) * (2.0 / SHADOW_MAP_SIZE as f32);
+
+			light_proj.rows[0].w += round_offset_x;
+			light_proj.rows[1].w += round_offset_y;
+
 			let view_proj = light_proj * light_view;
-
 			set.cascades[c].view_proj = view_proj.to_array();
 		}
 	}
 
-	pub fn cascade_view_proj(&self, light_idx: usize) -> [[f32; 16]; CASCADE_COUNT] {
+	pub fn cascade_view_proj(
+		&self,
+		frame_idx: usize,
+		light_idx: usize,
+	) -> [[f32; 16]; CASCADE_COUNT] {
 		if light_idx < MAX_DIRECTIONAL_LIGHTS
-			&& let Some(set) = &self.cascade_sets[light_idx]
+			&& let Some(set) = &self.cascade_sets[frame_idx][light_idx]
 		{
 			return [
 				set.cascades[0].view_proj,
@@ -251,9 +238,9 @@ impl ShadowManager {
 		self.split_depths
 	}
 
-	pub fn cascade_shadow_ids(&self, light_idx: usize) -> [u32; CASCADE_COUNT] {
+	pub fn cascade_shadow_ids(&self, frame_idx: usize, light_idx: usize) -> [u32; CASCADE_COUNT] {
 		if light_idx < MAX_DIRECTIONAL_LIGHTS
-			&& let Some(set) = &self.cascade_sets[light_idx]
+			&& let Some(set) = &self.cascade_sets[frame_idx][light_idx]
 		{
 			return [
 				set.cascades[0].descriptor_id,
@@ -263,5 +250,71 @@ impl ShadowManager {
 			];
 		}
 		[0; CASCADE_COUNT]
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use mochi_math::Vec4;
+
+	#[test]
+	fn test_shadow_projection_stability() {
+		let dir = Vec3::new(0.5_f32, -1.0, 0.3).normalize();
+		let up = Vec3::new(0.0, 1.0, 0.0);
+		let radius = 6.0_f32;
+		let shadow_map_size = 2048.0_f32;
+
+		const FAR_OFFSET: f32 = 100.0;
+		let near_z = 0.0;
+		let far_z = 2.0 * radius + FAR_OFFSET + 50.0;
+
+		let valient_vp = |center: Vec3<f32>| -> Mat4x4<f32> {
+			let eye = center - dir * (radius + FAR_OFFSET);
+			let light_view = Mat4x4::look_at(eye, center, up);
+			let mut light_proj = Mat4x4::orthographic(-radius, radius, -radius, radius, near_z, far_z);
+
+			let shadow_matrix = light_proj * light_view;
+			let shadow_origin = shadow_matrix * Vec4::new_with(0.0, 0.0, 0.0, 1.0);
+
+			let half_size = shadow_map_size * 0.5;
+			let texel_origin_x = shadow_origin.x * half_size;
+			let texel_origin_y = shadow_origin.y * half_size;
+
+			let round_offset_x = (texel_origin_x.round() - texel_origin_x) * (2.0 / shadow_map_size);
+			let round_offset_y = (texel_origin_y.round() - texel_origin_y) * (2.0 / shadow_map_size);
+
+			light_proj.rows[0].w += round_offset_x;
+			light_proj.rows[1].w += round_offset_y;
+
+			light_proj * light_view
+		};
+
+		let p_world = Vec4::new_with(0.0, 0.0, 0.0, 1.0);
+		let base_center = Vec3::new(0.0, 0.4, 1.0);
+
+		// Verify that in all directions (+/- X, +/- Y, +/- Z), sub-texel phase error is strictly 0
+		for step in -10..=10 {
+			let center =
+				base_center + Vec3::new(step as f32 * 0.03, step as f32 * -0.02, step as f32 * 0.05);
+			let vp = valient_vp(center);
+			let clip = vp * p_world;
+			let uv = (clip.x * 0.5 + 0.5, clip.y * 0.5 + 0.5);
+			let tex = (uv.0 * shadow_map_size, uv.1 * shadow_map_size);
+			let frac_x = (tex.0 - tex.0.round()).abs();
+			let frac_y = (tex.1 - tex.1.round()).abs();
+			assert!(
+				frac_x < 1e-4,
+				"Subtexel phase error on X for step {}: {}",
+				step,
+				frac_x
+			);
+			assert!(
+				frac_y < 1e-4,
+				"Subtexel phase error on Y for step {}: {}",
+				step,
+				frac_y
+			);
+		}
 	}
 }

@@ -28,12 +28,20 @@ pub fn import(info: ImportInfo) -> Result<(), Error> {
 		return Err(Error::New | format!("input file does not exist: {}", info.input.display()));
 	}
 
-	let ext = info.input.extension().and_then(|s| s.to_str()).unwrap_or("");
+	let ext = info
+		.input
+		.extension()
+		.and_then(|s| s.to_str())
+		.unwrap_or("");
 	if ext != "glb" && ext != "gltf" {
 		return Err(Error::New | format!("unsupported 3d format '.{ext}', expected .glb or .gltf"));
 	}
 
-	eprintln!("{:>12} {}", "Importing".green().bold(), info.input.display());
+	eprintln!(
+		"{:>12} {}",
+		"Importing".green().bold(),
+		info.input.display()
+	);
 
 	let model = ModelAsset::load_gltf(info.input)
 		.map_err(|e| Error::New | format!("failed to import {}: {e}", info.input.display()))?;
@@ -46,7 +54,11 @@ pub fn import(info: ImportInfo) -> Result<(), Error> {
 			.file_stem()
 			.and_then(|s| s.to_str())
 			.unwrap_or("model");
-		let target_ext = if info.binary { "mmodel.bin" } else { "mmodel.ron" };
+		let target_ext = if info.binary {
+			"mmodel.bin"
+		} else {
+			"mmodel.ron"
+		};
 		info.input.with_file_name(format!("{stem}.{target_ext}"))
 	};
 

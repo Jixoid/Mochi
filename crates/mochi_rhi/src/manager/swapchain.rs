@@ -54,7 +54,13 @@ unsafe impl<B: RhiBackend> Send for Swapchain<B> {}
 unsafe impl<B: RhiBackend> Sync for Swapchain<B> {}
 
 impl<B: RhiBackend> Swapchain<B> {
-	pub fn new(device: &Device<B>, surface: &Surface<B>, width: u32, height: u32, vsync: bool) -> Self {
+	pub fn new(
+		device: &Device<B>,
+		surface: &Surface<B>,
+		width: u32,
+		height: u32,
+		vsync: bool,
+	) -> Self {
 		let sw = B::create_swapchain(device.raw(), surface.handle(), width, height, vsync)
 			.expect("Failed to create swapchain");
 		Self {

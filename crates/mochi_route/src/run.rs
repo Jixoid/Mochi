@@ -53,8 +53,7 @@ pub fn run(info: RunInfo) -> Result<(), Error> {
 		return Err(Error::New | format!("cannot find mochi.ron in '{}'", project_dir.display()));
 	}
 
-	let mut config = ProjectConfig::load(&config_file)
-		.map_err(|e| Error::New | e)?;
+	let mut config = ProjectConfig::load(&config_file).map_err(|e| Error::New | e)?;
 
 	// If a specific scene is passed (via info.scene or info.path being a .mscene file)
 	if let Some(scene) = info.scene {
@@ -104,7 +103,11 @@ pub fn run(info: RunInfo) -> Result<(), Error> {
 	}
 
 	// QW style execution message
-	eprintln!("{:>12} {}", "Running".green().bold(), config.scene.start_scene);
+	eprintln!(
+		"{:>12} {}",
+		"Running".green().bold(),
+		config.scene.start_scene
+	);
 
 	let mut engine = Engine::with_config(config);
 

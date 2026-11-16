@@ -213,7 +213,7 @@ impl AshPipeline {
 		};
 
 		let rasterizer = vk::PipelineRasterizationStateCreateInfo::default()
-			.depth_clamp_enable(false)
+			.depth_clamp_enable(is_depth_only)
 			.rasterizer_discard_enable(false)
 			.polygon_mode(to_vk_polygon_mode(polymode))
 			.cull_mode(cull_mode)

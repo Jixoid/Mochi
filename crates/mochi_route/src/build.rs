@@ -68,8 +68,12 @@ pub fn build(info: BuildInfo) -> Result<(), Error> {
 
 		let needs_compile = info.force || !out_so.exists() || {
 			if let (Ok(src_meta), Ok(out_meta)) = (fs::metadata(script), fs::metadata(&out_so)) {
-				src_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-					> out_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+				src_meta
+					.modified()
+					.unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+					> out_meta
+						.modified()
+						.unwrap_or(std::time::SystemTime::UNIX_EPOCH)
 			} else {
 				true
 			}

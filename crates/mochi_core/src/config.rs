@@ -97,11 +97,7 @@ impl Default for ProjectConfig {
 impl ProjectConfig {
 	pub fn find_project_root(start: impl AsRef<Path>) -> Option<PathBuf> {
 		let p = start.as_ref();
-		let mut current = if p.is_file() {
-			p.parent()
-		} else {
-			Some(p)
-		};
+		let mut current = if p.is_file() { p.parent() } else { Some(p) };
 		while let Some(dir) = current {
 			if dir.join("mochi.ron").exists() {
 				return Some(dir.to_path_buf());

@@ -338,11 +338,7 @@ static CURRENT_FRAME_GEN: std::sync::atomic::AtomicBool = std::sync::atomic::Ato
 
 pub fn take_requested_frame_gen() -> Option<bool> {
 	let val = REQUESTED_FRAME_GEN.swap(-1, std::sync::atomic::Ordering::Relaxed);
-	if val < 0 {
-		None
-	} else {
-		Some(val != 0)
-	}
+	if val < 0 { None } else { Some(val != 0) }
 }
 
 pub fn set_current_frame_gen(enabled: bool) {
@@ -351,7 +347,10 @@ pub fn set_current_frame_gen(enabled: bool) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mochi_set_frame_generation(enabled: bool) {
-	REQUESTED_FRAME_GEN.store(if enabled { 1 } else { 0 }, std::sync::atomic::Ordering::Relaxed);
+	REQUESTED_FRAME_GEN.store(
+		if enabled { 1 } else { 0 },
+		std::sync::atomic::Ordering::Relaxed,
+	);
 }
 
 #[unsafe(no_mangle)]

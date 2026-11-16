@@ -120,19 +120,29 @@ void main() {
 		return;
 	}
 
-	// 2. Sample 3x3 neighborhood in current frame for AABB clipping
-	vec3 box_min = current_ycocg;
-	vec3 box_max = current_ycocg;
+	// 2. Sample 3x3 neighborhood in current frame with variance clipping (Karis standard)
+	vec3 m1 = current_ycocg;
+	vec3 m2 = current_ycocg * current_ycocg;
+	vec3 neighbor_min = current_ycocg;
+	vec3 neighbor_max = current_ycocg;
 
 	for (int y = -1; y <= 1; ++y) {
 		for (int x = -1; x <= 1; ++x) {
 			if (x == 0 && y == 0) continue;
 			vec2 sample_uv = in_uv + vec2(float(x), float(y)) * texel;
 			vec3 c = rgb_to_ycocg(texture(u_textures[nonuniformEXT(pc.color_tex_id)], sample_uv).rgb);
-			box_min = min(box_min, c);
-			box_max = max(box_max, c);
+			m1 += c;
+			m2 += c * c;
+			neighbor_min = min(neighbor_min, c);
+			neighbor_max = max(neighbor_max, c);
 		}
 	}
+
+	vec3 mu = m1 / 9.0;
+	vec3 sigma = sqrt(max(vec3(0.0), m2 / 9.0 - mu * mu));
+	const float gamma = 1.25;
+	vec3 box_min = max(neighbor_min, mu - gamma * sigma);
+	vec3 box_max = min(neighbor_max, mu + gamma * sigma);
 
 	// 3. Dilated velocity & Reprojection
 	vec2 velocity = get_dilated_velocity(in_uv, texel);

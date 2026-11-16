@@ -146,8 +146,6 @@ pub struct SceneFrameBuffer {
 	point_light_count: u32,
 	spot_light_count: u32,
 	primary_sun_dir: mochi_math::Vec3<f32>,
-	prev_view_proj: Option<[f32; 16]>,
-	prev_jitter: [f32; 2],
 }
 
 impl SceneFrameBuffer {
@@ -161,8 +159,6 @@ impl SceneFrameBuffer {
 			point_light_count: 0,
 			spot_light_count: 0,
 			primary_sun_dir: mochi_math::Vec3::new(0.5, -1.0, 0.3).normalize(),
-			prev_view_proj: None,
-			prev_jitter: [0.0; 2],
 		}
 	}
 
@@ -187,7 +183,9 @@ impl SceneFrameBuffer {
 		cascade_shadow_ids: [[u32; 4]; MAX_DIRECTIONAL_LIGHTS],
 		jitter: (f32, f32),
 		mip_bias: f32,
-	) {
+		prev_view_proj: Option<[f32; 16]>,
+		prev_jitter: [f32; 2],
+	) -> ([f32; 16], [f32; 2]) {
 		let view = camera.view_matrix(camera_transform);
 		let mut proj = camera.projection_matrix(aspect);
 
@@ -210,16 +208,9 @@ impl SceneFrameBuffer {
 		let view_proj = proj * view;
 		let inv_view_proj = view_proj.inverse();
 
-		let prev_vp = self.prev_view_proj.unwrap_or_else(|| view_proj.to_array());
-		self.prev_view_proj = Some(view_proj.to_array());
+		let prev_vp = prev_view_proj.unwrap_or_else(|| view_proj.to_array());
 
-		let jitter_data = [
-			jitter_ndc_x,
-			jitter_ndc_y,
-			self.prev_jitter[0],
-			self.prev_jitter[1],
-		];
-		self.prev_jitter = [jitter_ndc_x, jitter_ndc_y];
+		let jitter_data = [jitter_ndc_x, jitter_ndc_y, prev_jitter[0], prev_jitter[1]];
 
 		let cam_pos = camera_transform.translation;
 
@@ -403,6 +394,8 @@ impl SceneFrameBuffer {
 			};
 			uploader.copy_memory_to_buffer(TransferTime::Now, bytes, buffer);
 		}
+
+		(view_proj.to_array(), [jitter_ndc_x, jitter_ndc_y])
 	}
 
 	pub fn address(&self) -> u64 {

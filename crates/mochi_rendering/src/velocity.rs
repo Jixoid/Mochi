@@ -37,7 +37,7 @@ pub struct VelocityManager {
 	pub pipeline: rhi::Pipeline,
 	pub meta: rhi::PipelineMeta,
 	pub sampler: rhi::Sampler2,
-	pub target: Option<VelocityTarget>,
+	pub targets: [Option<VelocityTarget>; 2],
 }
 
 impl VelocityManager {
@@ -70,7 +70,7 @@ impl VelocityManager {
 			pipeline,
 			meta,
 			sampler,
-			target: None,
+			targets: [None, None],
 		}
 	}
 
@@ -80,8 +80,9 @@ impl VelocityManager {
 		alloc: &rhi::Allocator,
 		width: u32,
 		height: u32,
+		frame_idx: usize,
 	) {
-		if let Some(target) = &self.target
+		if let Some(target) = &self.targets[frame_idx]
 			&& target.width == width
 			&& target.height == height
 		{
@@ -96,7 +97,7 @@ impl VelocityManager {
 			.expect("Failed to create velocity image view");
 		let descriptor_id = device.write_texture_descriptor(&view, &self.sampler);
 
-		self.target = Some(VelocityTarget {
+		self.targets[frame_idx] = Some(VelocityTarget {
 			width,
 			height,
 			image,
@@ -105,7 +106,11 @@ impl VelocityManager {
 		});
 	}
 
+	pub fn target(&self, frame_idx: usize) -> Option<&VelocityTarget> {
+		self.targets[frame_idx].as_ref()
+	}
+
 	pub fn free_target(&mut self) {
-		self.target = None;
+		self.targets = [None, None];
 	}
 }

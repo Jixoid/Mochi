@@ -15,8 +15,10 @@ use mochi_except::*;
 
 
 static FULLSCREEN_VERT_SPV: &[u8] = include_bytes!("../../../res/shaders/fullscreen.vert.spv");
-static FSR3_FRAME_GEN_FRAG_SPV: &[u8] = include_bytes!("../../../res/shaders/fsr3_frame_gen.frag.spv");
-static FULLSCREEN_BLIT_FRAG_SPV: &[u8] = include_bytes!("../../../res/shaders/fullscreen_blit.frag.spv");
+static FSR3_FRAME_GEN_FRAG_SPV: &[u8] =
+	include_bytes!("../../../res/shaders/fsr3_frame_gen.frag.spv");
+static FULLSCREEN_BLIT_FRAG_SPV: &[u8] =
+	include_bytes!("../../../res/shaders/fullscreen_blit.frag.spv");
 
 pub const DEFAULT_INTERPOLATION_FACTOR: f32 = 0.5;
 pub const DEFAULT_DISOCCLUSION_THRESHOLD: f32 = 0.08;

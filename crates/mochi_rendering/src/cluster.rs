@@ -69,9 +69,9 @@ pub struct CullPushConstants {
 
 pub struct ClusterManager {
 	aabb_buffer: rhi::Buffer,
-	grid_buffer: rhi::Buffer,
-	point_index_list_buffer: rhi::Buffer,
-	spot_index_list_buffer: rhi::Buffer,
+	grid_buffers: [rhi::Buffer; 2],
+	point_index_list_buffers: [rhi::Buffer; 2],
+	spot_index_list_buffers: [rhi::Buffer; 2],
 	build_pipeline: rhi::Pipeline,
 	_build_meta: rhi::PipelineMeta,
 	cull_pipeline: rhi::Pipeline,
@@ -100,21 +100,39 @@ impl ClusterManager {
 			AllocationLocation::PreferDevice,
 		);
 
-		let grid_buffer = alloc.alloc_buffer(
+		let grid_buffer_0 = alloc.alloc_buffer(
+			grid_size,
+			buffer_usage,
+			AllocationCreate::Dedicated,
+			AllocationLocation::PreferDevice,
+		);
+		let grid_buffer_1 = alloc.alloc_buffer(
 			grid_size,
 			buffer_usage,
 			AllocationCreate::Dedicated,
 			AllocationLocation::PreferDevice,
 		);
 
-		let point_index_list_buffer = alloc.alloc_buffer(
+		let point_index_list_buffer_0 = alloc.alloc_buffer(
+			pt_index_size,
+			buffer_usage,
+			AllocationCreate::Dedicated,
+			AllocationLocation::PreferDevice,
+		);
+		let point_index_list_buffer_1 = alloc.alloc_buffer(
 			pt_index_size,
 			buffer_usage,
 			AllocationCreate::Dedicated,
 			AllocationLocation::PreferDevice,
 		);
 
-		let spot_index_list_buffer = alloc.alloc_buffer(
+		let spot_index_list_buffer_0 = alloc.alloc_buffer(
+			spot_index_size,
+			buffer_usage,
+			AllocationCreate::Dedicated,
+			AllocationLocation::PreferDevice,
+		);
+		let spot_index_list_buffer_1 = alloc.alloc_buffer(
 			spot_index_size,
 			buffer_usage,
 			AllocationCreate::Dedicated,
@@ -151,9 +169,9 @@ impl ClusterManager {
 
 		Ok(Self {
 			aabb_buffer,
-			grid_buffer,
-			point_index_list_buffer,
-			spot_index_list_buffer,
+			grid_buffers: [grid_buffer_0, grid_buffer_1],
+			point_index_list_buffers: [point_index_list_buffer_0, point_index_list_buffer_1],
+			spot_index_list_buffers: [spot_index_list_buffer_0, spot_index_list_buffer_1],
 			build_pipeline,
 			_build_meta: build_meta,
 			cull_pipeline,
@@ -163,16 +181,16 @@ impl ClusterManager {
 		})
 	}
 
-	pub fn grid_address(&self) -> u64 {
-		self.grid_buffer.address()
+	pub fn grid_address(&self, frame_idx: usize) -> u64 {
+		self.grid_buffers[frame_idx].address()
 	}
 
-	pub fn point_index_list_address(&self) -> u64 {
-		self.point_index_list_buffer.address()
+	pub fn point_index_list_address(&self, frame_idx: usize) -> u64 {
+		self.point_index_list_buffers[frame_idx].address()
 	}
 
-	pub fn spot_index_list_address(&self) -> u64 {
-		self.spot_index_list_buffer.address()
+	pub fn spot_index_list_address(&self, frame_idx: usize) -> u64 {
+		self.spot_index_list_buffers[frame_idx].address()
 	}
 
 	pub fn update_camera(
@@ -206,13 +224,13 @@ impl ClusterManager {
 		cmd.compute_barrier();
 	}
 
-	pub fn cull_lights(&mut self, cmd: &mut rhi::Command, scene_address: u64) {
+	pub fn cull_lights(&mut self, cmd: &mut rhi::Command, scene_address: u64, frame_idx: usize) {
 		let pc = CullPushConstants {
 			scene_address,
 			aabb_buffer_address: self.aabb_buffer.address(),
-			grid_buffer_address: self.grid_buffer.address(),
-			point_index_list_address: self.point_index_list_buffer.address(),
-			spot_index_list_address: self.spot_index_list_buffer.address(),
+			grid_buffer_address: self.grid_buffers[frame_idx].address(),
+			point_index_list_address: self.point_index_list_buffers[frame_idx].address(),
+			spot_index_list_address: self.spot_index_list_buffers[frame_idx].address(),
 			max_point_lights: MAX_POINT_LIGHTS_PER_CLUSTER,
 			max_spot_lights: MAX_SPOT_LIGHTS_PER_CLUSTER,
 		};

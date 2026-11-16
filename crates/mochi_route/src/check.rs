@@ -80,7 +80,10 @@ pub fn check(info: CheckInfo) -> Result<(), Error> {
 	}
 
 	// Check QW compiler
-	match std::process::Command::new("qw.debug").arg("--version").output() {
+	match std::process::Command::new("qw.debug")
+		.arg("--version")
+		.output()
+	{
 		Ok(out) if out.status.success() => (),
 		_ => {
 			eprintln!(

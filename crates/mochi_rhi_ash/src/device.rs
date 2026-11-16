@@ -130,7 +130,8 @@ unsafe extern "system" fn vulkan_debug_callback(
 	p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
 	_p_user_data: *mut std::ffi::c_void,
 ) -> vk::Bool32 {
-	let message = if !p_callback_data.is_null() && unsafe { !(*p_callback_data).p_message.is_null() } {
+	let message = if !p_callback_data.is_null() && unsafe { !(*p_callback_data).p_message.is_null() }
+	{
 		unsafe { std::ffi::CStr::from_ptr((*p_callback_data).p_message) }.to_string_lossy()
 	} else {
 		std::borrow::Cow::Borrowed("unknown")
@@ -396,12 +397,14 @@ impl AshDevice {
 
 		let mut features13 = vk::PhysicalDeviceVulkan13Features::default()
 			.dynamic_rendering(true)
-			.synchronization2(true);
+			.synchronization2(true)
+			.shader_demote_to_helper_invocation(true);
 
 		let features = vk::PhysicalDeviceFeatures::default()
 			.sampler_anisotropy(true)
 			.fill_mode_non_solid(true)
-			.shader_int64(true);
+			.shader_int64(true)
+			.depth_clamp(true);
 
 		let device_create_info = vk::DeviceCreateInfo::default()
 			.queue_create_infos(&queue_create_infos)

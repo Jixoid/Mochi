@@ -94,7 +94,9 @@ pub struct HistoryTarget {
 pub struct RenderingSystem {
 	cmd_buffers: Vec<rhi::Command>,
 	cmdmng: rhi::CommandManager,
-	frame_buffer: SceneFrameBuffer,
+	frame_buffers: [SceneFrameBuffer; Self::MAX_FRAMES_IN_FLIGHT as usize],
+	prev_view_proj: Option<[f32; 16]>,
+	prev_jitter: [f32; 2],
 	material_storage: MaterialStorage,
 	render_queue: RenderQueue,
 	texture_manager: Option<TextureManager>,
@@ -103,7 +105,7 @@ pub struct RenderingSystem {
 	default_material: Option<Arc<MaterialInstance>>,
 	transparent_material: Option<Arc<MaterialInstance>>,
 	aa_mode: AntiAliasingMode,
-	offscreen_target: Option<OffscreenSceneTarget>,
+	offscreen_targets: [Option<OffscreenSceneTarget>; Self::MAX_FRAMES_IN_FLIGHT as usize],
 	history_target: Option<HistoryTarget>,
 	fxaa_pipeline: Option<rhi::Pipeline>,
 	fxaa_meta: Option<rhi::PipelineMeta>,
@@ -133,6 +135,7 @@ pub enum FrameGenPhase {
 }
 
 impl RenderingSystem {
+	/// The engine architecture is fixed at MAX_FRAMES_IN_FLIGHT = 2 for full double buffering.
 	pub const MAX_FRAMES_IN_FLIGHT: u32 = 2;
 
 	pub fn new(cmdmng: &rhi::CommandManager) -> Result<Self, String> {
@@ -144,7 +147,9 @@ impl RenderingSystem {
 		Ok(Self {
 			cmd_buffers,
 			cmdmng: cmdmng.clone(),
-			frame_buffer: SceneFrameBuffer::new(),
+			frame_buffers: [SceneFrameBuffer::new(), SceneFrameBuffer::new()],
+			prev_view_proj: None,
+			prev_jitter: [0.0; 2],
 			material_storage: MaterialStorage::new(),
 			render_queue: RenderQueue::new(),
 			texture_manager: None,
@@ -153,7 +158,7 @@ impl RenderingSystem {
 			default_material: None,
 			transparent_material: None,
 			aa_mode: AntiAliasingMode::Off,
-			offscreen_target: None,
+			offscreen_targets: [None, None],
 			history_target: None,
 			fxaa_pipeline: None,
 			fxaa_meta: None,
@@ -352,30 +357,34 @@ impl RenderingSystem {
 				let height = display.height();
 				let (render_w, render_h) = self.aa_mode.render_extent(width, height);
 				if let Some(target) = display.render_target(0) {
-					self.ensure_offscreen_target(
-						device,
-						alloc,
-						render_w,
-						render_h,
-						target.color_format(),
-						target.depth_format(),
-						msaa_samples,
-					);
+					for frame_idx in 0..Self::MAX_FRAMES_IN_FLIGHT as usize {
+						self.ensure_offscreen_target(
+							device,
+							alloc,
+							render_w,
+							render_h,
+							target.color_format(),
+							target.depth_format(),
+							msaa_samples,
+							frame_idx,
+						);
+					}
 				}
 			}
 
 			mochi_disp!(
 				"FSR 3.1 Frame Generation toggled: {}",
-				if enabled { "ENABLED (Paced 2-Phase)" } else { "DISABLED" }
+				if enabled {
+					"ENABLED (Paced 2-Phase)"
+				} else {
+					"DISABLED"
+				}
 			);
 		}
 	}
 
 	pub fn velocity_target(&self) -> Option<&crate::velocity::VelocityTarget> {
-		self
-			.velocity_manager
-			.as_ref()
-			.and_then(|v| v.target.as_ref())
+		self.velocity_manager.as_ref().and_then(|v| v.target(0))
 	}
 
 	pub fn history_target(&self) -> Option<&HistoryTarget> {
@@ -420,15 +429,18 @@ impl RenderingSystem {
 			let height = display.height();
 			let (render_w, render_h) = mode.render_extent(width, height);
 			if let Some(target) = display.render_target(0) {
-				self.ensure_offscreen_target(
-					device,
-					alloc,
-					render_w,
-					render_h,
-					target.color_format(),
-					target.depth_format(),
-					msaa_samples,
-				);
+				for frame_idx in 0..Self::MAX_FRAMES_IN_FLIGHT as usize {
+					self.ensure_offscreen_target(
+						device,
+						alloc,
+						render_w,
+						render_h,
+						target.color_format(),
+						target.depth_format(),
+						msaa_samples,
+						frame_idx,
+					);
+				}
 			}
 		}
 
@@ -461,10 +473,11 @@ impl RenderingSystem {
 		color_format: rhi::Format,
 		depth_format: rhi::Format,
 		msaa_samples: rhi::MsaaSamples,
+		frame_idx: usize,
 	) {
 		let needs_msaa = msaa_samples.count() > 1;
 
-		if let Some(target) = &mut self.offscreen_target
+		if let Some(target) = &mut self.offscreen_targets[frame_idx]
 			&& target.width == width
 			&& target.height == height
 			&& target.color_format == color_format
@@ -545,7 +558,7 @@ impl RenderingSystem {
 			None
 		};
 
-		self.offscreen_target = Some(OffscreenSceneTarget {
+		self.offscreen_targets[frame_idx] = Some(OffscreenSceneTarget {
 			color_image,
 			color_view,
 			depth_image,
@@ -618,15 +631,18 @@ impl RenderingSystem {
 			let height = display.height();
 			let (render_w, render_h) = self.aa_mode.render_extent(width, height);
 			if let Some(target) = display.render_target(0) {
-				self.ensure_offscreen_target(
-					device,
-					alloc,
-					render_w,
-					render_h,
-					target.color_format(),
-					target.depth_format(),
-					samples,
-				);
+				for frame_idx in 0..Self::MAX_FRAMES_IN_FLIGHT as usize {
+					self.ensure_offscreen_target(
+						device,
+						alloc,
+						render_w,
+						render_h,
+						target.color_format(),
+						target.depth_format(),
+						samples,
+						frame_idx,
+					);
+				}
 			}
 		}
 
@@ -679,7 +695,9 @@ impl RenderingSystem {
 	) {
 		if self.frame_gen_enabled && self.frame_gen_phase == FrameGenPhase::PresentReal {
 			// Optional pacing when VSync is disabled: wait until half of Phase A's duration has elapsed
-			if !display.vsync() && let Some(last_time) = self.last_phase_a_time {
+			if !display.vsync()
+				&& let Some(last_time) = self.last_phase_a_time
+			{
 				let target_half = self.phase_a_duration / 2;
 				let elapsed = last_time.elapsed();
 				if elapsed < target_half {
@@ -703,7 +721,8 @@ impl RenderingSystem {
 			let cmd = &mut self.cmd_buffers[frame];
 			cmd.begin();
 
-			if let (Some(fg), Some(swapchain_target)) = (&self.frame_gen_manager, display.render_target(img_idx))
+			if let (Some(fg), Some(swapchain_target)) =
+				(&self.frame_gen_manager, display.render_target(img_idx))
 				&& let Some(fg_targets) = &fg.targets
 			{
 				let target_no_depth = swapchain_target.without_depth();
@@ -785,19 +804,19 @@ impl RenderingSystem {
 			{
 				if light.cast_shadows {
 					let dir = t.rotation * light.direction;
-					sm.ensure_cascade_set(device, alloc, light_idx).ok();
-					sm.update_cascades(light_idx, &camera, &cam_transform, aspect, dir);
-					cascade_view_proj[light_idx] = sm.cascade_view_proj(light_idx);
-					cascade_shadow_ids[light_idx] = sm.cascade_shadow_ids(light_idx);
+					sm.ensure_cascade_set(device, alloc, frame, light_idx).ok();
+					sm.update_cascades(frame, light_idx, &camera, &cam_transform, aspect, dir);
+					cascade_view_proj[light_idx] = sm.cascade_view_proj(frame, light_idx);
+					cascade_shadow_ids[light_idx] = sm.cascade_shadow_ids(frame, light_idx);
 				}
 			}
 		}
 
 		let (grid_addr, pt_index_addr, spot_index_addr) = if let Some(cm) = &self.cluster_manager {
 			(
-				cm.grid_address(),
-				cm.point_index_list_address(),
-				cm.spot_index_list_address(),
+				cm.grid_address(frame),
+				cm.point_index_list_address(frame),
+				cm.spot_index_list_address(frame),
 			)
 		} else {
 			(0, 0, 0)
@@ -818,7 +837,7 @@ impl RenderingSystem {
 		};
 
 		// Update frame scene buffer (Camera + Dynamic Lights + Shadows + MipBias)
-		self.frame_buffer.update(
+		let (curr_vp, curr_jitter) = self.frame_buffers[frame].update(
 			device,
 			alloc,
 			scene,
@@ -837,7 +856,11 @@ impl RenderingSystem {
 			cascade_shadow_ids,
 			jitter,
 			mip_bias,
+			self.prev_view_proj,
+			self.prev_jitter,
 		);
+		self.prev_view_proj = Some(curr_vp);
+		self.prev_jitter = curr_jitter;
 
 		// Extract packets for ShadowCaster pass
 		self.shadow_queue.extract_from_scene(
@@ -868,10 +891,11 @@ impl RenderingSystem {
 				target.color_format(),
 				target.depth_format(),
 				msaa_samples,
+				frame,
 			);
 		}
 
-		let scene_addr = self.frame_buffer.address();
+		let scene_addr = self.frame_buffers[frame].address();
 		let material_addr = self.material_storage.buffer_address();
 
 		let cmd = &mut self.cmd_buffers[frame];
@@ -880,7 +904,7 @@ impl RenderingSystem {
 		// Cascaded Shadow Map render passes for all active shadow-casting directional lights
 		if let Some(sm) = &self.shadow_manager {
 			for light_idx in 0..MAX_DIRECTIONAL_LIGHTS {
-				if let Some(set) = &sm.cascade_sets[light_idx] {
+				if let Some(set) = &sm.cascade_sets[frame][light_idx] {
 					for cascade in set.cascades.iter().take(CASCADE_COUNT) {
 						let cascade_target = rhi::RenderTarget::builder(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
 							.depth(&cascade.image, &cascade.view, rhi::Format::Depth32f)
@@ -925,11 +949,11 @@ impl RenderingSystem {
 			let proj = camera.projection_matrix(aspect);
 			let inv_proj = proj.inverse();
 			cm.update_camera(cmd, inv_proj.to_array(), camera.near, camera.far);
-			cm.cull_lights(cmd, scene_addr);
+			cm.cull_lights(cmd, scene_addr, frame);
 		}
 
 		if is_post_process {
-			if let Some(offscreen) = &self.offscreen_target {
+			if let Some(offscreen) = &self.offscreen_targets[frame] {
 				let mut target_builder = rhi::RenderTarget::builder(target_w, target_h)
 					.color(
 						&offscreen.color_image,
@@ -965,8 +989,8 @@ impl RenderingSystem {
 				// On-demand Velocity Buffer generation (only if active mode or Frame Gen requires it)
 				if self.aa_mode.needs_velocity() || self.frame_gen_enabled {
 					if let Some(vm) = &mut self.velocity_manager {
-						vm.ensure_target(device, alloc, target_w, target_h);
-						if let Some(vt) = &vm.target {
+						vm.ensure_target(device, alloc, target_w, target_h, frame);
+						if let Some(vt) = vm.target(frame) {
 							let velocity_rt = rhi::RenderTarget::builder(target_w, target_h)
 								.color(&vt.image, &vt.view, rhi::Format::V2Float16)
 								.build(device);
@@ -989,7 +1013,9 @@ impl RenderingSystem {
 					vm.free_target();
 				}
 
-				if self.frame_gen_enabled && let Some(fg) = &mut self.frame_gen_manager {
+				if self.frame_gen_enabled
+					&& let Some(fg) = &mut self.frame_gen_manager
+				{
 					if let Some(swapchain_target) = display.render_target(img_idx) {
 						let swapchain_format = swapchain_target.color_format();
 						fg.update_swapchain_format(device, swapchain_format);
@@ -1015,9 +1041,7 @@ impl RenderingSystem {
 				};
 
 				if self.aa_mode.is_fxaa() {
-					if let (Some(target), Some(fxaa_pipeline)) =
-						(&final_output_target, &self.fxaa_pipeline)
-					{
+					if let (Some(target), Some(fxaa_pipeline)) = (&final_output_target, &self.fxaa_pipeline) {
 						let target_no_depth = target.without_depth();
 						cmd.render_pass(&target_no_depth, clear_color, |pass| {
 							pass.set_viewport_and_scissor(width, height);
@@ -1111,7 +1135,7 @@ impl RenderingSystem {
 						let velocity_tex_id = self
 							.velocity_manager
 							.as_ref()
-							.and_then(|v| v.target.as_ref())
+							.and_then(|v| v.target(frame))
 							.map(|vt| vt.descriptor_id)
 							.unwrap_or(0);
 
@@ -1207,7 +1231,7 @@ impl RenderingSystem {
 						let velocity_tex_id = self
 							.velocity_manager
 							.as_ref()
-							.and_then(|v| v.target.as_ref())
+							.and_then(|v| v.target(frame))
 							.map(|vt| vt.descriptor_id)
 							.unwrap_or(0);
 
@@ -1276,7 +1300,7 @@ impl RenderingSystem {
 						let velocity_tex_id = self
 							.velocity_manager
 							.as_ref()
-							.and_then(|v| v.target.as_ref())
+							.and_then(|v| v.target(frame))
 							.map(|vt| vt.descriptor_id)
 							.unwrap_or(0);
 
@@ -1365,7 +1389,8 @@ impl RenderingSystem {
 					}
 				} else if self.frame_gen_enabled
 					&& let Some(target) = &final_output_target
-					&& let (Some(fg), Some(offscreen)) = (&self.frame_gen_manager, &self.offscreen_target)
+					&& let (Some(fg), Some(offscreen)) =
+						(&self.frame_gen_manager, &self.offscreen_targets[frame])
 				{
 					let target_no_depth = target.without_depth();
 					cmd.render_pass(&target_no_depth, clear_color, |pass| {
@@ -1396,15 +1421,14 @@ impl RenderingSystem {
 			});
 		}
 
-		let offscreen_depth_id = self
-			.offscreen_target
+		let offscreen_depth_id = self.offscreen_targets[frame]
 			.as_ref()
 			.map(|o| o.depth_descriptor_id)
 			.unwrap_or(0);
 		let velocity_tex_id = self
 			.velocity_manager
 			.as_ref()
-			.and_then(|v| v.target.as_ref())
+			.and_then(|v| v.target(frame))
 			.map(|vt| vt.descriptor_id)
 			.unwrap_or(0);
 		let display_metrics = [

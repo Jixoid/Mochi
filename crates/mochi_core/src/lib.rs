@@ -62,14 +62,8 @@ pub struct EngineApp {
 impl EngineApp {
 	pub fn from_config(config: ProjectConfig) -> Self {
 		// RHI
-		let device = rhi::Device::new_with_options(
-			"MochiEngine",
-			0,
-			1,
-			0,
-			0,
-			config.rendering.validation,
-		);
+		let device =
+			rhi::Device::new_with_options("MochiEngine", 0, 1, 0, 0, config.rendering.validation);
 		let alloca = rhi::Allocator::new(&device);
 		let cmdmng = rhi::CommandManager::new(&device);
 		let syncer = rhi::Synchronizer::new(&device, RenderingSystem::MAX_FRAMES_IN_FLIGHT);
@@ -353,9 +347,12 @@ impl ApplicationHandler for EngineApp {
 						title_dirty = true;
 					}
 				} else if let Some(req_msaa) = mochi_script::api::take_requested_msaa()
-					&& let (Some(display), Some(rendering), Some(device), Some(alloc)) =
-						(&mut self.display, &mut self.rendering_system, &self.device, &self.alloca)
-				{
+					&& let (Some(display), Some(rendering), Some(device), Some(alloc)) = (
+						&mut self.display,
+						&mut self.rendering_system,
+						&self.device,
+						&self.alloca,
+					) {
 					rendering.set_msaa(device, alloc, display, req_msaa);
 					mochi_script::api::set_current_msaa(req_msaa);
 					title_dirty = true;
