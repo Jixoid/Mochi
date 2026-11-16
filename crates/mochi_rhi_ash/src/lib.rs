@@ -66,7 +66,18 @@ impl RhiBackend for AshVulkanBackend {
 		patch: u16,
 		build: u16,
 	) -> RhiResult<Self::Device> {
-		AshDevice::new(app_name, major, minor, patch, build)
+		AshDevice::new_with_options(app_name, major, minor, patch, build, false)
+	}
+
+	fn create_device_with_options(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		build: u16,
+		validation: bool,
+	) -> RhiResult<Self::Device> {
+		AshDevice::new_with_options(app_name, major, minor, patch, build, validation)
 	}
 
 	fn create_allocator(device: &Self::Device) -> RhiResult<Self::Allocator> {

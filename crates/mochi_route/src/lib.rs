@@ -91,6 +91,10 @@ pub enum MainCommands {
 		#[arg(long = "no-fg", alias = "no-frame-gen", conflicts_with = "fg")]
 		no_fg: bool,
 
+		/// Enable Vulkan validation layers
+		#[arg(long)]
+		validation: bool,
+
 		/// Mute audio
 		#[arg(short, long)]
 		mute: bool,
@@ -178,6 +182,7 @@ fn main_cmd(cli: Cli) {
 			msaa,
 			fg,
 			no_fg,
+			validation,
 			mute,
 		} => run::run(run::RunInfo {
 			path: &path,
@@ -197,6 +202,7 @@ fn main_cmd(cli: Cli) {
 			msaa,
 			frame_gen: fg,
 			no_frame_gen: no_fg,
+			validation: Some(validation),
 			mute,
 		}),
 

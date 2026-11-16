@@ -40,6 +40,17 @@ pub trait RhiBackend: 'static + Sized + Send + Sync {
 		minor: u16,
 		patch: u16,
 		build: u16,
+	) -> RhiResult<Self::Device> {
+		Self::create_device_with_options(app_name, major, minor, patch, build, false)
+	}
+
+	fn create_device_with_options(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		build: u16,
+		validation: bool,
 	) -> RhiResult<Self::Device>;
 	fn create_allocator(device: &Self::Device) -> RhiResult<Self::Allocator>;
 	fn create_command_queue(device: &Self::Device) -> RhiResult<Self::CommandQueue>;

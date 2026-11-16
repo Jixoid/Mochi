@@ -96,7 +96,18 @@ unsafe impl<B: RhiBackend> Sync for Device<B> {}
 
 impl<B: RhiBackend> Device<B> {
 	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> Self {
-		let dev = B::create_device(app_name, major, minor, patch, build)
+		Self::new_with_options(app_name, major, minor, patch, build, false)
+	}
+
+	pub fn new_with_options(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		build: u16,
+		validation: bool,
+	) -> Self {
+		let dev = B::create_device_with_options(app_name, major, minor, patch, build, validation)
 			.expect("Failed to initialize RHI device");
 		let q_family = dev.main_queue_family();
 		let main_q = Queue::new(q_family);

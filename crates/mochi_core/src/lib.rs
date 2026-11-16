@@ -62,7 +62,14 @@ pub struct EngineApp {
 impl EngineApp {
 	pub fn from_config(config: ProjectConfig) -> Self {
 		// RHI
-		let device = rhi::Device::new("MochiEngine", 0, 1, 0, 0);
+		let device = rhi::Device::new_with_options(
+			"MochiEngine",
+			0,
+			1,
+			0,
+			0,
+			config.rendering.validation,
+		);
 		let alloca = rhi::Allocator::new(&device);
 		let cmdmng = rhi::CommandManager::new(&device);
 		let syncer = rhi::Synchronizer::new(&device, RenderingSystem::MAX_FRAMES_IN_FLIGHT);

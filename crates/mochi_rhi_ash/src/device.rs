@@ -46,6 +46,8 @@ pub struct AshBindlessHeap {
 pub struct DeviceInner {
 	entry: ash::Entry,
 	surface_loader: Option<ash::khr::surface::Instance>,
+	debug_utils_loader: Option<ash::ext::debug_utils::Instance>,
+	debug_messenger: Option<vk::DebugUtilsMessengerEXT>,
 	allocator: Option<Arc<Mutex<Allocator>>>,
 	device: Option<ash::Device>,
 	instance: Option<ash::Instance>,
@@ -110,12 +112,47 @@ impl Drop for DeviceInner {
 			if let Some(device) = self.device.take() {
 				device.destroy_device(None);
 			}
+			if let (Some(loader), Some(messenger)) = (&self.debug_utils_loader, self.debug_messenger) {
+				loader.destroy_debug_utils_messenger(messenger, None);
+			}
 			self.surface_loader = None;
+			self.debug_utils_loader = None;
 			if let Some(instance) = self.instance.take() {
 				instance.destroy_instance(None);
 			}
 		}
 	}
+}
+
+unsafe extern "system" fn vulkan_debug_callback(
+	message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+	message_types: vk::DebugUtilsMessageTypeFlagsEXT,
+	p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
+	_p_user_data: *mut std::ffi::c_void,
+) -> vk::Bool32 {
+	let message = if !p_callback_data.is_null() && unsafe { !(*p_callback_data).p_message.is_null() } {
+		unsafe { std::ffi::CStr::from_ptr((*p_callback_data).p_message) }.to_string_lossy()
+	} else {
+		std::borrow::Cow::Borrowed("unknown")
+	};
+
+	let type_str = if message_types.contains(vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE) {
+		"PERF"
+	} else if message_types.contains(vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION) {
+		"VALIDATION"
+	} else {
+		"GENERAL"
+	};
+
+	if message_severity.contains(vk::DebugUtilsMessageSeverityFlagsEXT::ERROR) {
+		eprintln!("\x1b[1;31m[Vulkan {type_str} ERROR]\x1b[0m {message}");
+	} else if message_severity.contains(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING) {
+		eprintln!("\x1b[1;33m[Vulkan {type_str} WARNING]\x1b[0m {message}");
+	} else {
+		eprintln!("[Vulkan {type_str} INFO] {message}");
+	}
+
+	vk::FALSE
 }
 
 #[derive(Clone)]
@@ -127,7 +164,18 @@ unsafe impl Send for AshDevice {}
 unsafe impl Sync for AshDevice {}
 
 impl AshDevice {
-	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, _build: u16) -> RhiResult<Self> {
+	pub fn new(app_name: &str, major: u16, minor: u16, patch: u16, build: u16) -> RhiResult<Self> {
+		Self::new_with_options(app_name, major, minor, patch, build, false)
+	}
+
+	pub fn new_with_options(
+		app_name: &str,
+		major: u16,
+		minor: u16,
+		patch: u16,
+		_build: u16,
+		validation: bool,
+	) -> RhiResult<Self> {
 		let entry =
 			unsafe { ash::Entry::load().map_err(|e| RhiError::InitializationFailed(format!("{e}")))? };
 
@@ -175,9 +223,65 @@ impl AshDevice {
 			}
 		}
 
-		let instance_create_info = vk::InstanceCreateInfo::default()
+		let available_layers = unsafe {
+			entry
+				.enumerate_instance_layer_properties()
+				.unwrap_or_default()
+		};
+
+		let khronos_validation_layer = c"VK_LAYER_KHRONOS_validation";
+		let has_validation_layer = available_layers.iter().any(|layer| {
+			let name = unsafe { std::ffi::CStr::from_ptr(layer.layer_name.as_ptr()) };
+			name == khronos_validation_layer
+		});
+
+		let mut enabled_layers = Vec::new();
+		let mut debug_enabled = false;
+
+		if validation {
+			if has_validation_layer {
+				enabled_layers.push(khronos_validation_layer.as_ptr());
+				mochi_disp!("Vulkan validation layer enabled (VK_LAYER_KHRONOS_validation)");
+
+				let debug_utils_ext_name = ash::ext::debug_utils::NAME;
+				let has_debug_utils = supported_inst_exts.iter().any(|ext| {
+					let name = unsafe { std::ffi::CStr::from_ptr(ext.extension_name.as_ptr()) };
+					name == debug_utils_ext_name
+				});
+
+				if has_debug_utils {
+					if !enabled_inst_extensions.contains(&debug_utils_ext_name.as_ptr()) {
+						enabled_inst_extensions.push(debug_utils_ext_name.as_ptr());
+					}
+					debug_enabled = true;
+				}
+			} else {
+				mochi_warn!(
+					"Vulkan validation layer requested, but 'VK_LAYER_KHRONOS_validation' was not found on this system"
+				);
+			}
+		}
+
+		let mut debug_info = vk::DebugUtilsMessengerCreateInfoEXT::default()
+			.message_severity(
+				vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
+					| vk::DebugUtilsMessageSeverityFlagsEXT::WARNING,
+			)
+			.message_type(
+				vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+					| vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+					| vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
+			)
+			.pfn_user_callback(Some(vulkan_debug_callback));
+
+		let mut instance_create_info = vk::InstanceCreateInfo::default()
 			.application_info(&app_info)
-			.enabled_extension_names(&enabled_inst_extensions);
+			.enabled_extension_names(&enabled_inst_extensions)
+			.enabled_layer_names(&enabled_layers);
+
+		if debug_enabled {
+			instance_create_info = instance_create_info.push_next(&mut debug_info);
+		}
 
 		let instance = unsafe {
 			entry
@@ -185,6 +289,14 @@ impl AshDevice {
 				.map_err(|e| {
 					RhiError::InitializationFailed(format!("Failed to create Vulkan instance: {e}"))
 				})?
+		};
+
+		let (debug_utils_loader, debug_messenger) = if debug_enabled {
+			let loader = ash::ext::debug_utils::Instance::new(&entry, &instance);
+			let messenger = unsafe { loader.create_debug_utils_messenger(&debug_info, None).ok() };
+			(Some(loader), messenger)
+		} else {
+			(None, None)
 		};
 
 		let surface_loader = ash::khr::surface::Instance::new(&entry, &instance);
@@ -278,7 +390,9 @@ impl AshDevice {
 			.shader_sampled_image_array_non_uniform_indexing(true)
 			.descriptor_binding_partially_bound(true)
 			.descriptor_binding_variable_descriptor_count(true)
-			.runtime_descriptor_array(true);
+			.descriptor_binding_sampled_image_update_after_bind(true)
+			.runtime_descriptor_array(true)
+			.scalar_block_layout(true);
 
 		let mut features13 = vk::PhysicalDeviceVulkan13Features::default()
 			.dynamic_rendering(true)
@@ -403,6 +517,8 @@ impl AshDevice {
 			queue_family,
 			allocator: Some(Arc::new(Mutex::new(allocator))),
 			surface_loader: Some(surface_loader),
+			debug_utils_loader,
+			debug_messenger,
 			bindless_heap: Some(bindless_heap),
 		};
 

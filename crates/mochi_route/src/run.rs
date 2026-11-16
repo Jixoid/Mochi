@@ -31,6 +31,7 @@ pub struct RunInfo<'a> {
 	pub msaa: Option<u32>,
 	pub frame_gen: bool,
 	pub no_frame_gen: bool,
+	pub validation: Option<bool>,
 	pub mute: bool,
 }
 
@@ -96,6 +97,10 @@ pub fn run(info: RunInfo) -> Result<(), Error> {
 	} else if info.no_frame_gen {
 		config.rendering.frame_generation = false;
 		mochi_script::api::mochi_set_frame_generation(false);
+	}
+
+	if let Some(val) = info.validation {
+		config.rendering.validation = val;
 	}
 
 	// QW style execution message
