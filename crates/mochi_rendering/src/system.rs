@@ -32,7 +32,8 @@ use crate::taa::{TaaManager, TaaPushConstants, TaaSharpenPushConstants};
 use crate::velocity::{VelocityManager, VelocityPushConstants};
 use mochi_rhi as rhi;
 use mochi_scene::{
-	CameraComponent, DirectionalLightComponent, Scene, SpotLightComponent, TransformComponent,
+	CameraComponent, DirectionalLightComponent, Scene, SkeletonComponent, SpotLightComponent,
+	TransformComponent,
 };
 use mochi_display::Display;
 use mochi_except::*;
@@ -51,8 +52,10 @@ pub struct ObjectPushConstants {
 	pub scene_addr: u64,
 	pub vertex_addr: u64,
 	pub material_addr: u64,
+	pub joint_addr: u64,
 	pub material_id: u32,
 	pub flags: u32,
+	pub _pad: [u32; 2],
 }
 
 #[repr(C, align(16))]
@@ -898,6 +901,11 @@ impl RenderingSystem {
 		self.prev_view_proj = Some(curr_vp);
 		self.prev_jitter = curr_jitter;
 
+		// Update GPU buffers for active skeletons
+		for (_entity, skeleton) in scene.world().query::<&mut SkeletonComponent>().iter() {
+			skeleton.update_gpu(device, alloc);
+		}
+
 		// Extract packets for ShadowCaster pass
 		self.shadow_queue.extract_from_scene(
 			scene,
@@ -959,6 +967,7 @@ impl RenderingSystem {
 								let pc = ShadowPushConstants {
 									mvp,
 									vertex_addr: packet.vertex_buffer_addr,
+									joint_addr: packet.joint_buffer_addr,
 								};
 
 								pass.push_constant(rhi::ShaderStage::Vertex, 0, &pc);
@@ -999,6 +1008,7 @@ impl RenderingSystem {
 							let pc = ShadowPushConstants {
 								mvp,
 								vertex_addr: packet.vertex_buffer_addr,
+								joint_addr: packet.joint_buffer_addr,
 							};
 
 							pass.push_constant(rhi::ShaderStage::Vertex, 0, &pc);
@@ -1623,8 +1633,10 @@ impl RenderingSystem {
 				scene_addr,
 				vertex_addr: packet.vertex_buffer_addr,
 				material_addr,
+				joint_addr: packet.joint_buffer_addr,
 				material_id: packet.material_id,
 				flags: 0,
+				_pad: [0, 0],
 			};
 
 			pass.push_constant(rhi::ShaderStage::Vertex | rhi::ShaderStage::Pixel, 0, &pc);

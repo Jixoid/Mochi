@@ -656,74 +656,74 @@ pub const trait Min {
 
 const impl Min for f16 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for f32 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for f64 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for f128 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 
 const impl Min for i8 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for i16 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for i32 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for i64 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for i128 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 
 const impl Min for u8 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for u16 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for u32 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for u64 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 const impl Min for u128 {
 	fn min(self, min: Self) -> Self {
-		if self < min { min } else { self }
+		if self < min { self } else { min }
 	}
 }
 
@@ -734,74 +734,74 @@ pub const trait Max {
 
 const impl Max for f16 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for f32 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for f64 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for f128 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 
 const impl Max for i8 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for i16 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for i32 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for i64 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for i128 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 
 const impl Max for u8 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for u16 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for u32 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for u64 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 const impl Max for u128 {
 	fn max(self, max: Self) -> Self {
-		if self > max { max } else { self }
+		if self > max { self } else { max }
 	}
 }
 

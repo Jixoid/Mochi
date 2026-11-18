@@ -143,3 +143,34 @@ impl<T: Number> From<[Vec3<T>; 2]> for AABB<T> {
 		Self::new(arr[0], arr[1])
 	}
 }
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_aabb_from_points() {
+		let points = [
+			Vec3::new(1.0f32, -2.0, 3.0),
+			Vec3::new(-5.0f32, 4.0, 0.0),
+			Vec3::new(2.0f32, 1.0, -1.0),
+		];
+		let aabb = AABB::from_points(&points);
+		assert_eq!(aabb.min, Vec3::new(-5.0, -2.0, -1.0));
+		assert_eq!(aabb.max, Vec3::new(2.0, 4.0, 3.0));
+	}
+
+	#[test]
+	fn test_aabb_contains_and_intersects() {
+		let aabb1 = AABB::new(Vec3::new(0.0f32, 0.0, 0.0), Vec3::new(10.0, 10.0, 10.0));
+		let aabb2 = AABB::new(Vec3::new(5.0f32, 5.0, 5.0), Vec3::new(15.0, 15.0, 15.0));
+		let aabb3 = AABB::new(Vec3::new(20.0f32, 20.0, 20.0), Vec3::new(30.0, 30.0, 30.0));
+
+		assert!(aabb1.contains_point(Vec3::new(5.0, 5.0, 5.0)));
+		assert!(!aabb1.contains_point(Vec3::new(15.0, 5.0, 5.0)));
+
+		assert!(aabb1.intersects(&aabb2));
+		assert!(!aabb1.intersects(&aabb3));
+	}
+}

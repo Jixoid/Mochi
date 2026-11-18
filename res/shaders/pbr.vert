@@ -24,10 +24,22 @@ struct Vertex {
 	vec4 color;
 	vec2 uv0;
 	vec2 uv1;
+	uvec4 joints;
+	vec4 weights;
+};
+
+struct JointTransform {
+	vec4 row0;
+	vec4 row1;
+	vec4 row2;
 };
 
 layout(buffer_reference, scalar) readonly buffer VertexBuffer {
 	Vertex vertices[];
+};
+
+layout(buffer_reference, scalar) readonly buffer JointBuffer {
+	JointTransform joints[];
 };
 
 struct DirectionalLight {
@@ -75,8 +87,11 @@ layout(push_constant, scalar, row_major) uniform PushConstants {
 	uint64_t scene_address;
 	uint64_t vertex_address;
 	uint64_t material_address;
+	uint64_t joint_address;
 	uint material_id;
 	uint flags;
+	uint _pad0;
+	uint _pad1;
 } pc;
 
 layout(location = 0) out vec3 out_world_pos;
@@ -91,10 +106,38 @@ void main() {
 	SceneFrameData scene = SceneFrameData(pc.scene_address);
 	Vertex v = vbuf.vertices[gl_VertexIndex];
 
-	vec4 world_pos = pc.model * vec4(v.position.xyz, 1.0);
+	vec3 local_pos = v.position.xyz;
+	vec3 local_normal = v.normal.xyz;
+	vec3 local_tangent = v.tangent.xyz;
+
+	if (pc.joint_address != 0 && (v.weights.x + v.weights.y + v.weights.z + v.weights.w) > 0.001) {
+		JointBuffer jbuf = JointBuffer(pc.joint_address);
+
+		vec4 r0 = v.weights.x * jbuf.joints[v.joints.x].row0 +
+		          v.weights.y * jbuf.joints[v.joints.y].row0 +
+		          v.weights.z * jbuf.joints[v.joints.z].row0 +
+		          v.weights.w * jbuf.joints[v.joints.w].row0;
+
+		vec4 r1 = v.weights.x * jbuf.joints[v.joints.x].row1 +
+		          v.weights.y * jbuf.joints[v.joints.y].row1 +
+		          v.weights.z * jbuf.joints[v.joints.z].row1 +
+		          v.weights.w * jbuf.joints[v.joints.w].row1;
+
+		vec4 r2 = v.weights.x * jbuf.joints[v.joints.x].row2 +
+		          v.weights.y * jbuf.joints[v.joints.y].row2 +
+		          v.weights.z * jbuf.joints[v.joints.z].row2 +
+		          v.weights.w * jbuf.joints[v.joints.w].row2;
+
+		vec4 pos_h = vec4(local_pos, 1.0);
+		local_pos = vec3(dot(r0, pos_h), dot(r1, pos_h), dot(r2, pos_h));
+		local_normal = normalize(vec3(dot(r0.xyz, local_normal), dot(r1.xyz, local_normal), dot(r2.xyz, local_normal)));
+		local_tangent = normalize(vec3(dot(r0.xyz, local_tangent), dot(r1.xyz, local_tangent), dot(r2.xyz, local_tangent)));
+	}
+
+	vec4 world_pos = pc.model * vec4(local_pos, 1.0);
 	out_world_pos = world_pos.xyz;
-	out_normal = normalize(mat3(pc.model) * v.normal.xyz);
-	out_tangent = vec4(normalize(mat3(pc.model) * v.tangent.xyz), v.tangent.w);
+	out_normal = normalize(mat3(pc.model) * local_normal);
+	out_tangent = vec4(normalize(mat3(pc.model) * local_tangent), v.tangent.w);
 	out_color = v.color;
 	out_uv = v.uv0;
 

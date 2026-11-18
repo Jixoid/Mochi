@@ -18,7 +18,7 @@ use mochi_rendering::RenderingSystem;
 use mochi_rhi as rhi;
 use mochi_scene::{
 	CameraComponent, DirectionalLightComponent, MeshRendererComponent, PointLightComponent, Scene,
-	SpotLightComponent, TransformComponent,
+	SkeletonComponent, SpotLightComponent, TransformComponent,
 };
 use mochi_script::ScriptComponent;
 use mochi_except::*;
@@ -238,7 +238,13 @@ impl SceneAsset {
 			std::sync::Arc<mochi_material::MaterialInstance>,
 		)>;
 
-		let mut loaded_models: HashMap<String, LoadedMeshInstances> = HashMap::new();
+		#[derive(Clone)]
+		struct LoadedModelData {
+			submeshes: LoadedMeshInstances,
+			joint_count: Option<usize>,
+		}
+
+		let mut loaded_models: HashMap<String, LoadedModelData> = HashMap::new();
 
 		for entity_desc in &self.entities {
 			let transform = entity_desc
@@ -251,8 +257,8 @@ impl SceneAsset {
 				let resolved_model_path = crate::resolve_relative(&mr.asset, scene_dir, project_root);
 				let model_key = resolved_model_path.to_string_lossy().to_string();
 
-				let submeshes = if let Some(cached) = loaded_models.get(&model_key) {
-					cached.clone()
+				let (submeshes, joint_count) = if let Some(cached) = loaded_models.get(&model_key) {
+					(cached.submeshes.clone(), cached.joint_count)
 				} else {
 					match ModelAsset::load_file(&resolved_model_path, project_root) {
 						Ok(model) => {
@@ -265,15 +271,22 @@ impl SceneAsset {
 								&template,
 								&transparent_template,
 							);
-							loaded_models.insert(model_key, built.clone());
-							built
+							let jc = model.skins.first().map(|s| s.joint_node_indices.len());
+							loaded_models.insert(
+								model_key,
+								LoadedModelData {
+									submeshes: built.clone(),
+									joint_count: jc,
+								},
+							);
+							(built, jc)
 						}
 						Err(err) => {
 							mochi_error!(
 								"Failed to load model asset '{}': {err}",
 								resolved_model_path.display()
 							);
-							Vec::new()
+							(Vec::new(), None)
 						}
 					}
 				};
@@ -283,13 +296,21 @@ impl SceneAsset {
 					renderer.is_visible = mr.is_visible;
 					renderer.cast_shadows = mr.cast_shadows;
 
+					let skeleton_opt = joint_count.map(SkeletonComponent::new);
+
 					if let Some(sc) = &entity_desc.script {
 						let resolved_script_path = crate::resolve_relative(&sc.path, scene_dir, project_root);
 						let script_comp = ScriptComponent {
 							path: resolved_script_path.to_string_lossy().to_string(),
 							is_active: sc.is_active,
 						};
-						scene.spawn((transform, renderer, script_comp));
+						if let Some(skeleton) = skeleton_opt {
+							scene.spawn((transform, renderer, skeleton, script_comp));
+						} else {
+							scene.spawn((transform, renderer, script_comp));
+						}
+					} else if let Some(skeleton) = skeleton_opt {
+						scene.spawn((transform, renderer, skeleton));
 					} else {
 						scene.spawn((transform, renderer));
 					}
@@ -352,5 +373,25 @@ impl SceneAsset {
 		}
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_load_main_scene_with_skinned_model() {
+		let path = "../../test/khronos_test/scenes/main.mscene.ron";
+		if !std::path::Path::new(path).exists() {
+			return;
+		}
+
+		let scene_asset = SceneAsset::load(path).expect("Failed to deserialize main.mscene.ron");
+		let has_cesium_man = scene_asset
+			.entities
+			.iter()
+			.any(|e| e.name.as_deref() == Some("CesiumMan"));
+		assert!(has_cesium_man, "Scene should contain CesiumMan entity");
 	}
 }

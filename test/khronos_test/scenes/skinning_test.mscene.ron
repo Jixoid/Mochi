@@ -1,0 +1,111 @@
+SceneAsset(
+	name: "SkinningTestScene",
+	entities: [
+		EntityDesc(
+			name: Some("MainCamera"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 1.8, 4.0),
+			)),
+			camera: Some(CameraDesc(
+				fov_deg: 60.0,
+				near: 0.1,
+				far: 1000.0,
+				is_active: true,
+				clear_color: (0.05, 0.06, 0.09, 1.0),
+			)),
+			script: Some(ScriptDesc(
+				path: "scripts/free_cam.qw",
+				is_active: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("SunLight"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 15.0, 0.0),
+			)),
+			directional_light: Some(DirectionalLightDesc(
+				color: (1.0, 0.98, 0.92),
+				intensity: 1.2,
+				direction: (0.4, -1.0, 0.3),
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("SpotLight"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 4.0, 2.0),
+				rotation: (-0.3826834, 0.0, 0.0, 0.9238795),
+			)),
+			spot_light: Some(SpotLightDesc(
+				color: (1.0, 0.9, 0.8),
+				intensity: 5.0,
+				radius: 12.0,
+				inner_cone_angle_deg: 25.0,
+				outer_cone_angle_deg: 45.0,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("Floor"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 0.0, 0.0),
+				scale: (20.0, 1.0, 20.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/floor.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("CesiumManPedestal"),
+			transform: Some(TransformDesc(
+				translation: (-1.2, 0.2, 0.0),
+				scale: (1.6, 0.4, 1.6),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/pedestal.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("CesiumMan"),
+			transform: Some(TransformDesc(
+				translation: (-1.2, 0.4, 0.0),
+				rotation: (-0.5, -0.5, -0.5, 0.5),
+				scale: (1.0, 1.0, 1.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cesium_man.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("RiggedFigurePedestal"),
+			transform: Some(TransformDesc(
+				translation: (1.2, 0.2, 0.0),
+				scale: (1.6, 0.4, 1.6),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/pedestal.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("RiggedFigure"),
+			transform: Some(TransformDesc(
+				translation: (1.2, 0.4, 0.0),
+				rotation: (-0.7071068, 0.0, 0.0, 0.7071068),
+				scale: (1.0, 1.0, 1.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/rigged_figure.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+		),
+	],
+)

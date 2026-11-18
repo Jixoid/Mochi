@@ -1,0 +1,4 @@
+ModelAsset(
+	name: "RiggedFigure",
+	source: Some("rigged_figure.glb"),
+)

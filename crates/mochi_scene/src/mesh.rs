@@ -24,7 +24,13 @@ pub struct Vertex {
 	pub color: [f32; 4],
 	pub uv0: [f32; 2],
 	pub uv1: [f32; 2],
+	pub joints: [u32; 4],
+	pub weights: [f32; 4],
 }
+
+const _: () = {
+	assert!(std::mem::size_of::<Vertex>() == 112);
+};
 
 impl Vertex {
 	pub fn new(pos: [f32; 3], normal: [f32; 3], uv: [f32; 2], color: [f32; 4]) -> Self {
@@ -35,6 +41,28 @@ impl Vertex {
 			color,
 			uv0: uv,
 			uv1: [0.0, 0.0],
+			joints: [0, 0, 0, 0],
+			weights: [0.0, 0.0, 0.0, 0.0],
+		}
+	}
+
+	pub fn new_skinned(
+		pos: [f32; 3],
+		normal: [f32; 3],
+		uv: [f32; 2],
+		color: [f32; 4],
+		joints: [u32; 4],
+		weights: [f32; 4],
+	) -> Self {
+		Self {
+			pos: [pos[0], pos[1], pos[2], 1.0],
+			normal: [normal[0], normal[1], normal[2], 0.0],
+			tangent: [1.0, 0.0, 0.0, 1.0],
+			color,
+			uv0: uv,
+			uv1: [0.0, 0.0],
+			joints,
+			weights,
 		}
 	}
 }
@@ -253,5 +281,68 @@ impl Mesh {
 		];
 
 		Self::new_unindexed(device, alloc, &vertices)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use mochi_math::{Mat3x4, Vec4};
+	use crate::components::SkeletonComponent;
+
+	#[test]
+	fn test_vertex_layout_and_size() {
+		assert_eq!(std::mem::size_of::<Vertex>(), 112);
+		let v = Vertex::new_skinned(
+			[1.0, 2.0, 3.0],
+			[0.0, 1.0, 0.0],
+			[0.5, 0.5],
+			[1.0, 1.0, 1.0, 1.0],
+			[0, 1, 0, 0],
+			[0.7, 0.3, 0.0, 0.0],
+		);
+		assert_eq!(v.joints, [0, 1, 0, 0]);
+		assert_eq!(v.weights, [0.7, 0.3, 0.0, 0.0]);
+	}
+
+	#[test]
+	fn test_skeleton_component_affine3_matrices() {
+		let mut skel = SkeletonComponent::new(4);
+		assert_eq!(skel.joint_matrices.len(), 4);
+		assert_eq!(skel.joint_matrices[0], Mat3x4::IDENTITY);
+
+		// Transform joint 1 with translation [2.0, 0.0, 0.0]
+		skel.joint_matrices[1].rows[0].w = 2.0;
+
+		// Skinning math simulation matching pbr.vert / shadow.vert
+		let weights = [0.5_f32, 0.5, 0.0, 0.0];
+		let joints = [0usize, 1, 0, 0];
+
+		let j0 = skel.joint_matrices[joints[0]];
+		let j1 = skel.joint_matrices[joints[1]];
+
+		let r0 = j0.rows[0] * weights[0] + j1.rows[0] * weights[1];
+		let r1 = j0.rows[1] * weights[0] + j1.rows[1] * weights[1];
+		let r2 = j0.rows[2] * weights[0] + j1.rows[2] * weights[1];
+
+		let p_orig = Vec4::new_with(0.0_f32, 0.0, 0.0, 1.0);
+		let p_skinned = mochi_math::Vec3::new(r0.dot(&p_orig), r1.dot(&p_orig), r2.dot(&p_orig));
+
+		// 0.5 * 0.0 + 0.5 * 2.0 = 1.0
+		assert!(
+			(p_skinned.x - 1.0).abs() < 1e-5,
+			"Expected x=1.0, got {}",
+			p_skinned.x
+		);
+		assert!(
+			(p_skinned.y - 0.0).abs() < 1e-5,
+			"Expected y=0.0, got {}",
+			p_skinned.y
+		);
+		assert!(
+			(p_skinned.z - 0.0).abs() < 1e-5,
+			"Expected z=0.0, got {}",
+			p_skinned.z
+		);
 	}
 }

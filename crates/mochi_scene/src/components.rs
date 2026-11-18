@@ -14,7 +14,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use mochi_material::MaterialInstance;
 use crate::mesh::Mesh;
-use mochi_math::{Mat4x4, Transform, Vec3, Vec4};
+use mochi_math::{Mat3x4, Mat4x4, Transform, Vec3, Vec4};
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -176,5 +176,64 @@ impl MeshRendererComponent {
 			receive_shadows: true,
 			is_visible: true,
 		}
+	}
+}
+
+pub struct SkeletonComponent {
+	pub joint_matrices: Vec<Mat3x4<f32>>,
+	pub joint_buffer: Option<mochi_rhi::Buffer>,
+}
+
+impl SkeletonComponent {
+	pub fn new(joint_count: usize) -> Self {
+		Self {
+			joint_matrices: vec![Mat3x4::IDENTITY; joint_count],
+			joint_buffer: None,
+		}
+	}
+
+	pub fn from_matrices(matrices: Vec<Mat3x4<f32>>) -> Self {
+		Self {
+			joint_matrices: matrices,
+			joint_buffer: None,
+		}
+	}
+
+	pub fn update_gpu(&mut self, device: &mochi_rhi::Device, alloc: &mochi_rhi::Allocator) {
+		if self.joint_matrices.is_empty() {
+			return;
+		}
+
+		let byte_size = (self.joint_matrices.len() * std::mem::size_of::<Mat3x4<f32>>()) as u64;
+
+		let needs_realloc = match &self.joint_buffer {
+			Some(buf) => buf.size() < byte_size,
+			None => true,
+		};
+
+		if needs_realloc {
+			self.joint_buffer = Some(mochi_rhi::Buffer::new(
+				alloc,
+				byte_size.max(256),
+				mochi_rhi::BufferUsage::StorageBuffer | mochi_rhi::BufferUsage::DeviceAddress,
+				mochi_rhi::AllocationCreate::Mapped,
+				mochi_rhi::AllocationLocation::Auto,
+			));
+		}
+
+		if let Some(buf) = &mut self.joint_buffer {
+			let uploader = mochi_rhi::Uploader::new(device);
+			let bytes = unsafe {
+				std::slice::from_raw_parts(
+					self.joint_matrices.as_ptr() as *const u8,
+					self.joint_matrices.len() * std::mem::size_of::<Mat3x4<f32>>(),
+				)
+			};
+			uploader.copy_memory_to_buffer(mochi_rhi::TransferTime::Now, bytes, buf);
+		}
+	}
+
+	pub fn joint_buffer_address(&self) -> u64 {
+		self.joint_buffer.as_ref().map_or(0, |b| b.address())
 	}
 }

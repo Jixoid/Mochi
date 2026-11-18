@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 use mochi_material::{BlendMode, MaterialInstance, MaterialStorage, PassKind};
-use mochi_scene::{Mesh, MeshRendererComponent, Scene, TransformComponent};
+use mochi_scene::{Mesh, MeshRendererComponent, Scene, SkeletonComponent, TransformComponent};
 use mochi_math::Vec3;
 
 
@@ -21,6 +21,7 @@ pub struct RenderPacket {
 	pub model_matrix: [f32; 16],
 	pub vertex_buffer_addr: u64,
 	pub index_buffer_addr: u64,
+	pub joint_buffer_addr: u64,
 	pub index_count: u32,
 	pub vertex_count: u32,
 	pub material_id: u32,
@@ -53,9 +54,13 @@ impl RenderQueue {
 	) {
 		self.clear();
 
-		for (_entity, (transform, renderer)) in scene
+		for (_entity, (transform, renderer, skeleton)) in scene
 			.world()
-			.query::<(&TransformComponent, &MeshRendererComponent)>()
+			.query::<(
+				&TransformComponent,
+				&MeshRendererComponent,
+				Option<&SkeletonComponent>,
+			)>()
 			.iter()
 		{
 			if !renderer.is_visible {
@@ -100,12 +105,14 @@ impl RenderQueue {
 			);
 
 			let model_matrix = transform.to_array();
+			let joint_buffer_addr = skeleton.map_or(0, |s| s.joint_buffer_address());
 
 			self.packets.push(RenderPacket {
 				sort_key,
 				model_matrix,
 				vertex_buffer_addr: mesh.vertex_address(),
 				index_buffer_addr: mesh.index_address(),
+				joint_buffer_addr,
 				index_count: mesh.index_count(),
 				vertex_count: mesh.vertex_count(),
 				material_id: slot_id,

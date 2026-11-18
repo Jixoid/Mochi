@@ -1,0 +1,4 @@
+ModelAsset(
+	name: "CesiumMan",
+	source: Some("cesium_man.glb"),
+)

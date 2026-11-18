@@ -30,6 +30,10 @@ pub struct VertexAsset {
 	pub color: [f32; 4],
 	pub uv0: [f32; 2],
 	pub uv1: [f32; 2],
+	#[serde(default)]
+	pub joints: [u32; 4],
+	#[serde(default)]
+	pub weights: [f32; 4],
 }
 
 impl From<&Vertex> for VertexAsset {
@@ -41,6 +45,8 @@ impl From<&Vertex> for VertexAsset {
 			color: v.color,
 			uv0: v.uv0,
 			uv1: v.uv1,
+			joints: v.joints,
+			weights: v.weights,
 		}
 	}
 }
@@ -54,8 +60,47 @@ impl From<&VertexAsset> for Vertex {
 			color: v.color,
 			uv0: v.uv0,
 			uv1: v.uv1,
+			joints: v.joints,
+			weights: v.weights,
 		}
 	}
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SkinAsset {
+	pub name: String,
+	pub joint_node_indices: Vec<usize>,
+	pub inverse_bind_matrices: Vec<[[f32; 4]; 3]>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AnimationPath {
+	Translation,
+	Rotation,
+	Scale,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AnimationInterpolation {
+	Linear,
+	Step,
+	CubicSpline,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AnimationChannelAsset {
+	pub node_index: usize,
+	pub path: AnimationPath,
+	pub interpolation: AnimationInterpolation,
+	pub timestamps: Vec<f32>,
+	pub keyframe_data: Vec<f32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AnimationAsset {
+	pub name: String,
+	pub duration: f32,
+	pub channels: Vec<AnimationChannelAsset>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -140,6 +185,10 @@ pub struct ModelAsset {
 	pub materials: Vec<MaterialAsset>,
 	#[serde(default)]
 	pub exclude_meshes: Vec<String>,
+	#[serde(default)]
+	pub skins: Vec<SkinAsset>,
+	#[serde(default)]
+	pub animations: Vec<AnimationAsset>,
 }
 
 impl ModelAsset {
@@ -285,6 +334,23 @@ impl ModelAsset {
 					.map(|iter| iter.into_f32().collect())
 					.unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()]);
 
+				let joints: Vec<[u32; 4]> = reader
+					.read_joints(0)
+					.map(|iter| match iter {
+						gltf::mesh::util::ReadJoints::U8(i) => i
+							.map(|j| [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32])
+							.collect(),
+						gltf::mesh::util::ReadJoints::U16(i) => i
+							.map(|j| [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32])
+							.collect(),
+					})
+					.unwrap_or_else(|| vec![[0, 0, 0, 0]; positions.len()]);
+
+				let weights: Vec<[f32; 4]> = reader
+					.read_weights(0)
+					.map(|iter| iter.into_f32().collect())
+					.unwrap_or_else(|| vec![[0.0, 0.0, 0.0, 0.0]; positions.len()]);
+
 				let indices: Vec<u32> = reader
 					.read_indices()
 					.map(|iter| iter.into_u32().collect())
@@ -296,6 +362,8 @@ impl ModelAsset {
 					let t = tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]);
 					let c = colors.get(i).copied().unwrap_or([1.0, 1.0, 1.0, 1.0]);
 					let uv = uvs.get(i).copied().unwrap_or([0.0, 0.0]);
+					let j = joints.get(i).copied().unwrap_or([0, 0, 0, 0]);
+					let w = weights.get(i).copied().unwrap_or([0.0, 0.0, 0.0, 0.0]);
 
 					vertices.push(VertexAsset {
 						pos: [p[0], p[1], p[2], 1.0],
@@ -304,6 +372,8 @@ impl ModelAsset {
 						color: c,
 						uv0: uv,
 						uv1: [0.0, 0.0],
+						joints: j,
+						weights: w,
 					});
 				}
 
@@ -319,6 +389,109 @@ impl ModelAsset {
 			}
 		}
 
+		let mut skins = Vec::new();
+		for skin in document.skins() {
+			let skin_name = skin.name().unwrap_or("Skin").to_string();
+			let joint_node_indices: Vec<usize> = skin.joints().map(|j| j.index()).collect();
+
+			let reader = skin.reader(|buffer| Some(&buffers[buffer.index()]));
+			let ibms: Vec<[[f32; 4]; 3]> = reader
+				.read_inverse_bind_matrices()
+				.map(|iter| {
+					iter
+						.map(|m| {
+							// glTF inverseBindMatrices are column-major 4x4: m[col][row]
+							// We extract 3 rows (Affine3 / Mat3x4)
+							[
+								[m[0][0], m[1][0], m[2][0], m[3][0]],
+								[m[0][1], m[1][1], m[2][1], m[3][1]],
+								[m[0][2], m[1][2], m[2][2], m[3][2]],
+							]
+						})
+						.collect()
+				})
+				.unwrap_or_else(|| {
+					vec![
+						[
+							[1.0, 0.0, 0.0, 0.0],
+							[0.0, 1.0, 0.0, 0.0],
+							[0.0, 0.0, 1.0, 0.0],
+						];
+						joint_node_indices.len()
+					]
+				});
+
+			skins.push(SkinAsset {
+				name: skin_name,
+				joint_node_indices,
+				inverse_bind_matrices: ibms,
+			});
+		}
+
+		let mut animations = Vec::new();
+		for anim in document.animations() {
+			let anim_name = anim.name().unwrap_or("Animation").to_string();
+			let mut channels = Vec::new();
+			let mut duration = 0.0_f32;
+
+			for channel in anim.channels() {
+				let target = channel.target();
+				let node_index = target.node().index();
+				let path = match target.property() {
+					gltf::animation::Property::Translation => AnimationPath::Translation,
+					gltf::animation::Property::Rotation => AnimationPath::Rotation,
+					gltf::animation::Property::Scale => AnimationPath::Scale,
+					_ => continue,
+				};
+
+				let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
+				let timestamps: Vec<f32> = match reader.read_inputs() {
+					Some(inputs) => inputs.collect(),
+					None => continue,
+				};
+
+				if let Some(&last_t) = timestamps.last()
+					&& last_t > duration
+				{
+					duration = last_t;
+				}
+
+				let interpolation = match channel.sampler().interpolation() {
+					gltf::animation::Interpolation::Linear => AnimationInterpolation::Linear,
+					gltf::animation::Interpolation::Step => AnimationInterpolation::Step,
+					gltf::animation::Interpolation::CubicSpline => AnimationInterpolation::CubicSpline,
+				};
+
+				let keyframe_data: Vec<f32> = match reader.read_outputs() {
+					Some(gltf::animation::util::ReadOutputs::Translations(t)) => {
+						t.flat_map(|v| [v[0], v[1], v[2]]).collect()
+					}
+					Some(gltf::animation::util::ReadOutputs::Rotations(r)) => r
+						.into_f32()
+						.flat_map(|q| [q[0], q[1], q[2], q[3]])
+						.collect(),
+					Some(gltf::animation::util::ReadOutputs::Scales(s)) => {
+						s.flat_map(|v| [v[0], v[1], v[2]]).collect()
+					}
+					_ => continue,
+				};
+
+				channels.push(AnimationChannelAsset {
+					node_index,
+					path,
+					interpolation,
+					timestamps,
+					keyframe_data,
+				});
+			}
+
+			animations.push(AnimationAsset {
+				name: anim_name,
+				duration,
+				channels,
+			});
+		}
+
 		let model_name = path_ref
 			.file_stem()
 			.and_then(|s| s.to_str())
@@ -331,6 +504,8 @@ impl ModelAsset {
 			submeshes,
 			materials,
 			exclude_meshes: Vec::new(),
+			skins,
+			animations,
 		})
 	}
 
@@ -344,6 +519,15 @@ impl ModelAsset {
 		let bytes =
 			postcard::to_stdvec(self).map_err(|e| format!("Failed to serialize model to binary: {e}"))?;
 		fs::write(path, bytes).map_err(|e| format!("Failed to write binary file {path}: {e}"))
+	}
+
+	pub fn create_skeleton(&self) -> Option<mochi_scene::SkeletonComponent> {
+		if let Some(skin) = self.skins.first() {
+			let joint_count = skin.joint_node_indices.len();
+			Some(mochi_scene::SkeletonComponent::new(joint_count))
+		} else {
+			None
+		}
 	}
 
 	pub fn build_runtime(
@@ -573,5 +757,44 @@ impl ModelAsset {
 				(mesh, mat)
 			})
 			.collect()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_load_gltf_skinned_model() {
+		let path = "../../test/khronos_test/models/cesium_man.glb";
+		if !Path::new(path).exists() {
+			return;
+		}
+
+		let model = ModelAsset::load_gltf(path).expect("Failed to load CesiumMan.glb");
+		assert_eq!(model.skins.len(), 1, "CesiumMan should have 1 skin");
+		assert!(
+			model.skins[0].joint_node_indices.len() > 10,
+			"Should have joints"
+		);
+		assert_eq!(
+			model.skins[0].inverse_bind_matrices.len(),
+			model.skins[0].joint_node_indices.len()
+		);
+		assert!(
+			!model.animations.is_empty(),
+			"CesiumMan should have animation"
+		);
+
+		// Verify vertices have joint weights
+		let has_skinned_vertices = model.submeshes.iter().any(|sm| {
+			sm.vertices
+				.iter()
+				.any(|v| (v.weights[0] + v.weights[1] + v.weights[2] + v.weights[3]) > 0.0)
+		});
+		assert!(
+			has_skinned_vertices,
+			"Model should have vertices with skinning weights"
+		);
 	}
 }

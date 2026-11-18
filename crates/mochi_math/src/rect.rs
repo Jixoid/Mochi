@@ -149,3 +149,27 @@ impl<T: Number> From<(T, T, T, T)> for Rect<T> {
 		Self::new(x, y, w, h)
 	}
 }
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_rect_intersection() {
+		let r1 = Rect::new(0.0f32, 0.0, 100.0, 100.0);
+		let r2 = Rect::new(30.0f32, 40.0, 50.0, 50.0);
+		let inter = r1.intersection(&r2).unwrap();
+		assert_eq!(inter.x(), 30.0);
+		assert_eq!(inter.y(), 40.0);
+		assert_eq!(inter.width(), 50.0);
+		assert_eq!(inter.height(), 50.0);
+	}
+
+	#[test]
+	fn test_rect_no_intersection() {
+		let r1 = Rect::new(0.0f32, 0.0, 10.0, 10.0);
+		let r2 = Rect::new(20.0f32, 20.0, 10.0, 10.0);
+		assert!(r1.intersection(&r2).is_none());
+	}
+}

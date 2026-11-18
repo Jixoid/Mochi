@@ -33,6 +33,7 @@ pub const SHADOW_VERT_SPV: &[u8] = include_bytes!("../../../res/shaders/shadow.v
 pub struct ShadowPushConstants {
 	pub mvp: [f32; 16],
 	pub vertex_addr: u64,
+	pub joint_addr: u64,
 }
 
 pub struct CascadeData {
