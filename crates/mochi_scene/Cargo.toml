@@ -9,4 +9,5 @@ hecs = "0.10"
 mochi_material = { path = "../mochi_material" }
 mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
 mochi_math = { path = "../mochi_math" }
+mochi_phi = { path = "../mochi_phi" }
 mochi_except = { path = "../mochi_except" }

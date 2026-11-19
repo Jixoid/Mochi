@@ -1,0 +1,16 @@
+ProjectConfig(
+	name: "Mochi Engine - Skinning Test",
+	version: "0.1.0",
+	window: WindowConfig(
+		title: "Mochi Engine - GPU Skinning & Animation",
+		width: 1280,
+		height: 720,
+		vsync: true,
+	),
+	rendering: RenderingConfig(
+		clear_color: (0.05, 0.06, 0.09, 1.0),
+	),
+	scene: SceneConfig(
+		start_scene: "scenes/skinning_test.mscene.ron",
+	),
+)

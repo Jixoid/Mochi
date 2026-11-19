@@ -118,8 +118,11 @@ layout(push_constant, scalar, row_major) uniform PushConstants {
 	uint64_t scene_address;
 	uint64_t vertex_address;
 	uint64_t material_address;
+	uint64_t joint_address;
 	uint material_id;
 	uint flags;
+	uint _pad0;
+	uint _pad1;
 } pc;
 
 layout(location = 0) in vec3 in_world_pos;

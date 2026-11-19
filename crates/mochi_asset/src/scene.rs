@@ -167,6 +167,143 @@ pub struct ScriptDesc {
 	pub is_active: bool,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RigidBodyDesc {
+	#[serde(default = "default_body_type")]
+	pub body_type: String,
+	#[serde(default = "default_mass")]
+	pub mass: f32,
+	#[serde(default = "default_linear_damping")]
+	pub linear_damping: f32,
+	#[serde(default = "default_angular_damping")]
+	pub angular_damping: f32,
+	#[serde(default = "default_ccd")]
+	pub use_ccd: bool,
+}
+
+fn default_body_type() -> String {
+	"dynamic".into()
+}
+fn default_mass() -> f32 {
+	1.0
+}
+fn default_linear_damping() -> f32 {
+	0.05
+}
+fn default_angular_damping() -> f32 {
+	0.1
+}
+fn default_ccd() -> bool {
+	false
+}
+
+impl Default for RigidBodyDesc {
+	fn default() -> Self {
+		Self {
+			body_type: default_body_type(),
+			mass: default_mass(),
+			linear_damping: default_linear_damping(),
+			angular_damping: default_angular_damping(),
+			use_ccd: default_ccd(),
+		}
+	}
+}
+
+impl RigidBodyDesc {
+	pub fn to_component(&self, transform: &Transform<f32>) -> mochi_scene::RigidBodyComponent {
+		let b_type = match self.body_type.to_lowercase().as_str() {
+			"static" => mochi_scene::BodyType::Static,
+			"kinematic" => mochi_scene::BodyType::Kinematic,
+			_ => mochi_scene::BodyType::Dynamic,
+		};
+		let def = mochi_scene::BodyDef {
+			body_type: b_type,
+			mass: if b_type == mochi_scene::BodyType::Static {
+				0.0
+			} else {
+				self.mass
+			},
+			linear_damping: self.linear_damping,
+			angular_damping: self.angular_damping,
+			use_ccd: self.use_ccd,
+			position: transform.translation,
+			rotation: transform.rotation,
+			..Default::default()
+		};
+		mochi_scene::RigidBodyComponent::new(def)
+	}
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ColliderDesc {
+	#[serde(default = "default_shape_name")]
+	pub shape: String,
+	#[serde(default)]
+	pub half_extents: Option<[f32; 3]>,
+	#[serde(default)]
+	pub radius: Option<f32>,
+	#[serde(default)]
+	pub height: Option<f32>,
+	#[serde(default = "default_friction")]
+	pub friction: f32,
+	#[serde(default = "default_restitution")]
+	pub restitution: f32,
+}
+
+fn default_shape_name() -> String {
+	"box".into()
+}
+fn default_friction() -> f32 {
+	0.4
+}
+fn default_restitution() -> f32 {
+	0.0
+}
+
+impl Default for ColliderDesc {
+	fn default() -> Self {
+		Self {
+			shape: default_shape_name(),
+			half_extents: None,
+			radius: None,
+			height: None,
+			friction: default_friction(),
+			restitution: default_restitution(),
+		}
+	}
+}
+
+impl ColliderDesc {
+	pub fn to_component(&self) -> mochi_scene::ColliderComponent {
+		let shape = match self.shape.to_lowercase().as_str() {
+			"sphere" => {
+				let r = self.radius.unwrap_or(0.5);
+				mochi_scene::ColliderShape::sphere(r)
+			}
+			"capsule" => {
+				let r = self.radius.unwrap_or(0.5);
+				let h = self.height.unwrap_or(1.0);
+				mochi_scene::ColliderShape::capsule(r, h)
+			}
+			_ => {
+				let he = self.half_extents.unwrap_or([0.5, 0.5, 0.5]);
+				mochi_scene::ColliderShape::box_shape(he[0], he[1], he[2])
+			}
+		};
+		let mat = mochi_scene::PhysicsMaterial {
+			friction: self.friction,
+			restitution: self.restitution,
+			density: 1.0,
+		};
+		let def = mochi_scene::ColliderDef {
+			shape,
+			material: mat,
+			..Default::default()
+		};
+		mochi_scene::ColliderComponent::new(def)
+	}
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EntityDesc {
 	pub name: Option<String>,
@@ -177,6 +314,8 @@ pub struct EntityDesc {
 	pub spot_light: Option<SpotLightDesc>,
 	pub mesh_renderer: Option<MeshRendererDesc>,
 	pub script: Option<ScriptDesc>,
+	pub rigid_body: Option<RigidBodyDesc>,
+	pub collider: Option<ColliderDesc>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -298,25 +437,43 @@ impl SceneAsset {
 
 					let skeleton_opt = joint_count.map(SkeletonComponent::new);
 
-					if let Some(sc) = &entity_desc.script {
+					let entity = if let Some(sc) = &entity_desc.script {
 						let resolved_script_path = crate::resolve_relative(&sc.path, scene_dir, project_root);
 						let script_comp = ScriptComponent {
 							path: resolved_script_path.to_string_lossy().to_string(),
 							is_active: sc.is_active,
 						};
 						if let Some(skeleton) = skeleton_opt {
-							scene.spawn((transform, renderer, skeleton, script_comp));
+							scene.spawn((transform, renderer, skeleton, script_comp))
 						} else {
-							scene.spawn((transform, renderer, script_comp));
+							scene.spawn((transform, renderer, script_comp))
 						}
 					} else if let Some(skeleton) = skeleton_opt {
-						scene.spawn((transform, renderer, skeleton));
+						scene.spawn((transform, renderer, skeleton))
 					} else {
-						scene.spawn((transform, renderer));
+						scene.spawn((transform, renderer))
+					};
+
+					if let Some(rb_desc) = &entity_desc.rigid_body {
+						let rb_comp = rb_desc.to_component(&transform.0);
+						let _ = scene.world_mut().insert_one(entity, rb_comp);
+					}
+					if let Some(col_desc) = &entity_desc.collider {
+						let col_comp = col_desc.to_component();
+						let _ = scene.world_mut().insert_one(entity, col_comp);
 					}
 				}
 			} else {
 				let entity = scene.spawn((transform,));
+
+				if let Some(rb_desc) = &entity_desc.rigid_body {
+					let rb_comp = rb_desc.to_component(&transform.0);
+					let _ = scene.world_mut().insert_one(entity, rb_comp);
+				}
+				if let Some(col_desc) = &entity_desc.collider {
+					let col_comp = col_desc.to_component();
+					let _ = scene.world_mut().insert_one(entity, col_comp);
+				}
 
 				if let Some(cam) = &entity_desc.camera {
 					let mut camera_comp = CameraComponent::new(cam.fov_deg, cam.near, cam.far);
@@ -393,5 +550,26 @@ mod tests {
 			.iter()
 			.any(|e| e.name.as_deref() == Some("CesiumMan"));
 		assert!(has_cesium_man, "Scene should contain CesiumMan entity");
+	}
+
+	#[test]
+	fn test_load_physics_cubes_scene() {
+		let path = "../../test/physics_test/scenes/physics_cubes.mscene.ron";
+		if !std::path::Path::new(path).exists() {
+			return;
+		}
+
+		let scene_asset =
+			SceneAsset::load(path).expect("Failed to deserialize physics_cubes.mscene.ron");
+		assert_eq!(scene_asset.name, "PhysicsCubesScene");
+		let cube_count = scene_asset
+			.entities
+			.iter()
+			.filter(|e| e.rigid_body.is_some() && e.collider.is_some())
+			.count();
+		assert!(
+			cube_count >= 8,
+			"Expected at least 8 physics entities (floor + 7 cubes), got {cube_count}"
+		);
 	}
 }

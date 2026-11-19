@@ -42,6 +42,30 @@ pub fn resolve_relative(
 		if candidate.exists() {
 			return candidate;
 		}
+		// 2b. Relative to shared assets directory or parent folder
+		if let Some(parent) = root.parent() {
+			let cand_assets = parent.join("assets").join(p);
+			if cand_assets.exists() {
+				return cand_assets;
+			}
+			let cand_parent = parent.join(p);
+			if cand_parent.exists() {
+				return cand_parent;
+			}
+		}
+	}
+	// 3. Direct relative path from current working directory
+	if p.exists() {
+		return p.to_path_buf();
+	}
+	// 4. Relative to test/assets or test/ from workspace root
+	let test_assets_candidate = Path::new("test/assets").join(p);
+	if test_assets_candidate.exists() {
+		return test_assets_candidate;
+	}
+	let test_candidate = Path::new("test").join(p);
+	if test_candidate.exists() {
+		return test_candidate;
 	}
 	// Fallback
 	if let Some(root) = project_root {

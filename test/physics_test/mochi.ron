@@ -1,0 +1,16 @@
+ProjectConfig(
+	name: "Mochi Engine - Physics Test",
+	version: "0.1.0",
+	window: WindowConfig(
+		title: "Mochi Engine - Baryon Physics Cube Simulation",
+		width: 1280,
+		height: 720,
+		vsync: true,
+	),
+	rendering: RenderingConfig(
+		clear_color: (0.04, 0.05, 0.08, 1.0),
+	),
+	scene: SceneConfig(
+		start_scene: "scenes/physics_cubes.mscene.ron",
+	),
+)

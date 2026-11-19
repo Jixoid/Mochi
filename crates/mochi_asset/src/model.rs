@@ -267,10 +267,13 @@ impl ModelAsset {
 				base_color[3] = 0.5;
 			}
 			let metallic = pbr.metallic_factor();
-			let emissive = if mat.emissive_texture().is_some() {
-				[0.0, 0.0, 0.0]
-			} else {
-				mat.emissive_factor()
+			let emissive = {
+				let f = mat.emissive_factor();
+				if mat.emissive_texture().is_some() && f == [0.0, 0.0, 0.0] {
+					[1.0, 1.0, 1.0]
+				} else {
+					f
+				}
 			};
 			let normal_scale = mat.normal_texture().map_or(1.0, |t| t.scale());
 			let occlusion = mat.occlusion_texture().map_or(1.0, |t| t.strength());
@@ -535,13 +538,13 @@ impl ModelAsset {
 		device: &rhi::Device,
 		alloc: &rhi::Allocator,
 		cmdmng: &rhi::CommandManager,
-		texture_manager: Option<&mut TextureManager>,
+		mut texture_manager: Option<&mut TextureManager>,
 		default_template: &Arc<MaterialTemplate>,
 		transparent_template: &Arc<MaterialTemplate>,
 	) -> Vec<(Arc<Mesh>, Arc<MaterialInstance>)> {
 		let mut material_instances: Vec<Arc<MaterialInstance>> = Vec::new();
 
-		if let (Some(source_path), Some(ref mut tm)) = (&self.source, texture_manager)
+		if let (Some(source_path), Some(tm)) = (&self.source, texture_manager.as_deref_mut())
 			&& (source_path.ends_with(".glb") || source_path.ends_with(".gltf"))
 			&& Path::new(source_path).exists()
 			&& let Ok((document, _buffers, images)) = gltf::import(source_path)
@@ -720,20 +723,82 @@ impl ModelAsset {
 		}
 
 		if material_instances.is_empty() {
-			material_instances = self
-				.materials
-				.iter()
-				.map(|m| {
-					let mut props = m.to_pbr_properties();
-					let tmpl = if props.base_color.w < 0.999 {
-						props.alpha_cutoff = 0.0;
-						Arc::clone(transparent_template)
-					} else {
-						Arc::clone(default_template)
-					};
-					MaterialInstance::new(tmpl, props)
-				})
-				.collect();
+			for m in &self.materials {
+				let mut props = m.to_pbr_properties();
+				if let Some(tm) = texture_manager.as_deref_mut() {
+					if let Some(ref path_str) = m.albedo_texture
+						&& let Ok(img) = image::open(path_str)
+					{
+						let rgba = img.to_rgba8();
+						let (w, h) = rgba.dimensions();
+						let id = tm.load_raw_rgba8(
+							device,
+							alloc,
+							cmdmng,
+							w,
+							h,
+							mochi_rhi::Format::RGBA8_SRGB,
+							&rgba,
+						);
+						props.albedo_texture_id = Some(id);
+					}
+					if let Some(ref path_str) = m.normal_texture
+						&& let Ok(img) = image::open(path_str)
+					{
+						let rgba = img.to_rgba8();
+						let (w, h) = rgba.dimensions();
+						let id = tm.load_raw_rgba8(
+							device,
+							alloc,
+							cmdmng,
+							w,
+							h,
+							mochi_rhi::Format::RGBA8_UNORM,
+							&rgba,
+						);
+						props.normal_texture_id = Some(id);
+					}
+					if let Some(ref path_str) = m.orm_texture
+						&& let Ok(img) = image::open(path_str)
+					{
+						let rgba = img.to_rgba8();
+						let (w, h) = rgba.dimensions();
+						let id = tm.load_raw_rgba8(
+							device,
+							alloc,
+							cmdmng,
+							w,
+							h,
+							mochi_rhi::Format::RGBA8_UNORM,
+							&rgba,
+						);
+						props.orm_texture_id = Some(id);
+					}
+					if let Some(ref path_str) = m.emissive_texture
+						&& let Ok(img) = image::open(path_str)
+					{
+						let rgba = img.to_rgba8();
+						let (w, h) = rgba.dimensions();
+						let id = tm.load_raw_rgba8(
+							device,
+							alloc,
+							cmdmng,
+							w,
+							h,
+							mochi_rhi::Format::RGBA8_SRGB,
+							&rgba,
+						);
+						props.emissive_texture_id = Some(id);
+					}
+				}
+				let tmpl = if props.base_color.w < 0.999 {
+					props.alpha_cutoff = 0.0;
+					Arc::clone(transparent_template)
+				} else {
+					Arc::clone(default_template)
+				};
+				material_instances.push(MaterialInstance::new(tmpl, props));
+			}
 		}
 
 		let fallback_mat = MaterialInstance::new_default(Arc::clone(default_template));
@@ -766,7 +831,7 @@ mod tests {
 
 	#[test]
 	fn test_load_gltf_skinned_model() {
-		let path = "../../test/khronos_test/models/cesium_man.glb";
+		let path = "../../test/assets/models/cesium_man.glb";
 		if !Path::new(path).exists() {
 			return;
 		}

@@ -9,6 +9,7 @@ winit = "0.30"
 serde = { version = "1.0", features = ["derive"] }
 ron = "0.8"
 mochi_input = { path = "../mochi_input" }
+mochi_math = { path = "../mochi_math" }
 mochi_display = { path = "../mochi_display" }
 mochi_material = { path = "../mochi_material" }
 mochi_audio = { path = "../mochi_audio" }
@@ -17,4 +18,6 @@ mochi_rendering = { path = "../mochi_rendering" }
 mochi_script = { path = "../mochi_script" }
 mochi_asset = { path = "../mochi_asset" }
 mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
+mochi_phi = { path = "../mochi_phi" }
+mochi_phi_baryon = { path = "../mochi_phi_baryon" }
 mochi_except = { path = "../mochi_except" }

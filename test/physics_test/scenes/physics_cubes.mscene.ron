@@ -1,0 +1,331 @@
+SceneAsset(
+	name: "PhysicsCubesScene",
+	entities: [
+		EntityDesc(
+			name: Some("MainCamera"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 6.0, 16.0),
+				rotation: (-0.1305262, 0.0, 0.0, 0.9914449),
+			)),
+			camera: Some(CameraDesc(
+				fov_deg: 60.0,
+				near: 0.1,
+				far: 1000.0,
+				is_active: true,
+				clear_color: (0.04, 0.05, 0.08, 1.0),
+			)),
+			script: Some(ScriptDesc(
+				path: "scripts/free_cam.qw",
+				is_active: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("SunLight"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 25.0, 0.0),
+			)),
+			directional_light: Some(DirectionalLightDesc(
+				color: (1.0, 0.96, 0.90),
+				intensity: 1.2,
+				direction: (0.5, -1.0, 0.4),
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("SpotLight"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 15.0, 6.0),
+				rotation: (-0.4226183, 0.0, 0.0, 0.9063078),
+			)),
+			spot_light: Some(SpotLightDesc(
+				color: (1.0, 0.92, 0.8),
+				intensity: 3.5,
+				radius: 35.0,
+				inner_cone_angle_deg: 30.0,
+				outer_cone_angle_deg: 60.0,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("FloorVisual"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 0.0, 0.0),
+				scale: (25.0, 1.0, 25.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/floor.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+		),
+		EntityDesc(
+			name: Some("FloorCollider"),
+			transform: Some(TransformDesc(
+				translation: (0.0, -0.5, 0.0),
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "static",
+				mass: 0.0,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((25.0, 0.5, 25.0)),
+				friction: 0.6,
+				restitution: 0.1,
+			)),
+		),
+		// Central Cube Tower (falling from high up)
+		EntityDesc(
+			name: Some("Cube_Center_1"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 4.0, 0.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.1,
+			)),
+		),
+		EntityDesc(
+			name: Some("Cube_Center_2"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 7.0, 0.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.1,
+			)),
+		),
+		EntityDesc(
+			name: Some("Cube_Center_3"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 10.0, 0.0),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.1,
+			)),
+		),
+		// Left Side Stack
+		EntityDesc(
+			name: Some("Cube_Left_1"),
+			transform: Some(TransformDesc(
+				translation: (-2.5, 5.0, 0.5),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.1,
+			)),
+		),
+		EntityDesc(
+			name: Some("Cube_Left_2"),
+			transform: Some(TransformDesc(
+				translation: (-2.5, 8.5, 0.5),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.1,
+			)),
+		),
+		// Right Side Stack
+		EntityDesc(
+			name: Some("Cube_Right_1"),
+			transform: Some(TransformDesc(
+				translation: (2.5, 6.0, -0.5),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.1,
+			)),
+		),
+		EntityDesc(
+			name: Some("Cube_Right_2"),
+			transform: Some(TransformDesc(
+				translation: (2.5, 9.5, -0.5),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.1,
+			)),
+		),
+		// High Tumbler Cube with rotation
+		EntityDesc(
+			name: Some("Cube_High_Tumbler"),
+			transform: Some(TransformDesc(
+				translation: (0.1, 13.0, 0.1),
+				rotation: (0.1464466, 0.3535534, 0.3535534, 0.8535534),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/cube.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 1.2,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.6, 0.6, 0.6)),
+				friction: 0.5,
+				restitution: 0.2,
+			)),
+		),
+		// PBR Textured Damaged Helmet (falling from high)
+		EntityDesc(
+			name: Some("Physics_DamagedHelmet"),
+			transform: Some(TransformDesc(
+				translation: (0.0, 16.0, 0.0),
+				scale: (0.8, 0.8, 0.8),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/helmet.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 2.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "sphere",
+				radius: Some(0.8),
+				friction: 0.4,
+				restitution: 0.25,
+			)),
+		),
+		// PBR Textured Duck (tumbling from above the left stack)
+		EntityDesc(
+			name: Some("Physics_Duck"),
+			transform: Some(TransformDesc(
+				translation: (-2.5, 12.0, 0.5),
+				scale: (0.015, 0.015, 0.015),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/duck.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 0.5,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "box",
+				half_extents: Some((0.5, 0.5, 0.5)),
+				friction: 0.6,
+				restitution: 0.3,
+			)),
+		),
+		// PBR Metallic Gold Sphere (tumbling from above the right stack)
+		EntityDesc(
+			name: Some("Physics_GoldSphere"),
+			transform: Some(TransformDesc(
+				translation: (2.5, 13.5, -0.5),
+				scale: (0.7, 0.7, 0.7),
+			)),
+			mesh_renderer: Some(MeshRendererDesc(
+				asset: "models/gold_sphere.masset.ron",
+				is_visible: true,
+				cast_shadows: true,
+			)),
+			rigid_body: Some(RigidBodyDesc(
+				body_type: "dynamic",
+				mass: 3.0,
+				use_ccd: true,
+			)),
+			collider: Some(ColliderDesc(
+				shape: "sphere",
+				radius: Some(0.7),
+				friction: 0.3,
+				restitution: 0.4,
+			)),
+		),
+	],
+)

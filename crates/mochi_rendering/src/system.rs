@@ -1654,3 +1654,41 @@ impl RenderingSystem {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_object_push_constants_layout() {
+		assert_eq!(
+			std::mem::size_of::<ObjectPushConstants>(),
+			112,
+			"ObjectPushConstants must be 112 bytes to match pbr.vert and pbr.frag layout"
+		);
+
+		let dummy = ObjectPushConstants {
+			model: [0.0; 16],
+			scene_addr: 0,
+			vertex_addr: 0,
+			material_addr: 0,
+			joint_addr: 0,
+			material_id: 0,
+			flags: 0,
+			_pad: [0; 2],
+		};
+
+		let base = &dummy as *const _ as usize;
+		let scene_addr_offset = &dummy.scene_addr as *const _ as usize - base;
+		let vertex_addr_offset = &dummy.vertex_addr as *const _ as usize - base;
+		let material_addr_offset = &dummy.material_addr as *const _ as usize - base;
+		let joint_addr_offset = &dummy.joint_addr as *const _ as usize - base;
+		let material_id_offset = &dummy.material_id as *const _ as usize - base;
+
+		assert_eq!(scene_addr_offset, 64);
+		assert_eq!(vertex_addr_offset, 72);
+		assert_eq!(material_addr_offset, 80);
+		assert_eq!(joint_addr_offset, 88);
+		assert_eq!(material_id_offset, 96);
+	}
+}

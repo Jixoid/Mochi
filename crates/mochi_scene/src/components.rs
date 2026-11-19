@@ -15,6 +15,9 @@ use std::sync::Arc;
 use mochi_material::MaterialInstance;
 use crate::mesh::Mesh;
 use mochi_math::{Mat3x4, Mat4x4, Transform, Vec3, Vec4};
+pub use mochi_phi::{
+	BodyDef, BodyHandle, BodyType, ColliderDef, ColliderHandle, ColliderShape, PhysicsMaterial,
+};
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -235,5 +238,65 @@ impl SkeletonComponent {
 
 	pub fn joint_buffer_address(&self) -> u64 {
 		self.joint_buffer.as_ref().map_or(0, |b| b.address())
+	}
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RigidBodyComponent {
+	pub def: BodyDef,
+	pub handle: BodyHandle,
+}
+
+impl Default for RigidBodyComponent {
+	fn default() -> Self {
+		Self {
+			def: BodyDef::default(),
+			handle: BodyHandle::INVALID,
+		}
+	}
+}
+
+impl RigidBodyComponent {
+	pub fn new(def: BodyDef) -> Self {
+		Self {
+			def,
+			handle: BodyHandle::INVALID,
+		}
+	}
+
+	pub fn dynamic() -> Self {
+		Self::new(BodyDef::dynamic())
+	}
+
+	pub fn static_body() -> Self {
+		Self::new(BodyDef::static_body())
+	}
+
+	pub fn kinematic() -> Self {
+		Self::new(BodyDef::kinematic())
+	}
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ColliderComponent {
+	pub def: ColliderDef,
+	pub handle: ColliderHandle,
+}
+
+impl Default for ColliderComponent {
+	fn default() -> Self {
+		Self {
+			def: ColliderDef::default(),
+			handle: ColliderHandle::INVALID,
+		}
+	}
+}
+
+impl ColliderComponent {
+	pub fn new(def: ColliderDef) -> Self {
+		Self {
+			def,
+			handle: ColliderHandle::INVALID,
+		}
 	}
 }

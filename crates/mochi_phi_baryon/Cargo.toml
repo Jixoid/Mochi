@@ -1,0 +1,12 @@
+[package]
+name = "mochi_phi_baryon"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_phi = { path = "../mochi_phi" }
+mochi_math = { path = "../mochi_math" }
+
+[build-dependencies]
+cc = "1.0"

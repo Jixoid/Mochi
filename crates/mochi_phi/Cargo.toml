@@ -1,0 +1,8 @@
+[package]
+name = "mochi_phi"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_math = { path = "../mochi_math" }

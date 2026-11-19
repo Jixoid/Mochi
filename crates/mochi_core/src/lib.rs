@@ -13,6 +13,7 @@
 pub mod config;
 
 use std::time::Instant;
+use mochi_math::Vec3;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -25,6 +26,8 @@ use mochi_rendering::RenderingSystem;
 use mochi_rhi as rhi;
 use mochi_scene::Scene;
 use mochi_script::ScriptSystem;
+use mochi_phi::PhysicsWorld;
+use mochi_phi_baryon::BaryonBackend;
 use mochi_except::*;
 
 pub use config::*;
@@ -53,6 +56,7 @@ pub struct EngineApp {
 	rendering_system: Option<RenderingSystem>,
 	audio_system: Option<AudioSystem>,
 	script_system: ScriptSystem,
+	physics_world: Option<PhysicsWorld<BaryonBackend>>,
 	input: Input,
 	display: Option<Display>,
 	scene: Scene,
@@ -89,6 +93,7 @@ impl EngineApp {
 			rendering_system: Some(rendering_system),
 			audio_system: Some(audio_system),
 			script_system,
+			physics_world: None,
 			input,
 			display: None,
 			scene: Scene::new(),
@@ -142,6 +147,60 @@ impl EngineApp {
 
 	pub fn config(&self) -> &ProjectConfig {
 		&self.config
+	}
+
+	pub fn init_physics(&mut self) {
+		let has_physics = self
+			.scene
+			.world()
+			.query::<&mochi_scene::RigidBodyComponent>()
+			.iter()
+			.next()
+			.is_some();
+
+		if !has_physics {
+			return;
+		}
+
+		let config = mochi_phi::PhysicsConfig {
+			gravity: Vec3::new(0.0, -9.81, 0.0),
+			fixed_timestep: 1.0 / 60.0,
+			..Default::default()
+		};
+
+		match PhysicsWorld::<BaryonBackend>::new(config) {
+			Ok(mut physics) => {
+				let mut body_count = 0;
+				for (_entity, (transform, rb)) in self.scene.world_mut().query_mut::<(
+					&mochi_scene::TransformComponent,
+					&mut mochi_scene::RigidBodyComponent,
+				)>() {
+					rb.def.position = transform.0.translation;
+					rb.def.rotation = transform.0.rotation;
+					if let Ok(handle) = physics.create_body(&rb.def) {
+						rb.handle = handle;
+						body_count += 1;
+					}
+				}
+
+				for (_entity, (rb, col)) in self.scene.world_mut().query_mut::<(
+					&mochi_scene::RigidBodyComponent,
+					&mut mochi_scene::ColliderComponent,
+				)>() {
+					if rb.handle.is_valid()
+						&& let Ok(col_handle) = physics.add_collider(rb.handle, &col.def)
+					{
+						col.handle = col_handle;
+					}
+				}
+
+				mochi_disp!("Initialized physics with {body_count} rigid bodies");
+				self.physics_world = Some(physics);
+			}
+			Err(err) => {
+				mochi_error!("Failed to initialize physics: {err}");
+			}
+		}
 	}
 
 	pub fn input(&self) -> &Input {
@@ -216,6 +275,7 @@ impl ApplicationHandler for EngineApp {
 								);
 							}
 						}
+						self.init_physics();
 					}
 					display.request_redraw();
 					self.input.set_cursor_captured(true);
@@ -294,6 +354,59 @@ impl ApplicationHandler for EngineApp {
 				mochi_log!("Escape pressed, shutting down");
 				event_loop.exit();
 			}
+			WindowEvent::KeyboardInput {
+				event:
+					KeyEvent {
+						physical_key: PhysicalKey::Code(KeyCode::KeyR),
+						state: ElementState::Pressed,
+						..
+					},
+				..
+			} => {
+				if let Some(physics) = &mut self.physics_world {
+					for (_entity, (rb, _)) in self
+						.scene
+						.world()
+						.query::<(
+							&mochi_scene::RigidBodyComponent,
+							&mochi_scene::MeshRendererComponent,
+						)>()
+						.iter()
+					{
+						if rb.handle.is_valid() && rb.def.body_type == mochi_scene::BodyType::Dynamic {
+							let _ = physics.set_body_transform(rb.handle, rb.def.position, rb.def.rotation);
+							let _ = physics.set_body_velocity(rb.handle, Vec3::ZERO, Vec3::ZERO);
+						}
+					}
+					mochi_disp!("Reset physics bodies to initial positions");
+				}
+			}
+			WindowEvent::KeyboardInput {
+				event:
+					KeyEvent {
+						physical_key: PhysicalKey::Code(KeyCode::Space) | PhysicalKey::Code(KeyCode::KeyJ),
+						state: ElementState::Pressed,
+						..
+					},
+				..
+			} => {
+				if let Some(physics) = &mut self.physics_world {
+					for (_entity, (rb, _)) in self
+						.scene
+						.world()
+						.query::<(
+							&mochi_scene::RigidBodyComponent,
+							&mochi_scene::MeshRendererComponent,
+						)>()
+						.iter()
+					{
+						if rb.handle.is_valid() && rb.def.body_type == mochi_scene::BodyType::Dynamic {
+							let _ = physics.apply_impulse(rb.handle, Vec3::new(0.0, 7.5, 0.0));
+						}
+					}
+					mochi_disp!("Applied upward impulse to all dynamic cubes");
+				}
+			}
 			WindowEvent::Resized(physical_size) => {
 				if let Some(display) = &mut self.display {
 					display.resize(physical_size.width, physical_size.height);
@@ -316,6 +429,21 @@ impl ApplicationHandler for EngineApp {
 				if !is_fg_present {
 					if let Some(cb) = &mut self.idle_cb {
 						cb(dt);
+					}
+
+					if let Some(physics) = &mut self.physics_world {
+						physics.step(dt);
+						for (_entity, (transform, rb)) in self.scene.world_mut().query_mut::<(
+							&mut mochi_scene::TransformComponent,
+							&mochi_scene::RigidBodyComponent,
+						)>() {
+							if rb.handle.is_valid()
+								&& let Ok((pos, rot)) = physics.body_transform(rb.handle)
+							{
+								transform.0.translation = pos;
+								transform.0.rotation = rot;
+							}
+						}
 					}
 
 					// Execute QW scripts on active entities

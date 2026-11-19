@@ -1037,6 +1037,7 @@ dependencies = [
  "mochi_input",
  "mochi_material",
  "mochi_math",
+ "mochi_phi",
  "mochi_rendering",
  "mochi_rhi",
  "mochi_rhi_ash",
@@ -1096,6 +1097,9 @@ dependencies = [
  "mochi_except",
  "mochi_input",
  "mochi_material",
+ "mochi_math",
+ "mochi_phi",
+ "mochi_phi_baryon",
  "mochi_rendering",
  "mochi_rhi_ash",
  "mochi_scene",
@@ -1140,6 +1144,22 @@ dependencies = [
 [[package]]
 name = "mochi_math"
 version = "0.1.0"
+
+[[package]]
+name = "mochi_phi"
+version = "0.1.0"
+dependencies = [
+ "mochi_math",
+]
+
+[[package]]
+name = "mochi_phi_baryon"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "mochi_math",
+ "mochi_phi",
+]
 
 [[package]]
 name = "mochi_plugin"
@@ -1210,6 +1230,7 @@ dependencies = [
  "mochi_except",
  "mochi_material",
  "mochi_math",
+ "mochi_phi",
  "mochi_rhi_ash",
 ]
 
