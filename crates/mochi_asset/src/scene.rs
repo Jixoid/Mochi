@@ -177,6 +177,8 @@ pub struct RigidBodyDesc {
 	pub linear_damping: f32,
 	#[serde(default = "default_angular_damping")]
 	pub angular_damping: f32,
+	#[serde(default = "default_gravity_scale")]
+	pub gravity_scale: f32,
 	#[serde(default = "default_ccd")]
 	pub use_ccd: bool,
 }
@@ -193,6 +195,9 @@ fn default_linear_damping() -> f32 {
 fn default_angular_damping() -> f32 {
 	0.1
 }
+fn default_gravity_scale() -> f32 {
+	1.0
+}
 fn default_ccd() -> bool {
 	false
 }
@@ -204,6 +209,7 @@ impl Default for RigidBodyDesc {
 			mass: default_mass(),
 			linear_damping: default_linear_damping(),
 			angular_damping: default_angular_damping(),
+			gravity_scale: default_gravity_scale(),
 			use_ccd: default_ccd(),
 		}
 	}
@@ -225,6 +231,7 @@ impl RigidBodyDesc {
 			},
 			linear_damping: self.linear_damping,
 			angular_damping: self.angular_damping,
+			gravity_scale: self.gravity_scale,
 			use_ccd: self.use_ccd,
 			position: transform.translation,
 			rotation: transform.rotation,
@@ -304,6 +311,47 @@ impl ColliderDesc {
 	}
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SpringJointDesc {
+	pub target_entity: String,
+	#[serde(default = "default_local_anchor")]
+	pub local_anchor_a: [f32; 3],
+	#[serde(default = "default_local_anchor")]
+	pub local_anchor_b: [f32; 3],
+	#[serde(default = "default_rest_length")]
+	pub rest_length: f32,
+	#[serde(default = "default_spring_stiffness")]
+	pub stiffness: f32,
+	#[serde(default = "default_spring_damping")]
+	pub damping: f32,
+}
+
+fn default_local_anchor() -> [f32; 3] {
+	[0.0, 0.0, 0.0]
+}
+fn default_rest_length() -> f32 {
+	1.0
+}
+fn default_spring_stiffness() -> f32 {
+	100.0
+}
+fn default_spring_damping() -> f32 {
+	5.0
+}
+
+impl Default for SpringJointDesc {
+	fn default() -> Self {
+		Self {
+			target_entity: String::new(),
+			local_anchor_a: default_local_anchor(),
+			local_anchor_b: default_local_anchor(),
+			rest_length: default_rest_length(),
+			stiffness: default_spring_stiffness(),
+			damping: default_spring_damping(),
+		}
+	}
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EntityDesc {
 	pub name: Option<String>,
@@ -316,6 +364,10 @@ pub struct EntityDesc {
 	pub script: Option<ScriptDesc>,
 	pub rigid_body: Option<RigidBodyDesc>,
 	pub collider: Option<ColliderDesc>,
+	#[serde(default)]
+	pub spring_joint: Option<SpringJointDesc>,
+	#[serde(default)]
+	pub spring_joints: Vec<SpringJointDesc>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -355,7 +407,64 @@ impl SceneAsset {
 			postcard::to_stdvec(self).map_err(|e| format!("Failed to serialize scene to binary: {e}"))?;
 		fs::write(path, bytes).map_err(|e| format!("Failed to write binary scene {path}: {e}"))
 	}
+}
 
+fn attach_common_entity_components(
+	scene: &mut mochi_scene::Scene,
+	entity: mochi_scene::Entity,
+	entity_desc: &EntityDesc,
+	transform: &mochi_scene::TransformComponent,
+) {
+	if let Some(name) = &entity_desc.name {
+		let _ = scene
+			.world_mut()
+			.insert_one(entity, mochi_scene::NameComponent::new(name.clone()));
+	}
+	if let Some(rb_desc) = &entity_desc.rigid_body {
+		let rb_comp = rb_desc.to_component(&transform.0);
+		let _ = scene.world_mut().insert_one(entity, rb_comp);
+	}
+	if let Some(col_desc) = &entity_desc.collider {
+		let col_comp = col_desc.to_component();
+		let _ = scene.world_mut().insert_one(entity, col_comp);
+	}
+	let mut joints = Vec::new();
+	if let Some(sj) = &entity_desc.spring_joint {
+		joints.push(
+			mochi_scene::SpringJointComponent::new(
+				sj.target_entity.clone(),
+				sj.rest_length,
+				sj.stiffness,
+				sj.damping,
+			)
+			.with_anchors(
+				Vec3::new(sj.local_anchor_a[0], sj.local_anchor_a[1], sj.local_anchor_a[2]),
+				Vec3::new(sj.local_anchor_b[0], sj.local_anchor_b[1], sj.local_anchor_b[2]),
+			),
+		);
+	}
+	for sj in &entity_desc.spring_joints {
+		joints.push(
+			mochi_scene::SpringJointComponent::new(
+				sj.target_entity.clone(),
+				sj.rest_length,
+				sj.stiffness,
+				sj.damping,
+			)
+			.with_anchors(
+				Vec3::new(sj.local_anchor_a[0], sj.local_anchor_a[1], sj.local_anchor_a[2]),
+				Vec3::new(sj.local_anchor_b[0], sj.local_anchor_b[1], sj.local_anchor_b[2]),
+			),
+		);
+	}
+	if !joints.is_empty() {
+		let _ = scene
+			.world_mut()
+			.insert_one(entity, mochi_scene::SpringJointsComponent::new(joints));
+	}
+}
+
+impl SceneAsset {
 	pub fn instantiate(
 		&self,
 		device: &rhi::Device,
@@ -454,26 +563,12 @@ impl SceneAsset {
 						scene.spawn((transform, renderer))
 					};
 
-					if let Some(rb_desc) = &entity_desc.rigid_body {
-						let rb_comp = rb_desc.to_component(&transform.0);
-						let _ = scene.world_mut().insert_one(entity, rb_comp);
-					}
-					if let Some(col_desc) = &entity_desc.collider {
-						let col_comp = col_desc.to_component();
-						let _ = scene.world_mut().insert_one(entity, col_comp);
-					}
+					attach_common_entity_components(scene, entity, entity_desc, &transform);
 				}
 			} else {
 				let entity = scene.spawn((transform,));
 
-				if let Some(rb_desc) = &entity_desc.rigid_body {
-					let rb_comp = rb_desc.to_component(&transform.0);
-					let _ = scene.world_mut().insert_one(entity, rb_comp);
-				}
-				if let Some(col_desc) = &entity_desc.collider {
-					let col_comp = col_desc.to_component();
-					let _ = scene.world_mut().insert_one(entity, col_comp);
-				}
+				attach_common_entity_components(scene, entity, entity_desc, &transform);
 
 				if let Some(cam) = &entity_desc.camera {
 					let mut camera_comp = CameraComponent::new(cam.fov_deg, cam.near, cam.far);
@@ -572,4 +667,26 @@ mod tests {
 			"Expected at least 8 physics entities (floor + 7 cubes), got {cube_count}"
 		);
 	}
+
+	#[test]
+	fn test_load_physics_heavy_cubes_scene() {
+		let path = "../../test/physics_test/scenes/physics_heavy_cubes.mscene.ron";
+		if !std::path::Path::new(path).exists() {
+			return;
+		}
+
+		let scene_asset =
+			SceneAsset::load(path).expect("Failed to deserialize physics_heavy_cubes.mscene.ron");
+		assert_eq!(scene_asset.name, "PhysicsHeavyCubesScene");
+		let body_count = scene_asset
+			.entities
+			.iter()
+			.filter(|e| e.rigid_body.is_some() && e.collider.is_some())
+			.count();
+		assert!(
+			body_count >= 1000,
+			"Expected at least 1000 physics entities, got {body_count}"
+		);
+	}
+
 }

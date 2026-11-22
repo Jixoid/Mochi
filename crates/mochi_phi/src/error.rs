@@ -23,6 +23,7 @@ pub enum PhiError {
 	BackendInitFailed(String),
 	InvalidShape(String),
 	SimulationError(String),
+	UnsupportedFeature(String),
 }
 
 impl std::fmt::Display for PhiError {
@@ -34,6 +35,7 @@ impl std::fmt::Display for PhiError {
 			Self::BackendInitFailed(msg) => write!(f, "Physics backend initialization failed: {msg}"),
 			Self::InvalidShape(msg) => write!(f, "Invalid collision shape: {msg}"),
 			Self::SimulationError(msg) => write!(f, "Physics simulation step error: {msg}"),
+			Self::UnsupportedFeature(msg) => write!(f, "Unsupported physics feature: {msg}"),
 		}
 	}
 }

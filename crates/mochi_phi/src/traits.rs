@@ -14,7 +14,7 @@ use mochi_math::{Quat, Vec3};
 use crate::body::{BodyDef, BodyHandle};
 use crate::collider::{ColliderDef, ColliderHandle, ContactManifold};
 use crate::error::PhiResult;
-use crate::joint::{DistanceJointDef, JointHandle, RevoluteJointDef};
+use crate::joint::{DistanceJointDef, JointHandle, RevoluteJointDef, SpringJointDef};
 use crate::ray::{Ray, RaycastHit};
 use crate::world::PhysicsConfig;
 
@@ -83,6 +83,10 @@ pub trait PhiWorld: Send + Sync + 'static {
 
 	fn add_revolute_joint(&mut self, def: &RevoluteJointDef) -> PhiResult<JointHandle>;
 
+	fn add_spring_joint(&mut self, _def: &SpringJointDef) -> PhiResult<JointHandle> {
+		Err(crate::PhiError::UnsupportedFeature("SpringJoint".into()))
+	}
+
 	fn remove_joint(&mut self, joint: JointHandle) -> PhiResult<()>;
 
 	fn raycast(&self, ray: &Ray) -> Option<RaycastHit>;
@@ -92,4 +96,6 @@ pub trait PhiWorld: Send + Sync + 'static {
 	fn contact_manifolds(&self) -> Vec<ContactManifold>;
 
 	fn contacts_for_body(&self, body: BodyHandle) -> Vec<ContactManifold>;
+
+	fn clear_contacts(&mut self) {}
 }

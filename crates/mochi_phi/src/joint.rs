@@ -96,3 +96,28 @@ pub struct FixedJointDef {
 	pub local_anchor_a: Vec3<f32>,
 	pub local_anchor_b: Vec3<f32>,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SpringJointDef {
+	pub body_a: BodyHandle,
+	pub body_b: BodyHandle,
+	pub local_anchor_a: Vec3<f32>,
+	pub local_anchor_b: Vec3<f32>,
+	pub rest_length: f32,
+	pub stiffness: f32,
+	pub damping: f32,
+}
+
+impl Default for SpringJointDef {
+	fn default() -> Self {
+		Self {
+			body_a: BodyHandle::INVALID,
+			body_b: BodyHandle::INVALID,
+			local_anchor_a: Vec3::ZERO,
+			local_anchor_b: Vec3::ZERO,
+			rest_length: 1.0,
+			stiffness: 100.0,
+			damping: 5.0,
+		}
+	}
+}

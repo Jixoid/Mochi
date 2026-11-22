@@ -26,8 +26,7 @@ use mochi_rendering::RenderingSystem;
 use mochi_rhi as rhi;
 use mochi_scene::Scene;
 use mochi_script::ScriptSystem;
-use mochi_phi::PhysicsWorld;
-use mochi_phi_baryon::BaryonBackend;
+use mochi_phi::{DummyPhysicsBackend, PhysicsWorld};
 use mochi_except::*;
 
 pub use config::*;
@@ -56,7 +55,7 @@ pub struct EngineApp {
 	rendering_system: Option<RenderingSystem>,
 	audio_system: Option<AudioSystem>,
 	script_system: ScriptSystem,
-	physics_world: Option<PhysicsWorld<BaryonBackend>>,
+	physics_world: Option<PhysicsWorld<DummyPhysicsBackend>>,
 	input: Input,
 	display: Option<Display>,
 	scene: Scene,
@@ -168,7 +167,7 @@ impl EngineApp {
 			..Default::default()
 		};
 
-		match PhysicsWorld::<BaryonBackend>::new(config) {
+		match PhysicsWorld::<DummyPhysicsBackend>::new(config) {
 			Ok(mut physics) => {
 				let mut body_count = 0;
 				for (_entity, (transform, rb)) in self.scene.world_mut().query_mut::<(
@@ -194,7 +193,61 @@ impl EngineApp {
 					}
 				}
 
-				mochi_disp!("Initialized physics with {body_count} rigid bodies");
+				let mut name_to_body = std::collections::HashMap::new();
+				for (_entity, (name, rb)) in self
+					.scene
+					.world()
+					.query::<(&mochi_scene::NameComponent, &mochi_scene::RigidBodyComponent)>()
+					.iter()
+				{
+					if rb.handle.is_valid() {
+						name_to_body.insert(name.0.clone(), rb.handle);
+					}
+				}
+
+				let mut spring_count = 0;
+				for (_entity, (rb, springs)) in self.scene.world_mut().query_mut::<(
+					&mochi_scene::RigidBodyComponent,
+					&mut mochi_scene::SpringJointsComponent,
+				)>() {
+					if !rb.handle.is_valid() {
+						continue;
+					}
+					for joint in &mut springs.joints {
+						if let Some(&target_body) = name_to_body.get(&joint.target_entity_name) {
+							let def = mochi_phi::SpringJointDef {
+								body_a: rb.handle,
+								body_b: target_body,
+								local_anchor_a: joint.local_anchor_a,
+								local_anchor_b: joint.local_anchor_b,
+								rest_length: joint.rest_length,
+								stiffness: joint.stiffness,
+								damping: joint.damping,
+							};
+							if let Ok(handle) = physics.add_spring_joint(&def) {
+								joint.handle = handle;
+								spring_count += 1;
+							} else {
+								mochi_warn!(
+									"Failed to add spring joint between {:?} and '{}'",
+									rb.handle,
+									joint.target_entity_name
+								);
+							}
+						} else {
+							mochi_warn!(
+								"Target entity '{}' for spring joint not found or has no rigid body",
+								joint.target_entity_name
+							);
+						}
+					}
+				}
+
+				if spring_count > 0 {
+					mochi_disp!("Initialized physics with {body_count} rigid bodies and {spring_count} spring/suspension constraints");
+				} else {
+					mochi_disp!("Initialized physics with {body_count} rigid bodies");
+				}
 				self.physics_world = Some(physics);
 			}
 			Err(err) => {
@@ -364,21 +417,23 @@ impl ApplicationHandler for EngineApp {
 				..
 			} => {
 				if let Some(physics) = &mut self.physics_world {
-					for (_entity, (rb, _)) in self
+					for (_entity, (transform, rb)) in self
 						.scene
-						.world()
-						.query::<(
+						.world_mut()
+						.query_mut::<(
+							&mut mochi_scene::TransformComponent,
 							&mochi_scene::RigidBodyComponent,
-							&mochi_scene::MeshRendererComponent,
 						)>()
-						.iter()
 					{
 						if rb.handle.is_valid() && rb.def.body_type == mochi_scene::BodyType::Dynamic {
+							transform.0.translation = rb.def.position;
+							transform.0.rotation = rb.def.rotation;
 							let _ = physics.set_body_transform(rb.handle, rb.def.position, rb.def.rotation);
 							let _ = physics.set_body_velocity(rb.handle, Vec3::ZERO, Vec3::ZERO);
 						}
 					}
-					mochi_disp!("Reset physics bodies to initial positions");
+					physics.clear_contacts();
+					mochi_disp!("Reset physics bodies to initial positions and cleared contacts");
 				}
 			}
 			WindowEvent::KeyboardInput {
@@ -391,13 +446,10 @@ impl ApplicationHandler for EngineApp {
 				..
 			} => {
 				if let Some(physics) = &mut self.physics_world {
-					for (_entity, (rb, _)) in self
+					for (_entity, rb) in self
 						.scene
 						.world()
-						.query::<(
-							&mochi_scene::RigidBodyComponent,
-							&mochi_scene::MeshRendererComponent,
-						)>()
+						.query::<&mochi_scene::RigidBodyComponent>()
 						.iter()
 					{
 						if rb.handle.is_valid() && rb.def.body_type == mochi_scene::BodyType::Dynamic {

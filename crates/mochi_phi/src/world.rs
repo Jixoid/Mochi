@@ -15,7 +15,7 @@ use mochi_math::{Quat, Vec3};
 use crate::body::{BodyDef, BodyHandle};
 use crate::collider::{ColliderDef, ColliderHandle, ContactManifold};
 use crate::error::PhiResult;
-use crate::joint::{DistanceJointDef, JointHandle, RevoluteJointDef};
+use crate::joint::{DistanceJointDef, JointHandle, RevoluteJointDef, SpringJointDef};
 use crate::ray::{Ray, RaycastHit};
 use crate::traits::{PhiBackend, PhiWorld};
 
@@ -99,6 +99,11 @@ impl<B: PhiBackend> PhysicsWorld<B> {
 		}
 	}
 
+	pub fn clear_contacts(&mut self) {
+		self.accumulator = 0.0;
+		self.inner.clear_contacts();
+	}
+
 	pub fn gravity(&self) -> Vec3<f32> {
 		self.inner.gravity()
 	}
@@ -173,6 +178,10 @@ impl<B: PhiBackend> PhysicsWorld<B> {
 		self.inner.add_revolute_joint(def)
 	}
 
+	pub fn add_spring_joint(&mut self, def: &SpringJointDef) -> PhiResult<JointHandle> {
+		self.inner.add_spring_joint(def)
+	}
+
 	pub fn remove_joint(&mut self, joint: JointHandle) -> PhiResult<()> {
 		self.inner.remove_joint(joint)
 	}
@@ -196,17 +205,26 @@ impl<B: PhiBackend> PhysicsWorld<B> {
 
 
 pub struct NullPhysicsBackend;
+pub type DummyPhysicsBackend = NullPhysicsBackend;
 
-type MockBodyRecord = (Vec3<f32>, Quat<f32>, Vec3<f32>, Vec3<f32>);
+#[derive(Clone, Debug)]
+pub struct MockBody {
+	pub position: Vec3<f32>,
+	pub rotation: Quat<f32>,
+	pub linear_velocity: Vec3<f32>,
+	pub angular_velocity: Vec3<f32>,
+}
 
 pub struct NullPhysicsWorld {
 	gravity: Vec3<f32>,
 	next_body_id: u32,
 	next_collider_id: u32,
 	next_joint_id: u32,
-	bodies: HashMap<BodyHandle, MockBodyRecord>,
+	bodies: HashMap<BodyHandle, MockBody>,
 	colliders: HashMap<ColliderHandle, (BodyHandle, ColliderDef)>,
 }
+
+pub type DummyPhysicsWorld = NullPhysicsWorld;
 
 impl PhiBackend for NullPhysicsBackend {
 	type World = NullPhysicsWorld;
@@ -224,11 +242,8 @@ impl PhiBackend for NullPhysicsBackend {
 }
 
 impl PhiWorld for NullPhysicsWorld {
-	fn step(&mut self, dt: f32) {
-		for (pos, _rot, lin_vel, _ang_vel) in self.bodies.values_mut() {
-			*lin_vel += self.gravity * dt;
-			*pos += *lin_vel * dt;
-		}
+	fn step(&mut self, _dt: f32) {
+		// Completely empty dummy physics step
 	}
 
 	fn gravity(&self) -> Vec3<f32> {
@@ -244,12 +259,12 @@ impl PhiWorld for NullPhysicsWorld {
 		self.next_body_id += 1;
 		self.bodies.insert(
 			handle,
-			(
-				def.position,
-				def.rotation,
-				def.linear_velocity,
-				def.angular_velocity,
-			),
+			MockBody {
+				position: def.position,
+				rotation: def.rotation,
+				linear_velocity: def.linear_velocity,
+				angular_velocity: def.angular_velocity,
+			},
 		);
 		Ok(handle)
 	}
@@ -271,7 +286,7 @@ impl PhiWorld for NullPhysicsWorld {
 		self
 			.bodies
 			.get(&handle)
-			.map(|(p, r, _, _)| (*p, *r))
+			.map(|b| (b.position, b.rotation))
 			.ok_or(crate::error::PhiError::BodyNotFound(handle))
 	}
 
@@ -282,8 +297,8 @@ impl PhiWorld for NullPhysicsWorld {
 		rot: Quat<f32>,
 	) -> PhiResult<()> {
 		if let Some(entry) = self.bodies.get_mut(&handle) {
-			entry.0 = pos;
-			entry.1 = rot;
+			entry.position = pos;
+			entry.rotation = rot;
 			Ok(())
 		} else {
 			Err(crate::error::PhiError::BodyNotFound(handle))
@@ -294,7 +309,7 @@ impl PhiWorld for NullPhysicsWorld {
 		self
 			.bodies
 			.get(&handle)
-			.map(|(_, _, l, a)| (*l, *a))
+			.map(|b| (b.linear_velocity, b.angular_velocity))
 			.ok_or(crate::error::PhiError::BodyNotFound(handle))
 	}
 
@@ -305,57 +320,42 @@ impl PhiWorld for NullPhysicsWorld {
 		angular: Vec3<f32>,
 	) -> PhiResult<()> {
 		if let Some(entry) = self.bodies.get_mut(&handle) {
-			entry.2 = linear;
-			entry.3 = angular;
+			entry.linear_velocity = linear;
+			entry.angular_velocity = angular;
 			Ok(())
 		} else {
 			Err(crate::error::PhiError::BodyNotFound(handle))
 		}
 	}
 
-	fn apply_force(&mut self, handle: BodyHandle, force: Vec3<f32>) -> PhiResult<()> {
-		if let Some(entry) = self.bodies.get_mut(&handle) {
-			entry.2 += force * 0.016;
-			Ok(())
-		} else {
-			Err(crate::error::PhiError::BodyNotFound(handle))
-		}
+	fn apply_force(&mut self, _handle: BodyHandle, _force: Vec3<f32>) -> PhiResult<()> {
+		Ok(())
 	}
 
-	fn apply_impulse(&mut self, handle: BodyHandle, impulse: Vec3<f32>) -> PhiResult<()> {
-		if let Some(entry) = self.bodies.get_mut(&handle) {
-			entry.2 += impulse;
-			Ok(())
-		} else {
-			Err(crate::error::PhiError::BodyNotFound(handle))
-		}
+	fn apply_impulse(&mut self, _handle: BodyHandle, _impulse: Vec3<f32>) -> PhiResult<()> {
+		Ok(())
 	}
 
-	fn apply_torque(&mut self, handle: BodyHandle, torque: Vec3<f32>) -> PhiResult<()> {
-		if let Some(entry) = self.bodies.get_mut(&handle) {
-			entry.3 += torque * 0.016;
-			Ok(())
-		} else {
-			Err(crate::error::PhiError::BodyNotFound(handle))
-		}
+	fn apply_torque(&mut self, _handle: BodyHandle, _torque: Vec3<f32>) -> PhiResult<()> {
+		Ok(())
 	}
 
 	fn apply_force_at_point(
 		&mut self,
-		handle: BodyHandle,
-		force: Vec3<f32>,
+		_handle: BodyHandle,
+		_force: Vec3<f32>,
 		_point: Vec3<f32>,
 	) -> PhiResult<()> {
-		self.apply_force(handle, force)
+		Ok(())
 	}
 
 	fn apply_impulse_at_point(
 		&mut self,
-		handle: BodyHandle,
-		impulse: Vec3<f32>,
+		_handle: BodyHandle,
+		_impulse: Vec3<f32>,
 		_point: Vec3<f32>,
 	) -> PhiResult<()> {
-		self.apply_impulse(handle, impulse)
+		Ok(())
 	}
 
 	fn add_collider(&mut self, body: BodyHandle, def: &ColliderDef) -> PhiResult<ColliderHandle> {
@@ -388,6 +388,12 @@ impl PhiWorld for NullPhysicsWorld {
 		Ok(handle)
 	}
 
+	fn add_spring_joint(&mut self, _def: &SpringJointDef) -> PhiResult<JointHandle> {
+		let handle = JointHandle(self.next_joint_id);
+		self.next_joint_id += 1;
+		Ok(handle)
+	}
+
 	fn remove_joint(&mut self, _joint: JointHandle) -> PhiResult<()> {
 		Ok(())
 	}
@@ -396,11 +402,17 @@ impl PhiWorld for NullPhysicsWorld {
 		let mut closest_hit: Option<RaycastHit> = None;
 
 		for (&collider_h, (body_h, collider_def)) in &self.colliders {
-			if let Some((body_pos, _, _, _)) = self.bodies.get(body_h) {
-				let center = *body_pos + collider_def.offset_position;
+			if let Some(body) = self.bodies.get(body_h) {
+				let center = body.position + collider_def.offset_position;
+				let radius = match &collider_def.shape {
+					crate::collider::ColliderShape::Sphere { radius } => *radius,
+					crate::collider::ColliderShape::Box { half_extents } => half_extents.x.max(half_extents.y).max(half_extents.z),
+					crate::collider::ColliderShape::Capsule { radius, height } => radius + height * 0.5,
+					_ => 1.0,
+				};
 				let oc = ray.origin - center;
 				let b = oc.dot(&ray.direction);
-				let c = oc.dot(&oc) - 1.0;
+				let c = oc.dot(&oc) - radius * radius;
 				let discriminant = b * b - c;
 
 				if discriminant > 0.0 {

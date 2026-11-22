@@ -2,7 +2,7 @@ ProjectConfig(
 	name: "Mochi Engine - Physics Test",
 	version: "0.1.0",
 	window: WindowConfig(
-		title: "Mochi Engine - Baryon Physics Cube Simulation",
+		title: "Mochi Engine - Physics Cube Simulation",
 		width: 1280,
 		height: 720,
 		vsync: true,

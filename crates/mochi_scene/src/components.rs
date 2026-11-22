@@ -16,7 +16,8 @@ use mochi_material::MaterialInstance;
 use crate::mesh::Mesh;
 use mochi_math::{Mat3x4, Mat4x4, Transform, Vec3, Vec4};
 pub use mochi_phi::{
-	BodyDef, BodyHandle, BodyType, ColliderDef, ColliderHandle, ColliderShape, PhysicsMaterial,
+	BodyDef, BodyHandle, BodyType, ColliderDef, ColliderHandle, ColliderShape, JointHandle,
+	PhysicsMaterial, SpringJointDef,
 };
 
 
@@ -297,6 +298,63 @@ impl ColliderComponent {
 		Self {
 			def,
 			handle: ColliderHandle::INVALID,
+		}
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct NameComponent(pub String);
+
+impl NameComponent {
+	pub fn new(name: impl Into<String>) -> Self {
+		Self(name.into())
+	}
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SpringJointComponent {
+	pub target_entity_name: String,
+	pub local_anchor_a: Vec3<f32>,
+	pub local_anchor_b: Vec3<f32>,
+	pub rest_length: f32,
+	pub stiffness: f32,
+	pub damping: f32,
+	pub handle: JointHandle,
+}
+
+impl SpringJointComponent {
+	pub fn new(target_entity_name: impl Into<String>, rest_length: f32, stiffness: f32, damping: f32) -> Self {
+		Self {
+			target_entity_name: target_entity_name.into(),
+			local_anchor_a: Vec3::ZERO,
+			local_anchor_b: Vec3::ZERO,
+			rest_length,
+			stiffness,
+			damping,
+			handle: JointHandle::INVALID,
+		}
+	}
+
+	pub fn with_anchors(mut self, anchor_a: Vec3<f32>, anchor_b: Vec3<f32>) -> Self {
+		self.local_anchor_a = anchor_a;
+		self.local_anchor_b = anchor_b;
+		self
+	}
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SpringJointsComponent {
+	pub joints: Vec<SpringJointComponent>,
+}
+
+impl SpringJointsComponent {
+	pub fn new(joints: Vec<SpringJointComponent>) -> Self {
+		Self { joints }
+	}
+
+	pub fn single(joint: SpringJointComponent) -> Self {
+		Self {
+			joints: vec![joint],
 		}
 	}
 }

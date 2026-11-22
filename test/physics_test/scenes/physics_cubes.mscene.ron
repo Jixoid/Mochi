@@ -55,7 +55,7 @@ SceneAsset(
 			mesh_renderer: Some(MeshRendererDesc(
 				asset: "models/floor.masset.ron",
 				is_visible: true,
-				cast_shadows: true,
+				cast_shadows: false,
 			)),
 		),
 		EntityDesc(

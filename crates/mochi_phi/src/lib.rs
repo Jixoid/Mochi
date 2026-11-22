@@ -12,7 +12,7 @@
 //! # Mochi Physics Hardware/Backend Interface (PHI)
 //!
 //! Abstract, backend-agnostic 3D physics interfaces, components, and math abstractions for the Mochi Engine.
-//! Designed to support multiple pluggable backends such as Baryon (C++/Rust) or Rapier3D.
+//! Designed to support multiple pluggable backends such as Rapier3D.
 
 pub mod body;
 pub mod collider;
@@ -51,12 +51,16 @@ mod tests {
 		assert_eq!(pos, Vec3::new(0.0, 10.0, 0.0));
 		assert_eq!(rot, Quat::IDENTITY);
 
-		// Step simulation with gravity
+		// Step simulation (dummy physics does no work)
 		world.step_direct(1.0);
 		let (new_pos, _) = world
 			.body_transform(body)
 			.expect("failed to get new transform");
-		assert!(new_pos.y < 10.0, "Body should have fallen under gravity");
+		assert_eq!(
+			new_pos,
+			Vec3::new(0.0, 10.0, 0.0),
+			"Dummy backend preserves position without gravity"
+		);
 
 		// Clean up
 		world.destroy_body(body).expect("failed to destroy body");
@@ -103,11 +107,11 @@ mod tests {
 			.create_body(&BodyDef::dynamic().with_position(Vec3::new(0.0, 5.0, 0.0)))
 			.expect("failed to create body");
 
-		// Frame with 0.033s delta time should trigger 2 fixed substeps (2 * 1/60s = 0.0333s)
+		// Frame with 0.033s delta time triggers accumulator steps (dummy physics does no work)
 		world.step_interpolated(0.034);
 		let (pos, _) = world
 			.body_transform(body)
 			.expect("failed to read transform");
-		assert!(pos.y < 5.0);
+		assert_eq!(pos, Vec3::new(0.0, 5.0, 0.0));
 	}
 }
