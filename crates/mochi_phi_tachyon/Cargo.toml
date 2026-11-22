@@ -1,0 +1,9 @@
+[package]
+name = "mochi_phi_tachyon"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mochi_math = { path = "../mochi_math" }
+mochi_phi = { path = "../mochi_phi" }

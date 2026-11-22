@@ -1099,6 +1099,7 @@ dependencies = [
  "mochi_material",
  "mochi_math",
  "mochi_phi",
+ "mochi_phi_tachyon",
  "mochi_rendering",
  "mochi_rhi_ash",
  "mochi_scene",
@@ -1149,6 +1150,14 @@ name = "mochi_phi"
 version = "0.1.0"
 dependencies = [
  "mochi_math",
+]
+
+[[package]]
+name = "mochi_phi_tachyon"
+version = "0.1.0"
+dependencies = [
+ "mochi_math",
+ "mochi_phi",
 ]
 
 [[package]]

@@ -26,7 +26,8 @@ use mochi_rendering::RenderingSystem;
 use mochi_rhi as rhi;
 use mochi_scene::Scene;
 use mochi_script::ScriptSystem;
-use mochi_phi::{DummyPhysicsBackend, PhysicsWorld};
+use mochi_phi::PhysicsWorld;
+use mochi_phi_tachyon::TachyonBackend;
 use mochi_except::*;
 
 pub use config::*;
@@ -55,7 +56,7 @@ pub struct EngineApp {
 	rendering_system: Option<RenderingSystem>,
 	audio_system: Option<AudioSystem>,
 	script_system: ScriptSystem,
-	physics_world: Option<PhysicsWorld<DummyPhysicsBackend>>,
+	physics_world: Option<PhysicsWorld<TachyonBackend>>,
 	input: Input,
 	display: Option<Display>,
 	scene: Scene,
@@ -167,7 +168,7 @@ impl EngineApp {
 			..Default::default()
 		};
 
-		match PhysicsWorld::<DummyPhysicsBackend>::new(config) {
+		match PhysicsWorld::<TachyonBackend>::new(config) {
 			Ok(mut physics) => {
 				let mut body_count = 0;
 				for (_entity, (transform, rb)) in self.scene.world_mut().query_mut::<(

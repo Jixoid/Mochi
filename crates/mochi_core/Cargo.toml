@@ -19,4 +19,5 @@ mochi_script = { path = "../mochi_script" }
 mochi_asset = { path = "../mochi_asset" }
 mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
 mochi_phi = { path = "../mochi_phi" }
+mochi_phi_tachyon = { path = "../mochi_phi_tachyon" }
 mochi_except = { path = "../mochi_except" }
