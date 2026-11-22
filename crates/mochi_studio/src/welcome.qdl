@@ -1,0 +1,281 @@
+styles {
+  brand_title {
+    font_size: 26
+  }
+  section_title {
+    font_size: 20
+  }
+  card_title {
+    font_size: 16
+  }
+  subtitle {
+    font_size: 13
+  }
+  footer_text {
+    font_size: 11
+  }
+}
+
+root qstd::hbox {
+  spacing: 12
+  paddings: 16
+  color: "monet(SurfaceContainerLowest)"
+
+  node qstd::vbox {
+    spacing: 14
+    paddings: 16
+    color: "monet(SurfaceContainerLow)"
+    corner_radius: 16
+
+    node qstd::text {
+      style: "brand_title"
+      text: "Mochi Studio"
+      anchor: "top-center"
+      color: "monet(PrimaryFixed)"
+    }
+
+    node qstd::text {
+      style: "subtitle"
+      text: "developed by QAOS"
+      anchor: "top-center"
+      color: "monet(OnSurfaceVariant)"
+    }
+
+    node qstd::spacer {
+      height: 8
+    }
+
+    node qstd::vbox {
+      spacing: 8
+      anchor: "top-fill"
+      color: "color(transparent)"
+
+      node qstd::button "nav_projects" {
+        text: "Projeler"
+        variant: "tonal"
+        anchor: "top-fill"
+        on_click: "NavProjects"
+      }
+
+      node qstd::button "nav_new_scene" {
+        text: "Yeni Proje"
+        variant: "outlined"
+        anchor: "top-fill"
+        on_click: "NavNewScene"
+      }
+
+      node qstd::button "nav_settings" {
+        text: "Ayarlar"
+        variant: "outlined"
+        anchor: "top-fill"
+        on_click: "NavSettings"
+      }
+    }
+
+    node qstd::spacer {
+      anchor: "fill"
+    }
+
+    node qstd::text {
+      style: "footer_text"
+      text: "Mochi v0.1.0"
+      anchor: "bottom-center"
+      color: "monet(OnSurfaceVariant)"
+    }
+  }
+
+  node qstd::vbox {
+    spacing: 14
+    paddings: 18
+    color: "monet(SurfaceContainer)"
+    corner_radius: 16
+    anchor: "fill"
+    scrollable: true
+
+    // Page 1: Projeler
+    node qstd::vbox "page_projects" {
+      spacing: 14
+      anchor: "top-fill"
+      color: "color(transparent)"
+      visible: true
+
+      node qstd::hbox {
+        spacing: 10
+        anchor: "top-fill"
+        color: "color(transparent)"
+
+        node qstd::text {
+          style: "section_title"
+          text: "Son Sahneler"
+          anchor: "fill"
+          color: "monet(OnSurface)"
+        }
+
+        node qstd::button {
+          text: "Yenile"
+          variant: "outlined"
+          on_click: "RefreshScenes"
+        }
+
+        node qstd::button {
+          text: "Yeni Proje"
+          variant: "filled"
+          on_click: "NavNewScene"
+        }
+      }
+
+      node qstd::edit "search_input" {
+        title: "Sahne veya proje ara..."
+        text: ""
+        anchor: "top-fill"
+        on_changed: "OnSearchChanged"
+      }
+
+      node qstd::vbox "scene_list" {
+        spacing: 12
+        anchor: "top-fill"
+        color: "color(transparent)"
+      }
+    }
+
+    // Page 2: Yeni Proje
+    node qstd::vbox "page_new_scene" {
+      spacing: 14
+      anchor: "top-fill"
+      color: "color(transparent)"
+      visible: false
+
+      node qstd::text {
+        style: "section_title"
+        text: "Yeni Mochi Projesi Oluştur"
+        color: "monet(OnSurface)"
+      }
+
+      node qstd::card {
+        paddings: 18
+        corner_radius: 12
+        anchor: "top-fill"
+        color: "monet(SurfaceContainerHigh)"
+
+        node qstd::vbox {
+          spacing: 12
+          color: "color(transparent)"
+
+          node qstd::edit "new_project_name" {
+            title: "Proje Adı"
+            text: "my_mochi_game"
+            anchor: "top-fill"
+            on_changed: "OnProjectNameChanged"
+          }
+
+          node qstd::edit "new_project_path" {
+            title: "Hedef Dizin"
+            text: "./projects/my_mochi_game"
+            anchor: "top-fill"
+            on_changed: "OnProjectPathChanged"
+          }
+
+          node qstd::edit "new_project_desc" {
+            title: "Açıklama"
+            text: "Mochi 3D Engine projesi"
+            anchor: "top-fill"
+            on_changed: "OnProjectDescChanged"
+          }
+
+          node qstd::check "new_project_no_git" {
+            text: "Git deposu oluşturma (--no-git)"
+            checked: false
+            on_changed: "OnNoGitChanged"
+          }
+
+          node qstd::text "create_status" {
+            style: "subtitle"
+            text: "Yeni proje 'mochi init' şablonu ile oluşturulur."
+            color: "monet(OnSurfaceVariant)"
+          }
+
+          node qstd::button {
+            text: "Proje Oluştur"
+            variant: "filled"
+            anchor: "right"
+            on_click: "CreateProject"
+          }
+        }
+      }
+    }
+
+    // Page 3: Ayarlar
+    node qstd::vbox "page_settings" {
+      spacing: 14
+      anchor: "top-fill"
+      color: "color(transparent)"
+      visible: false
+
+      node qstd::text {
+        style: "section_title"
+        text: "Stüdyo ve Motor Ayarları"
+        color: "monet(OnSurface)"
+      }
+
+      node qstd::collapsible {
+        title: "Grafik ve Başlatma Seçenekleri"
+        expanded: true
+        spacing: 10
+        paddings: 14
+        corner_radius: 12
+        anchor: "top-fill"
+
+        node qstd::switch "opt_vsync" {
+          text: "VSync (Dikey Senkronizasyon)"
+          checked: true
+          on_changed: "OnVsyncChanged"
+        }
+
+        node qstd::switch "opt_validation" {
+          text: "Vulkan Validation Katmanları"
+          checked: false
+          on_changed: "OnValidationChanged"
+        }
+
+        node qstd::switch "opt_mute" {
+          text: "Sesi Kapat (--mute)"
+          checked: false
+          on_changed: "OnMuteChanged"
+        }
+
+        node qstd::switch "opt_fg" {
+          text: "FSR 3.1 Frame Generation (--fg)"
+          checked: false
+          on_changed: "OnFgChanged"
+        }
+      }
+
+      node qstd::collapsible {
+        title: "Motor ve Sistem Bilgisi"
+        expanded: true
+        spacing: 8
+        paddings: 14
+        corner_radius: 12
+        anchor: "top-fill"
+
+        node qstd::text {
+          style: "subtitle"
+          text: "Fizik Backend: Tachyon (mochi_phi_tachyon)"
+          color: "monet(OnSurfaceVariant)"
+        }
+
+        node qstd::text {
+          style: "subtitle"
+          text: "Render Hattı: Clustered Forward • CSM • TAA • FSR 3.1"
+          color: "monet(OnSurfaceVariant)"
+        }
+
+        node qstd::text {
+          style: "subtitle"
+          text: "Arayüz: Nimbus UI (QDL • Material 3 Monet • Vulkan)"
+          color: "monet(OnSurfaceVariant)"
+        }
+      }
+    }
+  }
+}

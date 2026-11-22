@@ -30,3 +30,4 @@ mochi_math = { path = "crates/mochi_math" }
 mochi_phi = { path = "crates/mochi_phi" }
 mochi_except = { path = "crates/mochi_except" }
 mochi_route = { path = "crates/mochi_route" }
+mochi_studio = { path = "crates/mochi_studio" }

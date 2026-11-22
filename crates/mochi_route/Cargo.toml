@@ -16,3 +16,4 @@ mochi_asset = { path = "../mochi_asset" }
 mochi_scene = { path = "../mochi_scene" }
 mochi_rhi = { path = "../mochi_rhi_ash", package = "mochi_rhi_ash" }
 mochi_except = { path = "../mochi_except" }
+mochi_studio = { path = "../mochi_studio" }

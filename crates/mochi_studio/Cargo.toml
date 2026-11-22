@@ -1,0 +1,8 @@
+[package]
+name = "mochi_studio"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+nimbus = { git = "https://github.com/Jixoid/Nimbus.git", rev = "e8f4a737f0816ca5edac89d14e61a99627330117" }

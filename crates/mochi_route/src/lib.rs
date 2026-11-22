@@ -165,6 +165,13 @@ pub enum MainCommands {
 		#[arg(short, long)]
 		binary: bool,
 	},
+
+	/// Launch Mochi Studio (visual editor & scene hub)
+	Studio {
+		/// Optional scene file to open directly
+		#[arg(short, long)]
+		scene: Option<PathBuf>,
+	},
 }
 
 fn main_cmd(cli: Cli) {
@@ -243,6 +250,10 @@ fn main_cmd(cli: Cli) {
 			output: output.as_deref(),
 			binary,
 		}),
+
+		MainCommands::Studio { scene } => {
+			mochi_studio::run(scene).map_err(|e| Error::Str(e.to_string()))
+		}
 	};
 
 	if let Err(e) = res {
