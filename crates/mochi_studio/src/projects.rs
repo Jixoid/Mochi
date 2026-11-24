@@ -214,6 +214,42 @@ pub fn launch_scene(entry: &SceneEntry, options: &LaunchOptions) {
 }
 
 
+pub fn launch_editor(scene_path: &Path) {
+	let exe = match std::env::current_exe() {
+		Ok(path) => path,
+		Err(e) => {
+			eprintln!("[Mochi Studio] Çalıştırılabilir dosya bulunamadı: {e}");
+			return;
+		}
+	};
+
+	let mut cmd = Command::new(exe);
+	cmd.arg("studio").arg("--scene").arg(scene_path);
+
+	if let Err(e) = cmd.spawn() {
+		eprintln!("[Mochi Studio] Editör penceresi başlatılamadı: {e}");
+	}
+}
+
+
+pub fn launch_hub() {
+	let exe = match std::env::current_exe() {
+		Ok(path) => path,
+		Err(e) => {
+			eprintln!("[Mochi Studio] Çalıştırılabilir dosya bulunamadı: {e}");
+			return;
+		}
+	};
+
+	let mut cmd = Command::new(exe);
+	cmd.arg("studio");
+
+	if let Err(e) = cmd.spawn() {
+		eprintln!("[Mochi Studio] Hub penceresi başlatılamadı: {e}");
+	}
+}
+
+
 pub fn create_project(
 	target_path: &str,
 	name: &str,

@@ -22,12 +22,12 @@ use nimbus::core::{
 };
 use nimbus::math::Color;
 use nimbus::theme::{
-	ElevationTokens, Monet, MonetRole, RadiusTokens, StateTokens, StrokeTokens, Theme,
+	ElevationTokens, Monet, MonetRole, RadiusTokens, StrokeTokens, Theme,
 };
 use nimbus::ui::{Button, ButtonVariant, Card, HBox, Spacer, Text, Toast, ToastKind, VBox};
 
 use crate::projects::{LaunchOptions, SceneEntry};
-use crate::viewport_renderer::{StudioViewportBridge, ViewportController};
+use crate::viewport_renderer::StudioViewportBridge;
 
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -52,7 +52,6 @@ struct WelcomeIds {
 struct StudioState {
 	ids: Option<WelcomeIds>,
 	launch_options: Arc<Mutex<LaunchOptions>>,
-	vp_ctrl: ViewportController,
 	project_name: String,
 	project_path: String,
 	project_desc: String,
@@ -64,11 +63,10 @@ struct StudioState {
 }
 
 impl StudioState {
-	fn new(cwd: PathBuf, theme: Theme, vp_ctrl: ViewportController) -> Self {
+	fn new(cwd: PathBuf, theme: Theme) -> Self {
 		Self {
 			ids: None,
 			launch_options: Arc::new(Mutex::new(LaunchOptions::default())),
-			vp_ctrl,
 			project_name: "my_mochi_game".to_string(),
 			project_path: "./projects/my_mochi_game".to_string(),
 			project_desc: "Mochi 3D Engine projesi".to_string(),
@@ -87,7 +85,9 @@ pub fn run(initial_scene: Option<PathBuf>) -> Result<(), Box<dyn std::error::Err
 	{
 		let mut reg = WidgetRegistry::global().write().unwrap();
 		nimbus::ui::register_widgets(&mut reg);
+		nimbus_ui_dock::register_widgets(&mut reg);
 		nimbus_ui_gizmo::register_widgets(&mut reg);
+		nimbus_ui_inspector::register_widgets(&mut reg);
 	}
 
 	let monet = Monet::from_system().unwrap_or_else(|| {
@@ -101,69 +101,98 @@ pub fn run(initial_scene: Option<PathBuf>) -> Result<(), Box<dyn std::error::Err
 
 	let theme = Theme {
 		elevation: ElevationTokens::default(),
-		radius: RadiusTokens::default(),
-		state: StateTokens::default(),
+		radius: RadiusTokens {
+			none: 0.0,
+			xsmall: 2.0,
+			small: 4.0,
+			medium: 6.0,
+			large: 8.0,
+			xlarge: 12.0,
+			full: f32::MAX,
+		},
 		stroke: StrokeTokens::default(),
 		monet,
 	};
 
+	match initial_scene {
+		Some(scene_path) => run_editor_window(scene_path, theme),
+		None => run_welcome_window(theme),
+	}
+}
+
+
+fn run_welcome_window(theme: Theme) -> Result<(), Box<dyn std::error::Error>> {
 	let mut app = Application::new(theme);
 	let theme = app.theme;
 
-	let window_handle = app.create_window(Window::new("Mochi Studio", 1280, 760));
+	let window_handle = app.create_window(Window::new("Mochi Studio — Hub", 960, 620));
 	let main_window = app
 		.window_mut(window_handle)
-		.ok_or("Failed to get main window")?;
+		.ok_or("Failed to get welcome window")?;
+
+	let tasks = main_window.task_queue();
+	let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+	let state = Arc::new(Mutex::new(StudioState::new(cwd, theme)));
+
+	mount_welcome(main_window.tree_mut(), &state, &tasks)?;
+
+	app.run().map_err(|e| format!("Application error: {e}"))?;
+	Ok(())
+}
+
+
+fn run_editor_window(scene_path: PathBuf, theme: Theme) -> Result<(), Box<dyn std::error::Error>> {
+	let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+	let project_dir = scene_path
+		.parent()
+		.and_then(|p| {
+			if p.file_name().and_then(|n| n.to_str()) == Some("scenes") {
+				p.parent()
+			} else {
+				Some(p)
+			}
+		})
+		.unwrap_or(&cwd)
+		.to_path_buf();
+
+	let title = scene_path
+		.file_name()
+		.and_then(|s| s.to_str())
+		.unwrap_or("Sahne")
+		.to_string();
+
+	let window_title = format!("Mochi Studio — {title}");
+	let display_path = scene_path.to_string_lossy().replace('\\', "/");
+	let entry = SceneEntry {
+		title,
+		project_dir,
+		scene_path,
+		display_path,
+	};
+
+	let mut app = Application::new(theme);
+	let theme = app.theme;
+	let app_tasks = app.task_queue();
+
+	let window_handle = app.create_window(Window::new(window_title, 1360, 820));
+	let main_window = app
+		.window_mut(window_handle)
+		.ok_or("Failed to get editor window")?;
 
 	let tasks = main_window.task_queue();
 	let (mut vp_bridge, vp_ctrl) = StudioViewportBridge::spawn(tasks.clone());
-	let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-	let state = Arc::new(Mutex::new(StudioState::new(cwd.clone(), theme, vp_ctrl.clone())));
+	let launch_options = Arc::new(Mutex::new(LaunchOptions::default()));
 
-	if let Some(scene_path) = initial_scene {
-		let project_dir = scene_path
-			.parent()
-			.and_then(|p| {
-				if p.file_name().and_then(|n| n.to_str()) == Some("scenes") {
-					p.parent()
-				} else {
-					Some(p)
-				}
-			})
-			.unwrap_or(&cwd)
-			.to_path_buf();
-
-		let title = scene_path
-			.file_name()
-			.and_then(|s| s.to_str())
-			.unwrap_or("Sahne")
-			.to_string();
-
-		let display_path = scene_path.to_string_lossy().replace('\\', "/");
-		let entry = SceneEntry {
-			title,
-			project_dir,
-			scene_path,
-			display_path,
-		};
-
-		let launch_options = Arc::clone(&state.lock().unwrap().launch_options);
-		let back_state = Arc::clone(&state);
-		let back_tasks = tasks.clone();
-		editor::open_editor(
-			main_window.tree_mut(),
-			entry,
-			launch_options,
-			vp_ctrl,
-			theme,
-			tasks,
-			Arc::new(move |tree| {
-				let _ = mount_welcome(tree, &back_state, &back_tasks);
-			}),
-		);
-	} else {
-		mount_welcome(main_window.tree_mut(), &state, &tasks)?;
-	}
+	editor::open_editor(
+		main_window.tree_mut(),
+		entry,
+		launch_options,
+		vp_ctrl,
+		theme,
+		tasks,
+		app_tasks,
+		Arc::new(projects::launch_hub),
+	);
 
 	app.set_on_pre_render(move |device, cmd_manager, window| {
 		vp_bridge.poll(device, cmd_manager, window);
@@ -171,16 +200,6 @@ pub fn run(initial_scene: Option<PathBuf>) -> Result<(), Box<dyn std::error::Err
 
 	app.run().map_err(|e| format!("Application error: {e}"))?;
 	Ok(())
-}
-
-
-fn clear_tree_roots(tree: &mut UiTree) {
-	let roots = tree.roots.clone();
-	for root_id in roots {
-		tree.remove(root_id);
-	}
-	tree.needs_layout = true;
-	tree.needs_redraw = true;
 }
 
 
@@ -192,7 +211,6 @@ fn mount_welcome(
 	let theme = state.lock().unwrap().theme;
 	let methods = build_method_table(Arc::clone(state), tasks.clone());
 
-	clear_tree_roots(tree);
 	let qdl_scene = nimbus::qdl::load_into_tree(include_str!("welcome.qdl"), tree, &theme, &methods)
 		.map_err(|e| format!("Failed to parse welcome.qdl: {e}"))?;
 
@@ -359,7 +377,7 @@ fn build_method_table(state: Arc<Mutex<StudioState>>, tasks: TaskQueue) -> Metho
 
 					if let Some(status_text) = tree.get_widget_mut::<Text>(ids.create_status) {
 						status_text.text = msg;
-						status_text.color = Some(color);
+						status_text.color = Some(color.into());
 						tree.needs_layout = true;
 						tree.needs_redraw = true;
 					}
@@ -617,9 +635,8 @@ fn populate_scene_cards(
 				.build(),
 		);
 
-		// Open in Editor button
-		let edit_entry = entry.clone();
-		let edit_state = Arc::clone(state);
+		// Open in Editor button (spawns dedicated Editor window and closes Welcome Hub)
+		let edit_scene_path = entry.scene_path.clone();
 		let edit_tasks = tasks.clone();
 		tree.insert_child(
 			actions_row,
@@ -627,30 +644,9 @@ fn populate_scene_cards(
 				.text("Editör")
 				.variant(ButtonVariant::Tonal)
 				.on_click(move || {
-					let (launch_options, vp_ctrl, theme) = {
-						let guard = edit_state.lock().unwrap();
-						(
-							Arc::clone(&guard.launch_options),
-							guard.vp_ctrl.clone(),
-							guard.theme,
-						)
-					};
-					let entry_for_editor = edit_entry.clone();
-					let back_state = Arc::clone(&edit_state);
-					let back_tasks = edit_tasks.clone();
-					let tasks_for_editor = edit_tasks.clone();
-					edit_tasks.push_tree(move |tree| {
-						editor::open_editor(
-							tree,
-							entry_for_editor,
-							launch_options,
-							vp_ctrl,
-							theme,
-							tasks_for_editor,
-							Arc::new(move |tree| {
-								let _ = mount_welcome(tree, &back_state, &back_tasks);
-							}),
-						);
+					projects::launch_editor(&edit_scene_path);
+					edit_tasks.push_window(|win| {
+						win.close();
 					});
 				})
 				.build(),
@@ -666,6 +662,7 @@ fn populate_scene_cards(
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::viewport_renderer::ViewportController;
 
 	#[test]
 	fn test_welcome_qdl_loads_and_switches_tabs() {
@@ -681,7 +678,6 @@ mod tests {
 		let theme = Theme {
 			elevation: ElevationTokens::default(),
 			radius: RadiusTokens::default(),
-			state: StateTokens::default(),
 			stroke: StrokeTokens::default(),
 			monet,
 		};
@@ -690,11 +686,7 @@ mod tests {
 		let tasks = tree.task_queue();
 		let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 		let workspace_root = manifest_dir.parent().unwrap().parent().unwrap().to_path_buf();
-		let state = Arc::new(Mutex::new(StudioState::new(
-			workspace_root,
-			theme,
-			ViewportController::new_dummy(),
-		)));
+		let state = Arc::new(Mutex::new(StudioState::new(workspace_root, theme)));
 		let methods = build_method_table(Arc::clone(&state), tasks.clone());
 
 		let scene = nimbus::qdl::load_into_tree_with_registry(
@@ -731,7 +723,9 @@ mod tests {
 		{
 			let mut reg = WidgetRegistry::global().write().unwrap();
 			nimbus::ui::register_widgets(&mut reg);
+			nimbus_ui_dock::register_widgets(&mut reg);
 			nimbus_ui_gizmo::register_widgets(&mut reg);
+			nimbus_ui_inspector::register_widgets(&mut reg);
 		}
 
 		let monet = Monet::new(
@@ -743,7 +737,6 @@ mod tests {
 		let theme = Theme {
 			elevation: ElevationTokens::default(),
 			radius: RadiusTokens::default(),
-			state: StateTokens::default(),
 			stroke: StrokeTokens::default(),
 			monet,
 		};
@@ -758,6 +751,7 @@ mod tests {
 
 		let mut tree = UiTree::new();
 		let tasks = tree.task_queue();
+		let app_tasks = TaskQueue::new();
 		let opts = Arc::new(Mutex::new(LaunchOptions::default()));
 		let vp_ctrl = ViewportController::new_dummy();
 
@@ -768,7 +762,8 @@ mod tests {
 			vp_ctrl,
 			theme,
 			tasks,
-			Arc::new(|_| {}),
+			app_tasks,
+			Arc::new(|| {}),
 		);
 
 		assert!(!tree.roots.is_empty(), "Editor root should be mounted");

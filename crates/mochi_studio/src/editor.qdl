@@ -1,9 +1,9 @@
 styles {
   toolbar_title {
-    font_size: 16
+    font_size: 14
   }
   panel_title {
-    font_size: 15
+    font_size: 13
   }
   subtitle {
     font_size: 12
@@ -14,16 +14,64 @@ styles {
 }
 
 root qstd::vbox {
-  spacing: 8
-  paddings: 10
+  spacing: 6
+  paddings: 6
   color: "monet(SurfaceContainerLowest)"
 
-  // Top Toolbar
+  // 1. Top MenuBar
+  node qstd::menubar "editor_menubar" {
+    anchor: "top-fill"
+    on_action: "OnMenuAction"
+    items: [
+      {
+        text: "Dosya",
+        items: [
+          { text: "Kaydet", shortcut: "Ctrl+S", action: "FileSave" },
+          "-",
+          { text: "Welcome Hub'a Dön", action: "FileBackToHub" }
+        ]
+      },
+      {
+        text: "Düzenle",
+        items: [
+          { text: "Yeni Entity Ekle", action: "EditAddEntity" },
+          { text: "Seçili Entity'yi Sil", shortcut: "Del", action: "EditDeleteEntity" }
+        ]
+      },
+      {
+        text: "Görünüm",
+        items: [
+          {
+            text: "Tema Modu",
+            items: [
+              { text: "Koyu Tema", action: "ViewThemeDark" },
+              { text: "Açık Tema", action: "ViewThemeLight" }
+            ]
+          },
+          {
+            text: "Köşe Stili",
+            items: [
+              { text: "Kompakt (Editör)", action: "ViewRadiusCompact" },
+              { text: "Yuvarlatılmış", action: "ViewRadiusRounded" }
+            ]
+          }
+        ]
+      },
+      {
+        text: "Sahne",
+        items: [
+          { text: "Sahneyi Çalıştır", shortcut: "F5", action: "ScenePlay" }
+        ]
+      }
+    ]
+  }
+
+  // 2. Primary Toolbar
   node qstd::hbox {
-    spacing: 10
-    paddings: 10
+    spacing: 8
+    paddings: 6
     color: "monet(SurfaceContainerLow)"
-    corner_radius: 12
+    corner_radius: 8
     anchor: "top-fill"
 
     node qstd::button {
@@ -60,7 +108,7 @@ root qstd::vbox {
     }
 
     node qstd::spacer {
-      width: 8
+      width: 6
     }
 
     node qstd::button {
@@ -76,167 +124,211 @@ root qstd::vbox {
     }
   }
 
-  // Main 3-Column Workspace
-  node qstd::hbox {
-    spacing: 10
+  // 3. Dockable Pro Workspace (nimbus_ui_dock)
+  node dock::area "editor_dock" {
     anchor: "fill"
-    color: "color(transparent)"
+    splitter_size: 6
+    tab_bar_height: 28
+    on_pane_closed: "OnDockPaneClosed"
 
-    // Left Panel: Scene Hierarchy
-    node qstd::vbox {
-      spacing: 10
-      paddings: 12
-      color: "monet(SurfaceContainerLow)"
-      corner_radius: 12
-      scrollable: true
+    // Center: 3D Viewport
+    node dock::pane {
+      title: "3B Viewport"
+      slot: "center"
+      closable: false
+      paddings: 0
 
-      node qstd::hbox {
-        spacing: 8
-        anchor: "top-fill"
-        color: "color(transparent)"
-
-        node qstd::text {
-          style: "panel_title"
-          text: "Hiyerarşi"
-          anchor: "fill"
-          color: "monet(OnSurface)"
-        }
-
-        node qstd::button {
-          text: "+ Ekle"
-          variant: "tonal"
-          on_click: "EditorAddEntity"
-        }
-      }
-
-      node qstd::vbox "hierarchy_list" {
-        spacing: 6
-        anchor: "top-fill"
-        color: "color(transparent)"
-      }
-    }
-
-    // Center Panel: 3D Viewport
-    node qstd::viewport "main_viewport" {
-      anchor: "fill"
-      corner_radius: 12
-      color: "monet(SurfaceDim)"
-      border_width: 1
-      border_color: "monet(SurfaceOutlineVariant)"
-      on_resize: "ViewportResized"
-      on_pointer_down: "ViewportPointerDown"
-      on_pointer_up: "ViewportPointerUp"
-      on_pointer_move: "ViewportPointerMove"
-      on_scroll: "ViewportScroll"
-
-      node gizmo::transform "viewport_transform_gizmo" {
+      node qstd::viewport "main_viewport" {
         anchor: "fill"
-        mode: "translate"
-        space: "world"
-        on_changed: "GizmoTransformChanged"
-      }
+        corner_radius: 0
+        on_resize: "ViewportResized"
+        on_pointer_down: "ViewportPointerDown"
+        on_pointer_up: "ViewportPointerUp"
+        on_pointer_move: "ViewportPointerMove"
+        on_scroll: "ViewportScroll"
 
-      node gizmo::orientation "viewport_orientation_gizmo" {
-        anchor: "right-top"
-        size: 92
-        margin: 10
-        on_snap: "GizmoCameraSnap"
-        on_orbit: "GizmoCameraOrbit"
-      }
-
-      node qstd::card {
-        paddings: 10
-        corner_radius: 10
-        anchor: "left-top"
-        color: "monet(SurfaceContainer)"
-
-        node qstd::text "viewport_hud" {
-          style: "hud_text"
-          text: "Viewport • Hazır"
-          color: "monet(OnSurface)"
+        node gizmo::transform "viewport_transform_gizmo" {
+          anchor: "fill"
+          mode: "translate"
+          space: "world"
+          on_changed: "GizmoTransformChanged"
         }
-      }
 
-      node qstd::card "viewport_loading" {
-        paddings: 16
-        corner_radius: 14
-        anchor: "center"
-        color: "monet(SurfaceContainerHigh)"
+        node gizmo::orientation "viewport_orientation_gizmo" {
+          anchor: "right-top"
+          size: 86
+          margin: 10
+          on_snap: "GizmoCameraSnap"
+          on_orbit: "GizmoCameraOrbit"
+        }
 
-        node qstd::vbox {
-          spacing: 10
-          color: "color(transparent)"
+        node qstd::card {
+          paddings: 8
+          corner_radius: 6
+          anchor: "left-top"
+          color: "monet(SurfaceContainer)"
 
-          node qstd::spinner {
-            size: 36
-            thickness: 3.5
-            anchor: "top-center"
-          }
-
-          node qstd::text {
+          node qstd::text "viewport_hud" {
             style: "hud_text"
-            text: "3B Sahne Yükleniyor..."
-            anchor: "top-center"
+            text: "Viewport • Hazır"
+            color: "monet(OnSurface)"
+          }
+        }
+
+        node qstd::card "viewport_loading" {
+          paddings: 14
+          corner_radius: 10
+          anchor: "center"
+          color: "monet(SurfaceContainerHigh)"
+
+          node qstd::vbox {
+            spacing: 10
+            color: "color(transparent)"
+
+            node qstd::spinner {
+              size: 32
+              thickness: 3.5
+              anchor: "top-center"
+            }
+
+            node qstd::text {
+              style: "hud_text"
+              text: "3B Sahne Yükleniyor..."
+              anchor: "top-center"
+              color: "monet(OnSurfaceVariant)"
+            }
+          }
+        }
+
+        node qstd::card {
+          paddings: 6
+          corner_radius: 6
+          anchor: "left-bottom"
+          color: "monet(SurfaceContainer)"
+
+          node qstd::text "viewport_camera_hud" {
+            style: "hud_text"
+            text: "Orbit: Yaw 25.0° Pitch 20.0° Zoom 10.0"
             color: "monet(OnSurfaceVariant)"
           }
         }
       }
+    }
 
-      node qstd::card {
-        paddings: 8
-        corner_radius: 8
-        anchor: "left-bottom"
-        color: "monet(SurfaceContainer)"
+    // Left: Scene Hierarchy (qstd::treeview)
+    node dock::pane {
+      title: "Hiyerarşi"
+      slot: "left"
+      closable: false
+      paddings: 8
 
-        node qstd::text "viewport_camera_hud" {
-          style: "hud_text"
-          text: "Kamera: Orbit (Yaw 0.0° Pitch 20.0° Zoom 10.0)"
-          color: "monet(OnSurfaceVariant)"
+      node qstd::vbox {
+        anchor: "fill"
+        spacing: 6
+        color: "color(transparent)"
+
+        node qstd::hbox {
+          spacing: 6
+          anchor: "top-fill"
+          color: "color(transparent)"
+
+          node qstd::edit "hierarchy_search" {
+            title: "Entity ara..."
+            anchor: "fill"
+            on_changed: "OnHierarchySearch"
+          }
+
+          node qstd::button {
+            text: "+ Ekle"
+            variant: "tonal"
+            on_click: "EditorAddEntity"
+          }
+        }
+
+        node qstd::treeview "hierarchy_tree" {
+          anchor: "fill"
+          draggable: true
+          row_height: 26
+          on_selected: "OnHierarchySelected"
         }
       }
     }
 
-    // Right Panel: Inspector
-    node qstd::vbox {
-      spacing: 10
-      paddings: 12
-      color: "monet(SurfaceContainerLow)"
-      corner_radius: 12
-      scrollable: true
+    // Right: Inspector
+    node dock::pane {
+      title: "Inspector"
+      slot: "right"
+      closable: false
+      paddings: 8
 
-      node qstd::hbox {
+      node qstd::vbox {
+        anchor: "fill"
         spacing: 8
-        anchor: "top-fill"
         color: "color(transparent)"
+        scrollable: true
 
-        node qstd::text {
-          style: "panel_title"
-          text: "Inspector"
-          anchor: "fill"
-          color: "monet(OnSurface)"
+        node qstd::hbox {
+          spacing: 8
+          anchor: "top-fill"
+          color: "color(transparent)"
+
+          node qstd::text {
+            style: "panel_title"
+            text: "Bileşenler"
+            anchor: "fill"
+            color: "monet(OnSurfaceVariant)"
+          }
+
+          node qstd::button "btn_delete_entity" {
+            text: "Sil"
+            variant: "outlined"
+            on_click: "EditorDeleteEntity"
+          }
         }
 
-        node qstd::button "btn_delete_entity" {
-          text: "Sil"
-          variant: "outlined"
-          on_click: "EditorDeleteEntity"
+        node qstd::vbox "inspector_content" {
+          spacing: 8
+          anchor: "top-fill"
+          color: "color(transparent)"
         }
       }
+    }
 
-      node qstd::vbox "inspector_content" {
-        spacing: 10
-        anchor: "top-fill"
+    // Bottom Tab 1: Asset Browser
+    node dock::pane {
+      title: "İçerik Tarayıcı"
+      slot: "bottom"
+      paddings: 8
+
+      node qstd::vbox "asset_browser_list" {
+        anchor: "fill"
+        spacing: 4
         color: "color(transparent)"
+        scrollable: true
+      }
+    }
+
+    // Bottom Tab 2: Console
+    node dock::pane {
+      title: "Konsol"
+      slot: "bottom"
+      paddings: 8
+
+      node qstd::vbox "console_log_list" {
+        anchor: "fill"
+        spacing: 4
+        color: "color(transparent)"
+        scrollable: true
       }
     }
   }
 
-  // Bottom Status Bar
+  // 4. Bottom Status Bar
   node qstd::hbox {
     spacing: 12
-    paddings: 8
+    paddings: 6
     color: "monet(SurfaceContainerLow)"
-    corner_radius: 10
+    corner_radius: 6
     anchor: "bottom-fill"
 
     node qstd::text "editor_status_text" {

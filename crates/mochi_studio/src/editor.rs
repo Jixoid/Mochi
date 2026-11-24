@@ -13,17 +13,18 @@
 use std::sync::{Arc, Mutex};
 
 use mochi_asset::{EntityDesc, SceneAsset, TransformDesc};
-use nimbus::core::{Anchor, MethodTable, ObjectID, TaskQueue, UiTree};
+use nimbus::core::{Anchor, MethodTable, ObjectID, PropertyValue, TaskQueue, UiTree};
 use nimbus::math::Color;
-use nimbus::theme::{MonetRole, Theme};
+use nimbus::theme::{DColor, Monet, MonetRole, RadiusTokens, Theme};
 use nimbus::ui::{
 	Button, ButtonVariant, Collapsible, ComboBox, Edit, FloatSpinBox, Switch, Text, Toast,
-	ToastKind, VBox,
+	ToastKind, TreeItem, TreeView, VBox,
 };
 use nimbus_ui_gizmo::{
 	CameraViewPreset, GizmoCamera, GizmoMode, GizmoSpace, OrientationGizmo, Quat as GizmoQuat,
 	Rad as GizmoRad, Transform as GizmoTransform, TransformGizmo, Vec3 as GizmoVec3,
 };
+use nimbus_ui_inspector::Vec3Edit;
 
 use crate::projects::{self, LaunchOptions, SceneEntry};
 use crate::viewport_renderer::ViewportController;
@@ -32,8 +33,10 @@ use crate::viewport_renderer::ViewportController;
 #[derive(Clone, Copy)]
 struct EditorIds {
 	scene_title: ObjectID,
-	hierarchy_list: ObjectID,
+	hierarchy_tree: ObjectID,
 	inspector_content: ObjectID,
+	asset_browser_list: ObjectID,
+	console_log_list: ObjectID,
 	main_viewport: ObjectID,
 	transform_gizmo: ObjectID,
 	orientation_gizmo: ObjectID,
@@ -80,6 +83,7 @@ struct EditorState {
 }
 
 
+#[allow(clippy::too_many_arguments)]
 pub fn open_editor(
 	tree: &mut UiTree,
 	entry: SceneEntry,
@@ -87,7 +91,8 @@ pub fn open_editor(
 	vp_ctrl: ViewportController,
 	theme: Theme,
 	tasks: TaskQueue,
-	on_back: Arc<dyn Fn(&mut UiTree) + Send + Sync>,
+	app_tasks: TaskQueue,
+	on_back: Arc<dyn Fn() + Send + Sync>,
 ) {
 	let (scene, initial_status) = match SceneAsset::load_file(&entry.scene_path) {
 		Ok(asset) => {
@@ -126,7 +131,7 @@ pub fn open_editor(
 		vp_ctrl: vp_ctrl.clone(),
 	}));
 
-	let methods = build_editor_methods(Arc::clone(&state), tasks.clone(), on_back);
+	let methods = build_editor_methods(Arc::clone(&state), tasks.clone(), app_tasks, on_back);
 
 	clear_tree_roots(tree);
 	let qdl_scene = match nimbus::qdl::load_into_tree(
@@ -168,8 +173,10 @@ pub fn open_editor(
 		);
 	}
 
-	update_header_and_status(tree, &state, Some(initial_status));
-	rebuild_hierarchy(tree, &state, &tasks);
+	update_header_and_status(tree, &state, Some(initial_status.clone()));
+	push_console_log(tree, &state, "INFO", &initial_status);
+	populate_asset_browser(tree, &state);
+	rebuild_hierarchy(tree, &state);
 	rebuild_inspector(tree, &state, &tasks);
 	sync_gizmo_camera(tree, &state, false);
 	sync_gizmo_from_selection(tree, &state);
@@ -196,8 +203,10 @@ fn extract_editor_ids(scene: &nimbus::qdl::QdlScene) -> Result<EditorIds, String
 
 	Ok(EditorIds {
 		scene_title: get("editor_scene_title")?,
-		hierarchy_list: get("hierarchy_list")?,
+		hierarchy_tree: get("hierarchy_tree")?,
 		inspector_content: get("inspector_content")?,
+		asset_browser_list: get("asset_browser_list")?,
+		console_log_list: get("console_log_list")?,
 		main_viewport: get("main_viewport")?,
 		transform_gizmo: get("viewport_transform_gizmo")?,
 		orientation_gizmo: get("viewport_orientation_gizmo")?,
@@ -213,28 +222,16 @@ fn extract_editor_ids(scene: &nimbus::qdl::QdlScene) -> Result<EditorIds, String
 fn build_editor_methods(
 	state: Arc<Mutex<EditorState>>,
 	tasks: TaskQueue,
-	on_back: Arc<dyn Fn(&mut UiTree) + Send + Sync>,
+	app_tasks: TaskQueue,
+	on_back: Arc<dyn Fn() + Send + Sync>,
 ) -> MethodTable {
 	let mut methods = MethodTable::new();
 
-	// Back to Welcome Hub
-	{
+	// Helper closures reused by both Toolbar buttons and MenuBar actions
+	let do_save = {
 		let state = Arc::clone(&state);
 		let tasks = tasks.clone();
-		methods.register("EditorBackToHub", move || {
-			state.lock().unwrap().vp_ctrl.deactivate();
-			let on_back = Arc::clone(&on_back);
-			tasks.push_tree(move |tree| {
-				on_back(tree);
-			});
-		});
-	}
-
-	// Save scene to .mscene.ron
-	{
-		let state = Arc::clone(&state);
-		let tasks = tasks.clone();
-		methods.register("EditorSaveScene", move || {
+		Arc::new(move || {
 			let res = {
 				let mut guard = state.lock().unwrap();
 				let path_str = guard.entry.scene_path.to_string_lossy().to_string();
@@ -248,38 +245,50 @@ fn build_editor_methods(
 			};
 			let state = Arc::clone(&state);
 			tasks.push_tree(move |tree| {
-				let (title, msg, kind) = match res {
-					Ok(m) => ("Sahne Kaydedildi", m, ToastKind::Success),
-					Err(m) => ("Kaydetme Hatası", m, ToastKind::Error),
+				let (title, msg, kind, level) = match res {
+					Ok(m) => ("Sahne Kaydedildi", m, ToastKind::Success, "OK"),
+					Err(m) => ("Kaydetme Hatası", m, ToastKind::Error, "ERR"),
 				};
 				Toast::builder()
 					.title(title)
 					.message(msg.clone())
 					.kind(kind)
 					.show(tree);
+				push_console_log(tree, &state, level, &msg);
 				update_header_and_status(tree, &state, Some(msg));
 			});
-		});
-	}
+		})
+	};
 
-	// Launch scene in Mochi runtime
-	{
+	let do_back = {
 		let state = Arc::clone(&state);
-		methods.register("EditorPlayScene", move || {
+		let tasks = tasks.clone();
+		let on_back = Arc::clone(&on_back);
+		Arc::new(move || {
+			state.lock().unwrap().vp_ctrl.deactivate();
+			on_back();
+			tasks.push_window(|win| {
+				win.close();
+			});
+		})
+	};
+
+	let do_play = {
+		let state = Arc::clone(&state);
+		Arc::new(move || {
 			let (entry, opts) = {
 				let guard = state.lock().unwrap();
 				let opts = guard.launch_options.lock().unwrap().clone();
 				(guard.entry.clone(), opts)
 			};
 			projects::launch_scene(&entry, &opts);
-		});
-	}
+		})
+	};
 
-	// Add new entity
-	{
+	let do_add_entity = {
 		let state = Arc::clone(&state);
 		let tasks = tasks.clone();
-		methods.register("EditorAddEntity", move || {
+		Arc::new(move || {
 			let new_name = {
 				let mut guard = state.lock().unwrap();
 				let idx = guard.scene.entities.len() + 1;
@@ -299,20 +308,21 @@ fn build_editor_methods(
 			let state = Arc::clone(&state);
 			let tasks_inner = tasks.clone();
 			tasks.push_tree(move |tree| {
-				update_header_and_status(tree, &state, Some(format!("Yeni nesne eklendi: {new_name}")));
-				rebuild_hierarchy(tree, &state, &tasks_inner);
+				let msg = format!("Yeni nesne eklendi: {new_name}");
+				push_console_log(tree, &state, "ECS", &msg);
+				update_header_and_status(tree, &state, Some(msg));
+				rebuild_hierarchy(tree, &state);
 				rebuild_inspector(tree, &state, &tasks_inner);
 				sync_gizmo_from_selection(tree, &state);
 				update_viewport_hud(tree, &state);
 			});
-		});
-	}
+		})
+	};
 
-	// Delete selected entity
-	{
+	let do_delete_entity = {
 		let state = Arc::clone(&state);
 		let tasks = tasks.clone();
-		methods.register("EditorDeleteEntity", move || {
+		Arc::new(move || {
 			let removed_name = {
 				let mut guard = state.lock().unwrap();
 				if let Some(idx) = guard.selected_index
@@ -336,13 +346,146 @@ fn build_editor_methods(
 				let state = Arc::clone(&state);
 				let tasks_inner = tasks.clone();
 				tasks.push_tree(move |tree| {
-					update_header_and_status(tree, &state, Some(format!("Nesne silindi: {name}")));
-					rebuild_hierarchy(tree, &state, &tasks_inner);
+					let msg = format!("Nesne silindi: {name}");
+					push_console_log(tree, &state, "ECS", &msg);
+					update_header_and_status(tree, &state, Some(msg));
+					rebuild_hierarchy(tree, &state);
 					rebuild_inspector(tree, &state, &tasks_inner);
 					sync_gizmo_from_selection(tree, &state);
 					update_viewport_hud(tree, &state);
 				});
 			}
+		})
+	};
+
+	// Toolbar callbacks
+	{
+		let cb = Arc::clone(&do_back);
+		methods.register("EditorBackToHub", move || cb());
+	}
+	{
+		let cb = Arc::clone(&do_save);
+		methods.register("EditorSaveScene", move || cb());
+	}
+	{
+		let cb = Arc::clone(&do_play);
+		methods.register("EditorPlayScene", move || cb());
+	}
+	{
+		let cb = Arc::clone(&do_add_entity);
+		methods.register("EditorAddEntity", move || cb());
+	}
+	{
+		let cb = Arc::clone(&do_delete_entity);
+		methods.register("EditorDeleteEntity", move || cb());
+	}
+
+	// MenuBar actions
+	{
+		let state = Arc::clone(&state);
+		let tasks = tasks.clone();
+		let app_tasks = app_tasks.clone();
+		methods.register("OnMenuAction", move |action: String, _menu: String| {
+			match action.as_str() {
+				"FileSave" => do_save(),
+				"FileBackToHub" => do_back(),
+				"EditAddEntity" => do_add_entity(),
+				"EditDeleteEntity" => do_delete_entity(),
+				"ScenePlay" => do_play(),
+				"ViewThemeDark" | "ViewThemeLight" => {
+					let dark = action == "ViewThemeDark";
+					let monet = Monet::new(
+						Color::from_oklch(0.675, 0.138, 65.0),
+						Color::from_oklch(0.563, 0.038, 65.0),
+						Color::from_oklch(0.517, 0.052, 300.0),
+						dark,
+					);
+					state.lock().unwrap().theme.monet = monet;
+					app_tasks.push_theme(move |theme| {
+						theme.monet = monet;
+					});
+					let state_log = Arc::clone(&state);
+					tasks.push_tree(move |tree| {
+						let label = if dark { "Koyu" } else { "Açık" };
+						push_console_log(tree, &state_log, "UI", &format!("Tema değiştirildi: {label}"));
+					});
+				}
+				"ViewRadiusCompact" | "ViewRadiusRounded" => {
+					let radius = if action == "ViewRadiusCompact" {
+						RadiusTokens {
+							none: 0.0,
+							xsmall: 2.0,
+							small: 4.0,
+							medium: 6.0,
+							large: 8.0,
+							xlarge: 12.0,
+							full: f32::MAX,
+						}
+					} else {
+						RadiusTokens::default()
+					};
+					state.lock().unwrap().theme.radius = radius;
+					app_tasks.push_theme(move |theme| {
+						theme.radius = radius;
+					});
+				}
+				_ => {}
+			}
+		});
+	}
+
+	// Dock pane closed feedback
+	{
+		let tasks = tasks.clone();
+		methods.register("OnDockPaneClosed", move |title: String| {
+			tasks.push_tree(move |tree| {
+				Toast::builder()
+					.title("Panel Kapatıldı")
+					.message(format!("'{title}' paneli kapatıldı."))
+					.kind(ToastKind::Info)
+					.show(tree);
+			});
+		});
+	}
+
+	// Hierarchy TreeView selection & search
+	{
+		let state = Arc::clone(&state);
+		let tasks = tasks.clone();
+		methods.register("OnHierarchySelected", move |id: String, _label: String| {
+			let Ok(idx) = id.parse::<usize>() else {
+				return;
+			};
+			{
+				let mut guard = state.lock().unwrap();
+				if idx < guard.scene.entities.len() {
+					guard.selected_index = Some(idx);
+				} else {
+					return;
+				}
+			}
+			let state_inner = Arc::clone(&state);
+			let tasks_inner = tasks.clone();
+			tasks.push_tree(move |tree| {
+				rebuild_inspector(tree, &state_inner, &tasks_inner);
+				sync_gizmo_from_selection(tree, &state_inner);
+			});
+		});
+	}
+	{
+		let state = Arc::clone(&state);
+		let tasks = tasks.clone();
+		methods.register("OnHierarchySearch", move |query: String| {
+			let tv_id = state.lock().unwrap().ids.map(|i| i.hierarchy_tree);
+			tasks.push_tree(move |tree| {
+				if let Some(id) = tv_id
+					&& let Some(tv) = tree.get_widget_mut::<TreeView>(id)
+				{
+					tv.filter = query;
+					tree.needs_layout = true;
+					tree.needs_redraw = true;
+				}
+			});
 		});
 	}
 
@@ -617,22 +760,86 @@ fn entity_display_name(entity: &EntityDesc, index: usize) -> String {
 }
 
 
-fn entity_badge(entity: &EntityDesc) -> &'static str {
+fn entity_badge_and_color(entity: &EntityDesc) -> (&'static str, DColor) {
 	if entity.camera.is_some() {
-		"[Cam]"
-	} else if entity.directional_light.is_some() {
-		"[D. Light]"
-	}	else if entity.point_light.is_some() {
-		"[P. Light]"
-	} else if entity.spot_light.is_some() {
-		"[S. Light]"
+		("Cam", DColor::from(Color::new(0.73, 0.53, 0.98, 1.0)))
+	} else if entity.directional_light.is_some()
+		|| entity.point_light.is_some()
+		|| entity.spot_light.is_some()
+	{
+		("Light", DColor::from(Color::new(0.95, 0.79, 0.30, 1.0)))
 	} else if entity.rigid_body.is_some() {
-		"[Phys]"
+		("Phys", DColor::from(Color::new(0.32, 0.72, 0.41, 1.0)))
 	} else if entity.mesh_renderer.is_some() {
-		"[Mesh]"
+		("Mesh", DColor::from(Color::new(0.39, 0.66, 0.94, 1.0)))
 	} else {
-		"[Node]"
+		("Node", DColor::from(MonetRole::OnSurfaceVariant))
 	}
+}
+
+
+fn push_console_log(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, level: &str, msg: &str) {
+	let Some(console_id) = state.lock().unwrap().ids.map(|i| i.console_log_list) else {
+		return;
+	};
+	let color = match level {
+		"OK" => DColor::from(Color::new(0.32, 0.78, 0.48, 1.0)),
+		"ERR" => DColor::from(MonetRole::Error),
+		"ECS" | "UI" => DColor::from(MonetRole::Primary),
+		_ => DColor::from(MonetRole::OnSurfaceVariant),
+	};
+	let txt_id = tree.insert_child(
+		console_id,
+		Text::builder()
+			.text(format!("[{level}] {msg}"))
+			.font_size(12.0)
+			.color(color)
+			.build(),
+	);
+	tree.set_anchor(txt_id, Some(Anchor::TopFill));
+	tree.needs_layout = true;
+	tree.needs_redraw = true;
+}
+
+
+fn populate_asset_browser(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>) {
+	let (list_id, search_root) = {
+		let guard = state.lock().unwrap();
+		let Some(ids) = guard.ids else { return };
+		(ids.asset_browser_list, guard.entry.project_dir.clone())
+	};
+
+	clear_children(tree, list_id);
+	let scenes = projects::discover_scenes(&search_root);
+	if scenes.is_empty() {
+		tree.insert_child(
+			list_id,
+			Text::builder()
+				.text("Bu projede başka sahne bulunamadı.")
+				.font_size(12.0)
+				.color(DColor::from(MonetRole::OnSurfaceVariant))
+				.build(),
+		);
+		return;
+	}
+
+	for entry in scenes {
+		let open_path = entry.scene_path.clone();
+		let btn_id = tree.insert_child(
+			list_id,
+			Button::builder()
+				.text(format!("{}  —  {}", entry.title, entry.display_path))
+				.font_size(12.0)
+				.variant(ButtonVariant::Outlined)
+				.on_click(move || {
+					projects::launch_editor(&open_path);
+				})
+				.build(),
+		);
+		tree.set_anchor(btn_id, Some(Anchor::TopFill));
+	}
+	tree.needs_layout = true;
+	tree.needs_redraw = true;
 }
 
 
@@ -777,62 +984,35 @@ fn update_viewport_hud(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>) {
 }
 
 
-fn rebuild_hierarchy(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, tasks: &TaskQueue) {
-	let (ids, items, selected, theme) = {
+fn rebuild_hierarchy(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>) {
+	let (ids, scene_name, items, selected) = {
 		let guard = state.lock().unwrap();
 		let Some(ids) = guard.ids else { return };
-		let items: Vec<(usize, String)> = guard
+		let items: Vec<TreeItem> = guard
 			.scene
 			.entities
 			.iter()
 			.enumerate()
-			.map(|(i, e)| (i, format!("{} {}", entity_badge(e), entity_display_name(e, i))))
+			.map(|(i, e)| {
+				let (badge, color) = entity_badge_and_color(e);
+				TreeItem::new(entity_display_name(e, i))
+					.with_id(i.to_string())
+					.badge(badge)
+					.color(color)
+			})
 			.collect();
-		(ids, items, guard.selected_index, guard.theme)
+		(ids, guard.scene.name.clone(), items, guard.selected_index)
 	};
 
-	clear_children(tree, ids.hierarchy_list);
-
-	if items.is_empty() {
-		tree.insert_child(
-			ids.hierarchy_list,
-			Text::builder()
-				.text("Sahnede nesne yok")
-				.font_size(13.0)
-				.color(theme.monet[MonetRole::OnSurfaceVariant])
-				.build(),
-		);
-		return;
-	}
-
-	for (idx, label) in items {
-		let is_selected = selected == Some(idx);
-		let state_clone = Arc::clone(state);
-		let tasks_clone = tasks.clone();
-
-		let btn_id = tree.insert_child(
-			ids.hierarchy_list,
-			Button::builder()
-				.text(label)
-				.font_size(13.0)
-				.variant(if is_selected {
-					ButtonVariant::Tonal
-				} else {
-					ButtonVariant::Outlined
-				})
-				.on_click(move || {
-					state_clone.lock().unwrap().selected_index = Some(idx);
-					let state_inner = Arc::clone(&state_clone);
-					let tasks_inner = tasks_clone.clone();
-					tasks_clone.push_tree(move |tree| {
-						rebuild_hierarchy(tree, &state_inner, &tasks_inner);
-						rebuild_inspector(tree, &state_inner, &tasks_inner);
-						sync_gizmo_from_selection(tree, &state_inner);
-					});
-				})
-				.build(),
-		);
-		tree.set_anchor(btn_id, Some(Anchor::TopFill));
+	if let Some(tv) = tree.get_widget_mut::<TreeView>(ids.hierarchy_tree) {
+		let root = TreeItem::new(scene_name)
+			.with_id("root")
+			.expanded(true)
+			.badge("Scene")
+			.color(DColor::from(MonetRole::Primary))
+			.children(items);
+		tv.items = vec![root];
+		tv.selected = selected.map(|i| vec![0, i]);
 	}
 
 	tree.needs_layout = true;
@@ -841,13 +1021,13 @@ fn rebuild_hierarchy(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, tasks: 
 
 
 fn rebuild_inspector(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, tasks: &TaskQueue) {
-	let (ids, selected_opt, theme) = {
+	let (ids, selected_opt) = {
 		let guard = state.lock().unwrap();
 		let Some(ids) = guard.ids else { return };
 		let selected_opt = guard
 			.selected_index
 			.and_then(|i| guard.scene.entities.get(i).cloned().map(|e| (i, e)));
-		(ids, selected_opt, guard.theme)
+		(ids, selected_opt)
 	};
 
 	clear_children(tree, ids.inspector_content);
@@ -858,7 +1038,7 @@ fn rebuild_inspector(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, tasks: 
 			Text::builder()
 				.text("İncelemek için Hiyerarşi'den bir nesne seçin.")
 				.font_size(13.0)
-				.color(theme.monet[MonetRole::OnSurfaceVariant])
+				.color(DColor::from(MonetRole::OnSurfaceVariant))
 				.build(),
 		);
 		return;
@@ -883,10 +1063,9 @@ fn rebuild_inspector(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, tasks: 
 						}
 					}
 					let state_inner = Arc::clone(&state_clone);
-					let tasks_inner = tasks_clone.clone();
 					tasks_clone.push_tree(move |tree| {
 						update_header_and_status(tree, &state_inner, None);
-						rebuild_hierarchy(tree, &state_inner, &tasks_inner);
+						rebuild_hierarchy(tree, &state_inner);
 					});
 				})
 				.build(),
@@ -894,48 +1073,98 @@ fn rebuild_inspector(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, tasks: 
 		tree.set_anchor(edit_id, Some(Anchor::TopFill));
 	}
 
-	// Transform
+	// Transform (nimbus_ui_inspector Vec3Edit — color-coded scrubbable X/Y/Z)
 	let transform = entity.transform.clone().unwrap_or_default();
 	let tf_sec = insert_section(tree, ids.inspector_content, "Transform", true);
 
-	for (axis_idx, label) in [(0usize, "Pos X"), (1, "Pos Y"), (2, "Pos Z")] {
-		insert_float_field(
-			tree,
+	{
+		tree.insert_child(
 			tf_sec,
-			label,
-			transform.translation[axis_idx],
-			-10_000.0,
-			10_000.0,
-			0.25,
-			"",
-			Arc::clone(state),
-			tasks.clone(),
-			move |e, e_idx, vp, val| {
-				let tf = e.transform.get_or_insert_with(TransformDesc::default);
-				tf.translation[axis_idx] = val;
-				vp.update_transform(e_idx, tf.clone());
-			},
+			Text::builder()
+				.text("Konum")
+				.font_size(12.0)
+				.color(DColor::from(MonetRole::OnSurfaceVariant))
+				.build(),
 		);
+		let state_pos = Arc::clone(state);
+		let tasks_pos = tasks.clone();
+		let pos_id = tree.insert_child(
+			tf_sec,
+			Vec3Edit::new(transform.translation)
+				.with_step(0.1)
+				.with_on_changed(move |args: &[PropertyValue]| {
+					let (Some(x), Some(y), Some(z)) = (
+						args.first().and_then(|v| v.as_f32()),
+						args.get(1).and_then(|v| v.as_f32()),
+						args.get(2).and_then(|v| v.as_f32()),
+					) else {
+						return;
+					};
+					{
+						let mut guard = state_pos.lock().unwrap();
+						if let Some(sel) = guard.selected_index {
+							let vp_ctrl = guard.vp_ctrl.clone();
+							if let Some(e) = guard.scene.entities.get_mut(sel) {
+								let tf = e.transform.get_or_insert_with(TransformDesc::default);
+								tf.translation = [x, y, z];
+								vp_ctrl.update_transform(sel, tf.clone());
+								guard.dirty = true;
+							}
+						}
+					}
+					let state_inner = Arc::clone(&state_pos);
+					tasks_pos.push_tree(move |tree| {
+						update_header_and_status(tree, &state_inner, None);
+						sync_gizmo_from_selection(tree, &state_inner);
+					});
+				}),
+		);
+		tree.set_anchor(pos_id, Some(Anchor::TopFill));
 	}
 
-	for (axis_idx, label) in [(0usize, "Scale X"), (1, "Scale Y"), (2, "Scale Z")] {
-		insert_float_field(
-			tree,
+	{
+		tree.insert_child(
 			tf_sec,
-			label,
-			transform.scale[axis_idx],
-			0.01,
-			1000.0,
-			0.1,
-			"",
-			Arc::clone(state),
-			tasks.clone(),
-			move |e, e_idx, vp, val| {
-				let tf = e.transform.get_or_insert_with(TransformDesc::default);
-				tf.scale[axis_idx] = val;
-				vp.update_transform(e_idx, tf.clone());
-			},
+			Text::builder()
+				.text("Ölçek")
+				.font_size(12.0)
+				.color(DColor::from(MonetRole::OnSurfaceVariant))
+				.build(),
 		);
+		let state_sc = Arc::clone(state);
+		let tasks_sc = tasks.clone();
+		let mut sc_edit = Vec3Edit::new(transform.scale)
+			.with_step(0.05)
+			.with_on_changed(move |args: &[PropertyValue]| {
+				let (Some(x), Some(y), Some(z)) = (
+					args.first().and_then(|v| v.as_f32()),
+					args.get(1).and_then(|v| v.as_f32()),
+					args.get(2).and_then(|v| v.as_f32()),
+				) else {
+					return;
+				};
+				{
+					let mut guard = state_sc.lock().unwrap();
+					if let Some(sel) = guard.selected_index {
+						let vp_ctrl = guard.vp_ctrl.clone();
+						if let Some(e) = guard.scene.entities.get_mut(sel) {
+							let tf = e.transform.get_or_insert_with(TransformDesc::default);
+							tf.scale = [x.max(0.01), y.max(0.01), z.max(0.01)];
+							vp_ctrl.update_transform(sel, tf.clone());
+							guard.dirty = true;
+						}
+					}
+				}
+				let state_inner = Arc::clone(&state_sc);
+				tasks_sc.push_tree(move |tree| {
+					update_header_and_status(tree, &state_inner, None);
+					sync_gizmo_from_selection(tree, &state_inner);
+				});
+			});
+		sc_edit.default_values = [1.0, 1.0, 1.0];
+		sc_edit.min = Some(0.01);
+		let sc_id = tree.insert_child(tf_sec, sc_edit);
+		tree.set_anchor(sc_id, Some(Anchor::TopFill));
 	}
 
 	// Camera (if present)
@@ -1054,7 +1283,7 @@ fn rebuild_inspector(tree: &mut UiTree, state: &Arc<Mutex<EditorState>>, tasks: 
 			Text::builder()
 				.text(format!("Varlık: {}", mr.asset))
 				.font_size(12.0)
-				.color(theme.monet[MonetRole::OnSurfaceVariant])
+				.color(DColor::from(MonetRole::OnSurfaceVariant))
 				.build(),
 		);
 
