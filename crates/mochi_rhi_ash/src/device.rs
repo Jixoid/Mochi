@@ -363,11 +363,15 @@ impl AshDevice {
 
 		let queue_create_infos = [queue_create_info];
 
-		let desired_device_extensions = [
+		let mut desired_device_extensions = vec![
 			ash::khr::swapchain::NAME.as_ptr(),
 			ash::khr::dynamic_rendering::NAME.as_ptr(),
 			ash::khr::synchronization2::NAME.as_ptr(),
 		];
+		#[cfg(unix)]
+		{
+			desired_device_extensions.push(ash::khr::external_memory_fd::NAME.as_ptr());
+		}
 
 		let supported_dev_exts = unsafe {
 			instance

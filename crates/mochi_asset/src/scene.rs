@@ -474,6 +474,21 @@ impl SceneAsset {
 		scene_dir: Option<&std::path::Path>,
 		project_root: Option<&std::path::Path>,
 	) -> Result<(), String> {
+		self
+			.instantiate_tracked(device, alloc, rendering, scene, scene_dir, project_root)
+			.map(|_| ())
+	}
+
+	/// Instantiates the scene and returns the spawned ECS `Entity` handles grouped per `EntityDesc` index.
+	pub fn instantiate_tracked(
+		&self,
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		rendering: &mut RenderingSystem,
+		scene: &mut Scene,
+		scene_dir: Option<&std::path::Path>,
+		project_root: Option<&std::path::Path>,
+	) -> Result<Vec<Vec<mochi_scene::Entity>>, String> {
 		let template = rendering
 			.default_template()
 			.ok_or_else(|| "Default MaterialTemplate not available in RenderingSystem".to_string())?;
@@ -493,8 +508,10 @@ impl SceneAsset {
 		}
 
 		let mut loaded_models: HashMap<String, LoadedModelData> = HashMap::new();
+		let mut spawned_map: Vec<Vec<mochi_scene::Entity>> = Vec::with_capacity(self.entities.len());
 
 		for entity_desc in &self.entities {
+			let mut desc_entities = Vec::new();
 			let transform = entity_desc
 				.transform
 				.as_ref()
@@ -564,9 +581,11 @@ impl SceneAsset {
 					};
 
 					attach_common_entity_components(scene, entity, entity_desc, &transform);
+					desc_entities.push(entity);
 				}
 			} else {
 				let entity = scene.spawn((transform,));
+				desc_entities.push(entity);
 
 				attach_common_entity_components(scene, entity, entity_desc, &transform);
 
@@ -622,9 +641,11 @@ impl SceneAsset {
 					let _ = scene.world_mut().insert_one(entity, script_comp);
 				}
 			}
+
+			spawned_map.push(desc_entities);
 		}
 
-		Ok(())
+		Ok(spawned_map)
 	}
 }
 

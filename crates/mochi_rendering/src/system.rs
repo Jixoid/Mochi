@@ -1605,6 +1605,209 @@ impl RenderingSystem {
 		}
 	}
 
+	#[allow(clippy::too_many_arguments)]
+	pub fn render_to_target(
+		&mut self,
+		cmdmng: &rhi::CommandManager,
+		device: &rhi::Device,
+		alloc: &rhi::Allocator,
+		target: &rhi::RenderTarget,
+		width: u32,
+		height: u32,
+		scene: &Scene,
+		cam_transform: &TransformComponent,
+		camera: &CameraComponent,
+		time: f32,
+		delta_time: f32,
+	) {
+		let frame = 0usize;
+		let aspect = if height > 0 {
+			width as f32 / height as f32
+		} else {
+			1.0
+		};
+		let clear_color = camera.clear_color;
+
+		let mut cascade_view_proj =
+			[[[mochi_math::Mat4x4::IDENTITY.to_array(); 4]; MAX_DIRECTIONAL_LIGHTS]; 1][0];
+		let mut cascade_shadow_ids = [[0u32; 4]; MAX_DIRECTIONAL_LIGHTS];
+		let cascade_split_depths = [2.5, 8.0, 24.0, 80.0];
+		let mut spot_shadow_view_proj =
+			[[mochi_math::Mat4x4::IDENTITY.to_array(); MAX_SHADOW_CASTING_SPOT_LIGHTS]; 1][0];
+		let mut spot_shadow_ids = [0u32; MAX_SHADOW_CASTING_SPOT_LIGHTS];
+
+		if let Some(sm) = &mut self.shadow_manager {
+			for (light_idx, (_e, (t, light))) in scene
+				.world()
+				.query::<(&TransformComponent, &DirectionalLightComponent)>()
+				.iter()
+				.take(MAX_DIRECTIONAL_LIGHTS)
+				.enumerate()
+			{
+				if light.cast_shadows {
+					let dir = t.rotation * light.direction;
+					sm.ensure_cascade_set(device, alloc, frame, light_idx).ok();
+					sm.update_cascades(frame, light_idx, camera, cam_transform, aspect, dir);
+					cascade_view_proj[light_idx] = sm.cascade_view_proj(frame, light_idx);
+					cascade_shadow_ids[light_idx] = sm.cascade_shadow_ids(frame, light_idx);
+				}
+			}
+
+			let mut spot_slot = 0;
+			for (_e, (t, light)) in scene
+				.world()
+				.query::<(&TransformComponent, &SpotLightComponent)>()
+				.iter()
+			{
+				if light.cast_shadows && spot_slot < MAX_SHADOW_CASTING_SPOT_LIGHTS {
+					let pos = t.translation;
+					let dir = t.rotation * mochi_math::Vec3::new(0.0, 0.0, -1.0);
+					sm.ensure_spot_shadow_set(device, alloc, frame, spot_slot)
+						.ok();
+					sm.update_spot_shadow(
+						frame,
+						spot_slot,
+						pos,
+						dir,
+						light.outer_cone_angle_deg,
+						light.radius,
+					);
+					spot_shadow_view_proj[spot_slot] = sm.spot_shadow_view_proj(frame, spot_slot);
+					spot_shadow_ids[spot_slot] = sm.spot_shadow_id(frame, spot_slot);
+					spot_slot += 1;
+				}
+			}
+			sm.active_spot_counts[frame] = spot_slot;
+		}
+
+		let (grid_addr, pt_index_addr, spot_index_addr) = if let Some(cm) = &self.cluster_manager {
+			(
+				cm.grid_address(frame),
+				cm.point_index_list_address(frame),
+				cm.spot_index_list_address(frame),
+			)
+		} else {
+			(0, 0, 0)
+		};
+
+		self.frame_index += 1;
+		let (curr_vp, curr_jitter) = self.frame_buffers[frame].update(
+			device,
+			alloc,
+			scene,
+			cam_transform,
+			camera,
+			aspect,
+			time,
+			delta_time,
+			grid_addr,
+			pt_index_addr,
+			spot_index_addr,
+			width,
+			height,
+			cascade_view_proj,
+			cascade_split_depths,
+			cascade_shadow_ids,
+			spot_shadow_view_proj,
+			spot_shadow_ids,
+			(0.0, 0.0),
+			0.0,
+			self.prev_view_proj,
+			self.prev_jitter,
+		);
+		self.prev_view_proj = Some(curr_vp);
+		self.prev_jitter = curr_jitter;
+
+		for (_entity, skeleton) in scene.world().query::<&mut SkeletonComponent>().iter() {
+			skeleton.update_gpu(device, alloc);
+		}
+
+		self.shadow_queue.extract_from_scene(
+			scene,
+			PassKind::ShadowCaster,
+			cam_transform.translation,
+			&mut self.material_storage,
+		);
+		self.render_queue.extract_from_scene(
+			scene,
+			PassKind::ForwardLit,
+			cam_transform.translation,
+			&mut self.material_storage,
+		);
+		self.material_storage.update_gpu(device, alloc);
+
+		let scene_addr = self.frame_buffers[frame].address();
+		let material_addr = self.material_storage.buffer_address();
+
+		let cmd = &mut self.cmd_buffers[frame];
+		cmd.begin();
+
+		// Cascaded Shadow Maps
+		if let Some(sm) = &self.shadow_manager {
+			for light_idx in 0..MAX_DIRECTIONAL_LIGHTS {
+				if let Some(set) = &sm.cascade_sets[frame][light_idx] {
+					for cascade in set.cascades.iter().take(CASCADE_COUNT) {
+						let cascade_target = rhi::RenderTarget::builder(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
+							.depth(&cascade.image, &cascade.view, rhi::Format::Depth32f)
+							.build(device);
+
+						cmd.render_pass(&cascade_target, clear_color, |pass| {
+							pass.set_viewport_and_scissor(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+							pass.bind_pipeline(&sm.pipeline);
+
+							let view_proj = mochi_math::Mat4x4::from_array(cascade.view_proj);
+							for packet in &self.shadow_queue.packets {
+								let model = mochi_math::Mat4x4::from_array(packet.model_matrix);
+								let mvp = (view_proj * model).to_array();
+								let pc = ShadowPushConstants {
+									mvp,
+									vertex_addr: packet.vertex_buffer_addr,
+									joint_addr: packet.joint_buffer_addr,
+								};
+								pass.push_constant(rhi::ShaderStage::Vertex, 0, &pc);
+
+								if packet.is_indexed && packet.index_count > 0 {
+									if let Some(idx_buf) = packet.mesh.index_buffer() {
+										pass.bind_index_buffer(idx_buf, 0, rhi::IndexType::Uint32);
+										pass.draw_indexed(packet.index_count, 1, 0, 0, 0);
+									} else {
+										pass.draw(packet.vertex_count, 1, 0, 0);
+									}
+								} else {
+									pass.draw(packet.vertex_count, 1, 0, 0);
+								}
+							}
+						});
+					}
+				}
+			}
+		}
+
+		// Clustered Forward light culling
+		if let Some(cm) = &mut self.cluster_manager {
+			let proj = camera.projection_matrix(aspect);
+			let inv_proj = proj.inverse();
+			cm.update_camera(cmd, inv_proj.to_array(), camera.near, camera.far);
+			cm.cull_lights(cmd, scene_addr, frame);
+		}
+
+		// Main ForwardLit render pass into the offscreen target
+		cmd.render_pass(target, clear_color, |pass| {
+			Self::record_scene_packets(
+				pass,
+				width,
+				height,
+				&self.render_queue,
+				scene_addr,
+				material_addr,
+			);
+		});
+
+		cmd.end();
+		cmdmng.submit(cmd);
+		device.wait_idle();
+	}
+
 	fn record_scene_packets(
 		pass: &mut rhi::Command,
 		width: u32,

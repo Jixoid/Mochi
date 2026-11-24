@@ -1,0 +1,256 @@
+styles {
+  toolbar_title {
+    font_size: 16
+  }
+  panel_title {
+    font_size: 15
+  }
+  subtitle {
+    font_size: 12
+  }
+  hud_text {
+    font_size: 12
+  }
+}
+
+root qstd::vbox {
+  spacing: 8
+  paddings: 10
+  color: "monet(SurfaceContainerLowest)"
+
+  // Top Toolbar
+  node qstd::hbox {
+    spacing: 10
+    paddings: 10
+    color: "monet(SurfaceContainerLow)"
+    corner_radius: 12
+    anchor: "top-fill"
+
+    node qstd::button {
+      text: "← Hub"
+      variant: "outlined"
+      on_click: "EditorBackToHub"
+    }
+
+    node qstd::text "editor_scene_title" {
+      style: "toolbar_title"
+      text: "Sahne"
+      anchor: "left-center"
+      color: "monet(PrimaryFixed)"
+    }
+
+    node qstd::spacer {
+      anchor: "fill"
+    }
+
+    node qstd::choice {
+      tabs: ["Translate", "Rotate", "Scale"]
+      on_changed: "GizmoModeChanged"
+    }
+
+    node qstd::choice {
+      tabs: ["World", "Local"]
+      on_changed: "GizmoSpaceChanged"
+    }
+
+    node qstd::check {
+      text: "Snap"
+      checked: false
+      on_changed: "GizmoSnapChanged"
+    }
+
+    node qstd::spacer {
+      width: 8
+    }
+
+    node qstd::button {
+      text: "Kaydet"
+      variant: "tonal"
+      on_click: "EditorSaveScene"
+    }
+
+    node qstd::button {
+      text: "▶ Çalıştır"
+      variant: "filled"
+      on_click: "EditorPlayScene"
+    }
+  }
+
+  // Main 3-Column Workspace
+  node qstd::hbox {
+    spacing: 10
+    anchor: "fill"
+    color: "color(transparent)"
+
+    // Left Panel: Scene Hierarchy
+    node qstd::vbox {
+      spacing: 10
+      paddings: 12
+      color: "monet(SurfaceContainerLow)"
+      corner_radius: 12
+      scrollable: true
+
+      node qstd::hbox {
+        spacing: 8
+        anchor: "top-fill"
+        color: "color(transparent)"
+
+        node qstd::text {
+          style: "panel_title"
+          text: "Hiyerarşi"
+          anchor: "fill"
+          color: "monet(OnSurface)"
+        }
+
+        node qstd::button {
+          text: "+ Ekle"
+          variant: "tonal"
+          on_click: "EditorAddEntity"
+        }
+      }
+
+      node qstd::vbox "hierarchy_list" {
+        spacing: 6
+        anchor: "top-fill"
+        color: "color(transparent)"
+      }
+    }
+
+    // Center Panel: 3D Viewport
+    node qstd::viewport "main_viewport" {
+      anchor: "fill"
+      corner_radius: 12
+      color: "monet(SurfaceDim)"
+      border_width: 1
+      border_color: "monet(SurfaceOutlineVariant)"
+      on_resize: "ViewportResized"
+      on_pointer_down: "ViewportPointerDown"
+      on_pointer_up: "ViewportPointerUp"
+      on_pointer_move: "ViewportPointerMove"
+      on_scroll: "ViewportScroll"
+
+      node gizmo::transform "viewport_transform_gizmo" {
+        anchor: "fill"
+        mode: "translate"
+        space: "world"
+        on_changed: "GizmoTransformChanged"
+      }
+
+      node gizmo::orientation "viewport_orientation_gizmo" {
+        anchor: "right-top"
+        size: 92
+        margin: 10
+        on_snap: "GizmoCameraSnap"
+        on_orbit: "GizmoCameraOrbit"
+      }
+
+      node qstd::card {
+        paddings: 10
+        corner_radius: 10
+        anchor: "left-top"
+        color: "monet(SurfaceContainer)"
+
+        node qstd::text "viewport_hud" {
+          style: "hud_text"
+          text: "Viewport • Hazır"
+          color: "monet(OnSurface)"
+        }
+      }
+
+      node qstd::card "viewport_loading" {
+        paddings: 16
+        corner_radius: 14
+        anchor: "center"
+        color: "monet(SurfaceContainerHigh)"
+
+        node qstd::vbox {
+          spacing: 10
+          color: "color(transparent)"
+
+          node qstd::spinner {
+            size: 36
+            thickness: 3.5
+            anchor: "top-center"
+          }
+
+          node qstd::text {
+            style: "hud_text"
+            text: "3B Sahne Yükleniyor..."
+            anchor: "top-center"
+            color: "monet(OnSurfaceVariant)"
+          }
+        }
+      }
+
+      node qstd::card {
+        paddings: 8
+        corner_radius: 8
+        anchor: "left-bottom"
+        color: "monet(SurfaceContainer)"
+
+        node qstd::text "viewport_camera_hud" {
+          style: "hud_text"
+          text: "Kamera: Orbit (Yaw 0.0° Pitch 20.0° Zoom 10.0)"
+          color: "monet(OnSurfaceVariant)"
+        }
+      }
+    }
+
+    // Right Panel: Inspector
+    node qstd::vbox {
+      spacing: 10
+      paddings: 12
+      color: "monet(SurfaceContainerLow)"
+      corner_radius: 12
+      scrollable: true
+
+      node qstd::hbox {
+        spacing: 8
+        anchor: "top-fill"
+        color: "color(transparent)"
+
+        node qstd::text {
+          style: "panel_title"
+          text: "Inspector"
+          anchor: "fill"
+          color: "monet(OnSurface)"
+        }
+
+        node qstd::button "btn_delete_entity" {
+          text: "Sil"
+          variant: "outlined"
+          on_click: "EditorDeleteEntity"
+        }
+      }
+
+      node qstd::vbox "inspector_content" {
+        spacing: 10
+        anchor: "top-fill"
+        color: "color(transparent)"
+      }
+    }
+  }
+
+  // Bottom Status Bar
+  node qstd::hbox {
+    spacing: 12
+    paddings: 8
+    color: "monet(SurfaceContainerLow)"
+    corner_radius: 10
+    anchor: "bottom-fill"
+
+    node qstd::text "editor_status_text" {
+      style: "subtitle"
+      text: "Hazır"
+      anchor: "fill"
+      color: "monet(OnSurfaceVariant)"
+    }
+
+    node qstd::text "editor_viewport_size" {
+      style: "subtitle"
+      text: "Viewport: 0x0"
+      anchor: "right-center"
+      color: "monet(OnSurfaceVariant)"
+    }
+  }
+}

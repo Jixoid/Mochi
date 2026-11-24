@@ -10,7 +10,9 @@
 */
 
 
+pub mod editor;
 pub mod projects;
+pub mod viewport_renderer;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -22,9 +24,10 @@ use nimbus::math::Color;
 use nimbus::theme::{
 	ElevationTokens, Monet, MonetRole, RadiusTokens, StateTokens, StrokeTokens, Theme,
 };
-use nimbus::ui::{Button, ButtonVariant, Card, Text, VBox};
+use nimbus::ui::{Button, ButtonVariant, Card, HBox, Spacer, Text, Toast, ToastKind, VBox};
 
 use crate::projects::{LaunchOptions, SceneEntry};
+use crate::viewport_renderer::{StudioViewportBridge, ViewportController};
 
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -48,7 +51,8 @@ struct WelcomeIds {
 
 struct StudioState {
 	ids: Option<WelcomeIds>,
-	launch_options: LaunchOptions,
+	launch_options: Arc<Mutex<LaunchOptions>>,
+	vp_ctrl: ViewportController,
 	project_name: String,
 	project_path: String,
 	project_desc: String,
@@ -60,10 +64,11 @@ struct StudioState {
 }
 
 impl StudioState {
-	fn new(cwd: PathBuf, theme: Theme) -> Self {
+	fn new(cwd: PathBuf, theme: Theme, vp_ctrl: ViewportController) -> Self {
 		Self {
 			ids: None,
-			launch_options: LaunchOptions::default(),
+			launch_options: Arc::new(Mutex::new(LaunchOptions::default())),
+			vp_ctrl,
 			project_name: "my_mochi_game".to_string(),
 			project_path: "./projects/my_mochi_game".to_string(),
 			project_desc: "Mochi 3D Engine projesi".to_string(),
@@ -79,7 +84,11 @@ impl StudioState {
 
 pub fn run(initial_scene: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
 	nimbus::except::start();
-	nimbus::ui::register_widgets(&mut WidgetRegistry::global().write().unwrap());
+	{
+		let mut reg = WidgetRegistry::global().write().unwrap();
+		nimbus::ui::register_widgets(&mut reg);
+		nimbus_ui_gizmo::register_widgets(&mut reg);
+	}
 
 	let monet = Monet::from_system().unwrap_or_else(|| {
 		Monet::new(
@@ -101,24 +110,91 @@ pub fn run(initial_scene: Option<PathBuf>) -> Result<(), Box<dyn std::error::Err
 	let mut app = Application::new(theme);
 	let theme = app.theme;
 
-	let window_handle = app.create_window(Window::new("Mochi Studio", 980, 640));
+	let window_handle = app.create_window(Window::new("Mochi Studio", 1280, 760));
 	let main_window = app
 		.window_mut(window_handle)
 		.ok_or("Failed to get main window")?;
 
 	let tasks = main_window.task_queue();
+	let (mut vp_bridge, vp_ctrl) = StudioViewportBridge::spawn(tasks.clone());
 	let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-	let state = Arc::new(Mutex::new(StudioState::new(cwd, theme)));
+	let state = Arc::new(Mutex::new(StudioState::new(cwd.clone(), theme, vp_ctrl.clone())));
 
-	let methods = build_method_table(Arc::clone(&state), tasks);
+	if let Some(scene_path) = initial_scene {
+		let project_dir = scene_path
+			.parent()
+			.and_then(|p| {
+				if p.file_name().and_then(|n| n.to_str()) == Some("scenes") {
+					p.parent()
+				} else {
+					Some(p)
+				}
+			})
+			.unwrap_or(&cwd)
+			.to_path_buf();
 
-	let qdl_scene = nimbus::qdl::load_into_tree(
-		include_str!("welcome.qdl"),
-		main_window.tree_mut(),
-		&theme,
-		&methods,
-	)
-	.map_err(|e| format!("Failed to parse welcome.qdl: {e}"))?;
+		let title = scene_path
+			.file_name()
+			.and_then(|s| s.to_str())
+			.unwrap_or("Sahne")
+			.to_string();
+
+		let display_path = scene_path.to_string_lossy().replace('\\', "/");
+		let entry = SceneEntry {
+			title,
+			project_dir,
+			scene_path,
+			display_path,
+		};
+
+		let launch_options = Arc::clone(&state.lock().unwrap().launch_options);
+		let back_state = Arc::clone(&state);
+		let back_tasks = tasks.clone();
+		editor::open_editor(
+			main_window.tree_mut(),
+			entry,
+			launch_options,
+			vp_ctrl,
+			theme,
+			tasks,
+			Arc::new(move |tree| {
+				let _ = mount_welcome(tree, &back_state, &back_tasks);
+			}),
+		);
+	} else {
+		mount_welcome(main_window.tree_mut(), &state, &tasks)?;
+	}
+
+	app.set_on_pre_render(move |device, cmd_manager, window| {
+		vp_bridge.poll(device, cmd_manager, window);
+	});
+
+	app.run().map_err(|e| format!("Application error: {e}"))?;
+	Ok(())
+}
+
+
+fn clear_tree_roots(tree: &mut UiTree) {
+	let roots = tree.roots.clone();
+	for root_id in roots {
+		tree.remove(root_id);
+	}
+	tree.needs_layout = true;
+	tree.needs_redraw = true;
+}
+
+
+fn mount_welcome(
+	tree: &mut UiTree,
+	state: &Arc<Mutex<StudioState>>,
+	tasks: &TaskQueue,
+) -> Result<(), String> {
+	let theme = state.lock().unwrap().theme;
+	let methods = build_method_table(Arc::clone(state), tasks.clone());
+
+	clear_tree_roots(tree);
+	let qdl_scene = nimbus::qdl::load_into_tree(include_str!("welcome.qdl"), tree, &theme, &methods)
+		.map_err(|e| format!("Failed to parse welcome.qdl: {e}"))?;
 
 	let ids = extract_welcome_ids(&qdl_scene)?;
 	{
@@ -126,13 +202,7 @@ pub fn run(initial_scene: Option<PathBuf>) -> Result<(), Box<dyn std::error::Err
 		guard.ids = Some(ids);
 	}
 
-	reload_scene_lists(main_window.tree_mut(), &state);
-
-	if let Some(scene_path) = initial_scene {
-		println!("[Mochi Studio] Doğrudan sahne açılması istendi: {scene_path:?}");
-	}
-
-	app.run().map_err(|e| format!("Application error: {e}"))?;
+	reload_scene_lists(tree, state, tasks);
 	Ok(())
 }
 
@@ -181,8 +251,9 @@ fn build_method_table(state: Arc<Mutex<StudioState>>, tasks: TaskQueue) -> Metho
 		let tasks = tasks.clone();
 		methods.register("RefreshScenes", move || {
 			let state = Arc::clone(&state);
+			let tasks_inner = tasks.clone();
 			tasks.push_tree(move |tree| {
-				reload_scene_lists(tree, &state);
+				reload_scene_lists(tree, &state, &tasks_inner);
 			});
 		});
 	}
@@ -259,13 +330,32 @@ fn build_method_table(state: Arc<Mutex<StudioState>>, tasks: TaskQueue) -> Metho
 
 			let result = projects::create_project(&path, &name, &desc, no_git);
 			let state_clone = Arc::clone(&state);
+			let tasks_inner = tasks.clone();
 
 			if let Some(ids) = ids {
 				tasks.push_tree(move |tree| {
-					let (msg, color, ok) = match result {
-						Ok(ok_msg) => (ok_msg, theme.monet[MonetRole::Primary], true),
-						Err(err_msg) => (err_msg, theme.monet[MonetRole::Error], false),
+					let (toast_title, toast_kind, msg, color, ok) = match result {
+						Ok(ok_msg) => (
+							"Proje Oluşturuldu",
+							ToastKind::Success,
+							ok_msg,
+							theme.monet[MonetRole::Primary],
+							true,
+						),
+						Err(err_msg) => (
+							"Proje Hatası",
+							ToastKind::Error,
+							err_msg,
+							theme.monet[MonetRole::Error],
+							false,
+						),
 					};
+
+					Toast::builder()
+						.title(toast_title)
+						.message(msg.clone())
+						.kind(toast_kind)
+						.show(tree);
 
 					if let Some(status_text) = tree.get_widget_mut::<Text>(ids.create_status) {
 						status_text.text = msg;
@@ -275,7 +365,7 @@ fn build_method_table(state: Arc<Mutex<StudioState>>, tasks: TaskQueue) -> Metho
 					}
 
 					if ok {
-						reload_scene_lists(tree, &state_clone);
+						reload_scene_lists(tree, &state_clone, &tasks_inner);
 					}
 				});
 			}
@@ -286,25 +376,49 @@ fn build_method_table(state: Arc<Mutex<StudioState>>, tasks: TaskQueue) -> Metho
 	{
 		let state = Arc::clone(&state);
 		methods.register("OnVsyncChanged", move |checked: bool| {
-			state.lock().unwrap().launch_options.vsync = checked;
+			state
+				.lock()
+				.unwrap()
+				.launch_options
+				.lock()
+				.unwrap()
+				.vsync = checked;
 		});
 	}
 	{
 		let state = Arc::clone(&state);
 		methods.register("OnValidationChanged", move |checked: bool| {
-			state.lock().unwrap().launch_options.validation = checked;
+			state
+				.lock()
+				.unwrap()
+				.launch_options
+				.lock()
+				.unwrap()
+				.validation = checked;
 		});
 	}
 	{
 		let state = Arc::clone(&state);
 		methods.register("OnMuteChanged", move |checked: bool| {
-			state.lock().unwrap().launch_options.mute = checked;
+			state
+				.lock()
+				.unwrap()
+				.launch_options
+				.lock()
+				.unwrap()
+				.mute = checked;
 		});
 	}
 	{
 		let state = Arc::clone(&state);
 		methods.register("OnFgChanged", move |checked: bool| {
-			state.lock().unwrap().launch_options.frame_gen = checked;
+			state
+				.lock()
+				.unwrap()
+				.launch_options
+				.lock()
+				.unwrap()
+				.frame_gen = checked;
 		});
 	}
 
@@ -348,7 +462,11 @@ fn clear_children(tree: &mut UiTree, parent_id: ObjectID) {
 }
 
 
-fn reload_scene_lists(tree: &mut UiTree, state: &Arc<Mutex<StudioState>>) {
+fn reload_scene_lists(
+	tree: &mut UiTree,
+	state: &Arc<Mutex<StudioState>>,
+	tasks: &TaskQueue,
+) {
 	let (ids, cwd, theme, needle) = {
 		let guard = state.lock().unwrap();
 		match guard.ids {
@@ -364,9 +482,8 @@ fn reload_scene_lists(tree: &mut UiTree, state: &Arc<Mutex<StudioState>>) {
 
 	let discovered = projects::discover_scenes(&cwd);
 
-	// Rebuild main Projects/All Scenes list
 	clear_children(tree, ids.scene_list);
-	let created_cards = populate_scene_cards(tree, ids.scene_list, &discovered, &theme, state);
+	let created_cards = populate_scene_cards(tree, ids.scene_list, &discovered, &theme, state, tasks);
 
 	for (card_id, entry) in &created_cards {
 		let visible = needle.is_empty()
@@ -387,6 +504,7 @@ fn populate_scene_cards(
 	entries: &[SceneEntry],
 	theme: &Theme,
 	state: &Arc<Mutex<StudioState>>,
+	tasks: &TaskQueue,
 ) -> Vec<(ObjectID, SceneEntry)> {
 	let mut cards = Vec::with_capacity(entries.len());
 
@@ -446,6 +564,7 @@ fn populate_scene_cards(
 				.color(Color::TRANSPARENT)
 				.build(),
 		);
+		tree.set_anchor(vbox_id, Some(Anchor::TopFill));
 
 		tree.insert_child(
 			vbox_id,
@@ -465,20 +584,77 @@ fn populate_scene_cards(
 				.build(),
 		);
 
-		let entry_clone = entry.clone();
-		let state_clone = Arc::clone(state);
-		let btn_id = tree.insert_child(
+		let actions_row = tree.insert_child(
 			vbox_id,
+			HBox::builder()
+				.spacing(8.0)
+				.color(Color::TRANSPARENT)
+				.build(),
+		);
+		tree.set_anchor(actions_row, Some(Anchor::TopFill));
+
+		let spacer_id = tree.insert_child(actions_row, Spacer::default());
+		tree.set_anchor(spacer_id, Some(Anchor::Fill));
+
+		// Run button
+		let run_entry = entry.clone();
+		let run_state = Arc::clone(state);
+		tree.insert_child(
+			actions_row,
 			Button::builder()
-				.text("Aç")
-				.variant(ButtonVariant::Tonal)
+				.text("Çalıştır")
+				.variant(ButtonVariant::Outlined)
 				.on_click(move || {
-					let opts = state_clone.lock().unwrap().launch_options.clone();
-					projects::launch_scene(&entry_clone, &opts);
+					let opts = run_state
+						.lock()
+						.unwrap()
+						.launch_options
+						.lock()
+						.unwrap()
+						.clone();
+					projects::launch_scene(&run_entry, &opts);
 				})
 				.build(),
 		);
-		tree.set_anchor(btn_id, Some(Anchor::RightFill));
+
+		// Open in Editor button
+		let edit_entry = entry.clone();
+		let edit_state = Arc::clone(state);
+		let edit_tasks = tasks.clone();
+		tree.insert_child(
+			actions_row,
+			Button::builder()
+				.text("Editör")
+				.variant(ButtonVariant::Tonal)
+				.on_click(move || {
+					let (launch_options, vp_ctrl, theme) = {
+						let guard = edit_state.lock().unwrap();
+						(
+							Arc::clone(&guard.launch_options),
+							guard.vp_ctrl.clone(),
+							guard.theme,
+						)
+					};
+					let entry_for_editor = edit_entry.clone();
+					let back_state = Arc::clone(&edit_state);
+					let back_tasks = edit_tasks.clone();
+					let tasks_for_editor = edit_tasks.clone();
+					edit_tasks.push_tree(move |tree| {
+						editor::open_editor(
+							tree,
+							entry_for_editor,
+							launch_options,
+							vp_ctrl,
+							theme,
+							tasks_for_editor,
+							Arc::new(move |tree| {
+								let _ = mount_welcome(tree, &back_state, &back_tasks);
+							}),
+						);
+					});
+				})
+				.build(),
+		);
 
 		cards.push((card_id, entry.clone()));
 	}
@@ -514,8 +690,12 @@ mod tests {
 		let tasks = tree.task_queue();
 		let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 		let workspace_root = manifest_dir.parent().unwrap().parent().unwrap().to_path_buf();
-		let state = Arc::new(Mutex::new(StudioState::new(workspace_root, theme)));
-		let methods = build_method_table(Arc::clone(&state), tasks);
+		let state = Arc::new(Mutex::new(StudioState::new(
+			workspace_root,
+			theme,
+			ViewportController::new_dummy(),
+		)));
+		let methods = build_method_table(Arc::clone(&state), tasks.clone());
 
 		let scene = nimbus::qdl::load_into_tree_with_registry(
 			include_str!("welcome.qdl"),
@@ -529,7 +709,7 @@ mod tests {
 		let ids = extract_welcome_ids(&scene).expect("all named nodes should exist");
 		state.lock().unwrap().ids = Some(ids);
 
-		reload_scene_lists(&mut tree, &state);
+		reload_scene_lists(&mut tree, &state, &tasks);
 		assert!(!tree.nodes.get(ids.scene_list).unwrap().children.is_empty());
 
 		// Switch tabs via switch_tab
@@ -544,5 +724,53 @@ mod tests {
 			tree.get_widget::<Button>(ids.nav_projects).unwrap().variant,
 			ButtonVariant::Outlined
 		);
+	}
+
+	#[test]
+	fn test_editor_opens_real_scene() {
+		{
+			let mut reg = WidgetRegistry::global().write().unwrap();
+			nimbus::ui::register_widgets(&mut reg);
+			nimbus_ui_gizmo::register_widgets(&mut reg);
+		}
+
+		let monet = Monet::new(
+			Color::from_oklch(0.675, 0.138, 65.0),
+			Color::from_oklch(0.563, 0.038, 65.0),
+			Color::from_oklch(0.517, 0.052, 300.0),
+			true,
+		);
+		let theme = Theme {
+			elevation: ElevationTokens::default(),
+			radius: RadiusTokens::default(),
+			state: StateTokens::default(),
+			stroke: StrokeTokens::default(),
+			monet,
+		};
+
+		let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+		let workspace_root = manifest_dir.parent().unwrap().parent().unwrap();
+		let discovered = projects::discover_scenes(workspace_root);
+		let entry = discovered
+			.into_iter()
+			.find(|s| s.display_path.ends_with("physics_cubes.mscene.ron"))
+			.expect("physics_cubes.mscene.ron should be discovered");
+
+		let mut tree = UiTree::new();
+		let tasks = tree.task_queue();
+		let opts = Arc::new(Mutex::new(LaunchOptions::default()));
+		let vp_ctrl = ViewportController::new_dummy();
+
+		editor::open_editor(
+			&mut tree,
+			entry,
+			opts,
+			vp_ctrl,
+			theme,
+			tasks,
+			Arc::new(|_| {}),
+		);
+
+		assert!(!tree.roots.is_empty(), "Editor root should be mounted");
 	}
 }

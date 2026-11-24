@@ -1557,7 +1557,14 @@ dependencies = [
 name = "mochi_studio"
 version = "0.1.0"
 dependencies = [
+ "mochi_asset",
+ "mochi_math",
+ "mochi_rendering",
+ "mochi_rhi",
+ "mochi_rhi_ash",
+ "mochi_scene",
  "nimbus",
+ "nimbus_ui_gizmo",
 ]
 
 [[package]]
@@ -1629,7 +1636,7 @@ dependencies = [
 [[package]]
 name = "nimbus"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "nimbus_core",
  "nimbus_except",
@@ -1640,12 +1647,14 @@ dependencies = [
  "nimbus_rhi_ash",
  "nimbus_theme",
  "nimbus_ui",
+ "nimbus_ui_gizmo",
+ "nimbus_ui_purple_print",
 ]
 
 [[package]]
 name = "nimbus_core"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "nimbus_except",
  "nimbus_math",
@@ -1661,7 +1670,7 @@ dependencies = [
 [[package]]
 name = "nimbus_except"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "owo-colors",
 ]
@@ -1669,12 +1678,12 @@ dependencies = [
 [[package]]
 name = "nimbus_math"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 
 [[package]]
 name = "nimbus_platform"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "nimbus_except",
  "nimbus_math",
@@ -1687,7 +1696,7 @@ dependencies = [
 [[package]]
 name = "nimbus_qdl"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "nimbus_core",
  "nimbus_except",
@@ -1698,7 +1707,7 @@ dependencies = [
 [[package]]
 name = "nimbus_render2d"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "fontdue",
  "nimbus_except",
@@ -1710,7 +1719,7 @@ dependencies = [
 [[package]]
 name = "nimbus_rhi"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "bitflags 2.13.2",
  "nimbus_math",
@@ -1720,7 +1729,7 @@ dependencies = [
 [[package]]
 name = "nimbus_rhi_ash"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "ash",
  "ash-window",
@@ -1735,7 +1744,7 @@ dependencies = [
 [[package]]
 name = "nimbus_theme"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "mundy",
  "nimbus_math",
@@ -1744,10 +1753,32 @@ dependencies = [
 [[package]]
 name = "nimbus_ui"
 version = "0.1.0"
-source = "git+https://github.com/Jixoid/Nimbus.git?rev=e8f4a737f0816ca5edac89d14e61a99627330117#e8f4a737f0816ca5edac89d14e61a99627330117"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
 dependencies = [
  "nimbus_core",
  "nimbus_except",
+ "nimbus_math",
+ "nimbus_render2d",
+ "nimbus_theme",
+]
+
+[[package]]
+name = "nimbus_ui_gizmo"
+version = "0.1.0"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
+dependencies = [
+ "nimbus_core",
+ "nimbus_math",
+ "nimbus_render2d",
+ "nimbus_theme",
+]
+
+[[package]]
+name = "nimbus_ui_purple_print"
+version = "0.1.0"
+source = "git+https://github.com/Jixoid/Nimbus.git?rev=a55f93aa57feccd4fcc5f57bab837552ee15ce99#a55f93aa57feccd4fcc5f57bab837552ee15ce99"
+dependencies = [
+ "nimbus_core",
  "nimbus_math",
  "nimbus_render2d",
  "nimbus_theme",
