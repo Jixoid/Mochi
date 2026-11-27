@@ -198,7 +198,10 @@ impl EngineApp {
 				for (_entity, (name, rb)) in self
 					.scene
 					.world()
-					.query::<(&mochi_scene::NameComponent, &mochi_scene::RigidBodyComponent)>()
+					.query::<(
+						&mochi_scene::NameComponent,
+						&mochi_scene::RigidBodyComponent,
+					)>()
 					.iter()
 				{
 					if rb.handle.is_valid() {
@@ -245,7 +248,9 @@ impl EngineApp {
 				}
 
 				if spring_count > 0 {
-					mochi_disp!("Initialized physics with {body_count} rigid bodies and {spring_count} spring/suspension constraints");
+					mochi_disp!(
+						"Initialized physics with {body_count} rigid bodies and {spring_count} spring/suspension constraints"
+					);
 				} else {
 					mochi_disp!("Initialized physics with {body_count} rigid bodies");
 				}
@@ -418,14 +423,10 @@ impl ApplicationHandler for EngineApp {
 				..
 			} => {
 				if let Some(physics) = &mut self.physics_world {
-					for (_entity, (transform, rb)) in self
-						.scene
-						.world_mut()
-						.query_mut::<(
-							&mut mochi_scene::TransformComponent,
-							&mochi_scene::RigidBodyComponent,
-						)>()
-					{
+					for (_entity, (transform, rb)) in self.scene.world_mut().query_mut::<(
+						&mut mochi_scene::TransformComponent,
+						&mochi_scene::RigidBodyComponent,
+					)>() {
 						if rb.handle.is_valid() && rb.def.body_type == mochi_scene::BodyType::Dynamic {
 							transform.0.translation = rb.def.position;
 							transform.0.rotation = rb.def.rotation;

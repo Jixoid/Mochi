@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
-use mochi_asset::{SceneAsset, TransformDesc};
+use mochi_asset::{DirectionalLightDesc, PointLightDesc, SceneAsset, SpotLightDesc, TransformDesc};
 use mochi_math::{Quat, Rad, Transform, Vec3, Vec4};
 use mochi_rendering::RenderingSystem;
 use mochi_rhi::{Format as MochiFormat, ImageUsage, MsaaSamples, RenderTarget};
@@ -28,7 +28,7 @@ use mochi_rhi_ash::{
 };
 use mochi_scene::{
 	CameraComponent, DirectionalLightComponent, Entity, MeshRendererComponent, PointLightComponent,
-	Scene, TransformComponent,
+	Scene, SpotLightComponent, TransformComponent,
 };
 use nimbus::core::{ObjectID, TaskQueue, Window};
 use nimbus::rhi_ash::{
@@ -37,6 +37,8 @@ use nimbus::rhi_ash::{
 };
 use nimbus::ui::Viewport;
 
+
+use crate::scene_overlays::{ViewportOverlayOptions, populate_scene_overlays};
 
 pub enum RenderCommand {
 	Resize {
@@ -52,6 +54,7 @@ pub enum RenderCommand {
 		yaw_deg: f32,
 		pitch_deg: f32,
 		distance: f32,
+		target: [f32; 3],
 	},
 	UpdateTransform {
 		index: usize,
@@ -59,12 +62,15 @@ pub enum RenderCommand {
 	},
 	UpdateDirectionalLight {
 		index: usize,
-		intensity: f32,
+		desc: DirectionalLightDesc,
 	},
 	UpdatePointLight {
 		index: usize,
-		intensity: f32,
-		radius: f32,
+		desc: PointLightDesc,
+	},
+	UpdateSpotLight {
+		index: usize,
+		desc: SpotLightDesc,
 	},
 	UpdateMeshFlags {
 		index: usize,
@@ -77,6 +83,10 @@ pub enum RenderCommand {
 	RemoveEntity {
 		index: usize,
 	},
+	SetSelection {
+		index: Option<usize>,
+	},
+	SetOverlays(ViewportOverlayOptions),
 	Deactivate,
 	Shutdown,
 }
@@ -140,11 +150,12 @@ impl ViewportController {
 		});
 	}
 
-	pub fn update_camera(&self, yaw_deg: f32, pitch_deg: f32, distance: f32) {
+	pub fn update_camera(&self, yaw_deg: f32, pitch_deg: f32, distance: f32, target: [f32; 3]) {
 		let _ = self.cmd_tx.send(RenderCommand::UpdateCamera {
 			yaw_deg,
 			pitch_deg,
 			distance,
+			target,
 		});
 	}
 
@@ -154,18 +165,22 @@ impl ViewportController {
 			.send(RenderCommand::UpdateTransform { index, transform });
 	}
 
-	pub fn update_directional_light(&self, index: usize, intensity: f32) {
+	pub fn update_directional_light(&self, index: usize, desc: DirectionalLightDesc) {
 		let _ = self
 			.cmd_tx
-			.send(RenderCommand::UpdateDirectionalLight { index, intensity });
+			.send(RenderCommand::UpdateDirectionalLight { index, desc });
 	}
 
-	pub fn update_point_light(&self, index: usize, intensity: f32, radius: f32) {
-		let _ = self.cmd_tx.send(RenderCommand::UpdatePointLight {
-			index,
-			intensity,
-			radius,
-		});
+	pub fn update_point_light(&self, index: usize, desc: PointLightDesc) {
+		let _ = self
+			.cmd_tx
+			.send(RenderCommand::UpdatePointLight { index, desc });
+	}
+
+	pub fn update_spot_light(&self, index: usize, desc: SpotLightDesc) {
+		let _ = self
+			.cmd_tx
+			.send(RenderCommand::UpdateSpotLight { index, desc });
 	}
 
 	pub fn update_mesh_flags(&self, index: usize, is_visible: bool, cast_shadows: bool) {
@@ -182,6 +197,14 @@ impl ViewportController {
 
 	pub fn remove_entity(&self, index: usize) {
 		let _ = self.cmd_tx.send(RenderCommand::RemoveEntity { index });
+	}
+
+	pub fn set_selection(&self, index: Option<usize>) {
+		let _ = self.cmd_tx.send(RenderCommand::SetSelection { index });
+	}
+
+	pub fn set_overlays(&self, overlays: ViewportOverlayOptions) {
+		let _ = self.cmd_tx.send(RenderCommand::SetOverlays(overlays));
 	}
 
 	pub fn deactivate(&self) {
@@ -426,6 +449,9 @@ fn mochi_render_thread_main(
 	let mut yaw_deg: f32 = 25.0;
 	let mut pitch_deg: f32 = 20.0;
 	let mut distance: f32 = 10.0;
+	let mut target: [f32; 3] = [0.0, 0.0, 0.0];
+	let mut selected_index: Option<usize> = None;
+	let mut overlays = ViewportOverlayOptions::default();
 	let mut active = false;
 	let start_time = Instant::now();
 	let mut last_frame_time = start_time;
@@ -470,10 +496,20 @@ fn mochi_render_thread_main(
 					yaw_deg: y,
 					pitch_deg: p,
 					distance: d,
+					target: t,
 				} => {
 					yaw_deg = y;
 					pitch_deg = p;
 					distance = d;
+					target = t;
+					needs_render = true;
+				}
+				RenderCommand::SetSelection { index } => {
+					selected_index = index;
+					needs_render = true;
+				}
+				RenderCommand::SetOverlays(opts) => {
+					overlays = opts;
 					needs_render = true;
 				}
 				other => {
@@ -570,28 +606,56 @@ fn mochi_render_thread_main(
 						needs_render = true;
 					}
 				}
-				RenderCommand::UpdateDirectionalLight { index, intensity } => {
+				RenderCommand::UpdateDirectionalLight { index, desc } => {
 					if let Some(entities) = ctx.entity_map.get(index) {
+						let dir = Vec3::new(desc.direction[0], desc.direction[1], desc.direction[2]);
+						let len_sq = dir.x * dir.x + dir.y * dir.y + dir.z * dir.z;
+						let dir_norm = if len_sq > 1e-6 {
+							dir.normalize()
+						} else {
+							Vec3::new(0.0, -1.0, 0.0)
+						};
 						for &entity in entities {
-							if let Ok(mut dl) =
-								ctx.scene.world_mut().get::<&mut DirectionalLightComponent>(entity)
+							if let Ok(mut dl) = ctx
+								.scene
+								.world_mut()
+								.get::<&mut DirectionalLightComponent>(entity)
 							{
-								dl.intensity = intensity;
+								dl.color = Vec3::new(desc.color[0], desc.color[1], desc.color[2]);
+								dl.intensity = desc.intensity;
+								dl.direction = dir_norm;
+								dl.cast_shadows = desc.cast_shadows;
 							}
 						}
 						needs_render = true;
 					}
 				}
-				RenderCommand::UpdatePointLight {
-					index,
-					intensity,
-					radius,
-				} => {
+				RenderCommand::UpdatePointLight { index, desc } => {
 					if let Some(entities) = ctx.entity_map.get(index) {
 						for &entity in entities {
-							if let Ok(mut pl) = ctx.scene.world_mut().get::<&mut PointLightComponent>(entity) {
-								pl.intensity = intensity;
-								pl.radius = radius;
+							if let Ok(mut pl) = ctx
+								.scene
+								.world_mut()
+								.get::<&mut PointLightComponent>(entity)
+							{
+								pl.color = Vec3::new(desc.color[0], desc.color[1], desc.color[2]);
+								pl.intensity = desc.intensity;
+								pl.radius = desc.radius;
+							}
+						}
+						needs_render = true;
+					}
+				}
+				RenderCommand::UpdateSpotLight { index, desc } => {
+					if let Some(entities) = ctx.entity_map.get(index) {
+						for &entity in entities {
+							if let Ok(mut sl) = ctx.scene.world_mut().get::<&mut SpotLightComponent>(entity) {
+								sl.color = Vec3::new(desc.color[0], desc.color[1], desc.color[2]);
+								sl.intensity = desc.intensity;
+								sl.radius = desc.radius;
+								sl.inner_cone_angle_deg = desc.inner_cone_angle_deg;
+								sl.outer_cone_angle_deg = desc.outer_cone_angle_deg;
+								sl.cast_shadows = desc.cast_shadows;
 							}
 						}
 						needs_render = true;
@@ -604,7 +668,11 @@ fn mochi_render_thread_main(
 				} => {
 					if let Some(entities) = ctx.entity_map.get(index) {
 						for &entity in entities {
-							if let Ok(mut mr) = ctx.scene.world_mut().get::<&mut MeshRendererComponent>(entity) {
+							if let Ok(mut mr) = ctx
+								.scene
+								.world_mut()
+								.get::<&mut MeshRendererComponent>(entity)
+							{
 								mr.is_visible = is_visible;
 								mr.cast_shadows = cast_shadows;
 							}
@@ -613,7 +681,9 @@ fn mochi_render_thread_main(
 					}
 				}
 				RenderCommand::AddEntity { transform } => {
-					let entity = ctx.scene.spawn((TransformComponent(transform.to_transform()),));
+					let entity = ctx
+						.scene
+						.spawn((TransformComponent(transform.to_transform()),));
 					ctx.entity_map.push(vec![entity]);
 					needs_render = true;
 				}
@@ -651,7 +721,8 @@ fn mochi_render_thread_main(
 		};
 		let rotation = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), yaw)
 			* Quat::from_axis_angle(Vec3::new(1.0, 0.0, 0.0), pitch);
-		let position = rotation * Vec3::new(0.0, 0.0, distance.max(0.5));
+		let position = Vec3::new(target[0], target[1], target[2])
+			+ rotation * Vec3::new(0.0, 0.0, distance.max(0.5));
 		let cam_transform = TransformComponent(Transform {
 			translation: position,
 			rotation,
@@ -671,6 +742,17 @@ fn mochi_render_thread_main(
 			MochiFormat::Depth32f,
 		);
 		let render_target = RenderTarget::from_raw(ash_rt);
+
+		let selected_entities = selected_index
+			.and_then(|i| ctx.entity_map.get(i))
+			.map(|v| v.as_slice())
+			.unwrap_or(&[]);
+		populate_scene_overlays(
+			&ctx.scene,
+			selected_entities,
+			overlays,
+			ctx.rendering.debug_draw_mut(),
+		);
 
 		ctx.rendering.render_to_target(
 			&ctx.cmdmng,

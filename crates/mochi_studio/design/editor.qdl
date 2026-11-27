@@ -18,7 +18,7 @@ root qstd::vbox {
   paddings: 6
   color: "monet(SurfaceContainerLowest)"
 
-  // 1. Top MenuBar
+  // Top MenuBar
   node qstd::menubar "editor_menubar" {
     anchor: "top-fill"
     on_action: "OnMenuAction"
@@ -34,13 +34,35 @@ root qstd::vbox {
       {
         text: "Düzenle",
         items: [
-          { text: "Yeni Entity Ekle", action: "EditAddEntity" },
+          { text: "Geri Al", shortcut: "Ctrl+Z", action: "EditUndo" },
+          { text: "Yinele", shortcut: "Ctrl+Y", action: "EditRedo" },
+          "-",
+          { text: "Seçili Entity'yi Kopyala", shortcut: "Ctrl+D", action: "EditDuplicateEntity" },
           { text: "Seçili Entity'yi Sil", shortcut: "Del", action: "EditDeleteEntity" }
+        ]
+      },
+      {
+        text: "Oluştur",
+        items: [
+          { text: "Boş Entity", action: "CreateEmpty" },
+          "-",
+          { text: "Directional Light", action: "CreateDirLight" },
+          { text: "Point Light", action: "CreatePointLight" },
+          { text: "Spot Light", action: "CreateSpotLight" },
+          "-",
+          { text: "Kamera", action: "CreateCamera" },
+          { text: "Fizik Küpü", action: "CreatePhysicsCube" }
         ]
       },
       {
         text: "Görünüm",
         items: [
+          { text: "Seçili Nesneye Odaklan", shortcut: "F", action: "ViewFocusSelected" },
+          "-",
+          { text: "Izgara Göster / Gizle", action: "ViewToggleGrid" },
+          { text: "Işık & Kamera İkonları", action: "ViewToggleGizmos" },
+          { text: "Tüm Collider'ları Göster", action: "ViewToggleColliders" },
+          "-",
           {
             text: "Tema Modu",
             items: [
@@ -66,7 +88,7 @@ root qstd::vbox {
     ]
   }
 
-  // 2. Primary Toolbar
+  // Primary Toolbar
   node qstd::hbox {
     spacing: 8
     paddings: 6
@@ -124,7 +146,7 @@ root qstd::vbox {
     }
   }
 
-  // 3. Dockable Pro Workspace (nimbus_ui_dock)
+  // Dockable Workspace
   node dock::area "editor_dock" {
     anchor: "fill"
     splitter_size: 6
@@ -215,6 +237,34 @@ root qstd::vbox {
       }
     }
 
+    // Bottom: Asset Browser
+    node dock::pane {
+      title: "İçerik Tarayıcı"
+      slot: "bottom"
+      paddings: 8
+
+      node qstd::vbox "asset_browser_list" {
+        anchor: "fill"
+        spacing: 4
+        color: "color(transparent)"
+        scrollable: true
+      }
+    }
+
+    // Bottom: Console
+    node dock::pane {
+      title: "Konsol"
+      slot: "bottom"
+      paddings: 8
+
+      node qstd::vbox "console_log_list" {
+        anchor: "fill"
+        spacing: 4
+        color: "color(transparent)"
+        scrollable: true
+      }
+    }
+
     // Left: Scene Hierarchy (qstd::treeview)
     node dock::pane {
       title: "Hiyerarşi"
@@ -293,37 +343,9 @@ root qstd::vbox {
         }
       }
     }
-
-    // Bottom Tab 1: Asset Browser
-    node dock::pane {
-      title: "İçerik Tarayıcı"
-      slot: "bottom"
-      paddings: 8
-
-      node qstd::vbox "asset_browser_list" {
-        anchor: "fill"
-        spacing: 4
-        color: "color(transparent)"
-        scrollable: true
-      }
-    }
-
-    // Bottom Tab 2: Console
-    node dock::pane {
-      title: "Konsol"
-      slot: "bottom"
-      paddings: 8
-
-      node qstd::vbox "console_log_list" {
-        anchor: "fill"
-        spacing: 4
-        color: "color(transparent)"
-        scrollable: true
-      }
-    }
   }
 
-  // 4. Bottom Status Bar
+  // Bottom Status Bar
   node qstd::hbox {
     spacing: 12
     paddings: 6

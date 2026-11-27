@@ -13,9 +13,9 @@
 use std::collections::HashMap;
 use mochi_math::{Quat, Vec3};
 use mochi_phi::{
-	BodyDef, BodyHandle, ColliderDef, ColliderHandle, ContactManifold, DistanceJointDef,
-	JointHandle, PhiBackend, PhiError, PhiResult, PhiWorld, PhysicsConfig, Ray, RaycastHit,
-	RevoluteJointDef, SpringJointDef,
+	BodyDef, BodyHandle, ColliderDef, ColliderHandle, ContactManifold, DistanceJointDef, JointHandle,
+	PhiBackend, PhiError, PhiResult, PhiWorld, PhysicsConfig, Ray, RaycastHit, RevoluteJointDef,
+	SpringJointDef,
 };
 
 
@@ -232,9 +232,7 @@ impl PhiWorld for TachyonWorld {
 
 				if discriminant > 0.0 {
 					let t = -b - discriminant.sqrt();
-					if t > 0.0
-						&& t < ray.max_distance
-						&& closest_hit.as_ref().is_none_or(|h| t < h.distance)
+					if t > 0.0 && t < ray.max_distance && closest_hit.as_ref().is_none_or(|h| t < h.distance)
 					{
 						closest_hit = Some(RaycastHit {
 							body: *body_h,
@@ -285,7 +283,9 @@ mod tests {
 		assert_eq!(rot, Quat::IDENTITY);
 
 		world.step_direct(1.0);
-		let (new_pos, _) = world.body_transform(body).expect("get transform after step");
+		let (new_pos, _) = world
+			.body_transform(body)
+			.expect("get transform after step");
 		assert_eq!(new_pos, Vec3::new(1.0, 2.0, 3.0));
 
 		world.destroy_body(body).expect("destroy body");

@@ -16,6 +16,7 @@ use mochi_material::{
 };
 use crate::aa::AntiAliasingMode;
 use crate::cluster::ClusterManager;
+use crate::debug_draw::{DebugDraw, DebugDrawRenderer};
 use crate::frame::{MAX_DIRECTIONAL_LIGHTS, SceneFrameBuffer};
 use crate::queue::RenderQueue;
 use crate::shadow::{
@@ -133,6 +134,8 @@ pub struct RenderingSystem {
 	cluster_manager: Option<ClusterManager>,
 	shadow_manager: Option<ShadowManager>,
 	shadow_queue: RenderQueue,
+	debug_draw: DebugDraw,
+	debug_renderer: Option<DebugDrawRenderer>,
 	frame_index: u64,
 }
 
@@ -186,8 +189,18 @@ impl RenderingSystem {
 			cluster_manager: None,
 			shadow_manager: None,
 			shadow_queue: RenderQueue::new(),
+			debug_draw: DebugDraw::new(),
+			debug_renderer: None,
 			frame_index: 0,
 		})
+	}
+
+	pub fn debug_draw(&self) -> &DebugDraw {
+		&self.debug_draw
+	}
+
+	pub fn debug_draw_mut(&mut self) -> &mut DebugDraw {
+		&mut self.debug_draw
 	}
 
 	pub fn init_pipeline(
@@ -280,6 +293,13 @@ impl RenderingSystem {
 
 		let frame_gen_manager = FsrFrameGenManager::new(device, color_format);
 		self.frame_gen_manager = Some(frame_gen_manager);
+
+		self.debug_renderer = Some(DebugDrawRenderer::new(
+			device,
+			color_format,
+			depth_format,
+			samples,
+		));
 
 		match ClusterManager::new(device, alloc) {
 			Ok(cm) => {
@@ -942,6 +962,10 @@ impl RenderingSystem {
 		let scene_addr = self.frame_buffers[frame].address();
 		let material_addr = self.material_storage.buffer_address();
 
+		if let Some(dr) = &mut self.debug_renderer {
+			dr.upload(device, alloc, frame, &self.debug_draw);
+		}
+
 		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
 
@@ -1069,6 +1093,16 @@ impl RenderingSystem {
 						scene_addr,
 						material_addr,
 					);
+					if let Some(dr) = &self.debug_renderer {
+						dr.record(
+							pass,
+							target_w,
+							target_h,
+							scene_addr,
+							frame,
+							self.debug_draw.draw_grid,
+						);
+					}
 				});
 
 				// On-demand Velocity Buffer generation (only if active mode or Frame Gen requires it)
@@ -1503,6 +1537,16 @@ impl RenderingSystem {
 					scene_addr,
 					material_addr,
 				);
+				if let Some(dr) = &self.debug_renderer {
+					dr.record(
+						pass,
+						width,
+						height,
+						scene_addr,
+						frame,
+						self.debug_draw.draw_grid,
+					);
+				}
 			});
 		}
 
@@ -1603,6 +1647,7 @@ impl RenderingSystem {
 
 			display.present_with_semaphore(img_idx, &sig_sem);
 		}
+		self.debug_draw.clear();
 	}
 
 	#[allow(clippy::too_many_arguments)]
@@ -1739,6 +1784,10 @@ impl RenderingSystem {
 		let scene_addr = self.frame_buffers[frame].address();
 		let material_addr = self.material_storage.buffer_address();
 
+		if let Some(dr) = &mut self.debug_renderer {
+			dr.upload(device, alloc, frame, &self.debug_draw);
+		}
+
 		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
 
@@ -1801,11 +1850,22 @@ impl RenderingSystem {
 				scene_addr,
 				material_addr,
 			);
+			if let Some(dr) = &self.debug_renderer {
+				dr.record(
+					pass,
+					width,
+					height,
+					scene_addr,
+					frame,
+					self.debug_draw.draw_grid,
+				);
+			}
 		});
 
 		cmd.end();
 		cmdmng.submit(cmd);
 		device.wait_idle();
+		self.debug_draw.clear();
 	}
 
 	fn record_scene_packets(

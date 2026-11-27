@@ -159,7 +159,8 @@ fn read_project_name(mochi_ron: &Path) -> Option<String> {
 
 
 fn humanize_name(raw: &str) -> String {
-	raw.split(['_', '-'])
+	raw
+		.split(['_', '-'])
 		.filter(|part| !part.is_empty())
 		.map(|part| {
 			let mut chars = part.chars();
@@ -188,7 +189,8 @@ pub fn launch_scene(entry: &SceneEntry, options: &LaunchOptions) {
 	);
 
 	let mut cmd = Command::new(exe);
-	cmd.arg("run")
+	cmd
+		.arg("run")
 		.arg(&entry.project_dir)
 		.arg("--scene")
 		.arg(&entry.scene_path);
@@ -261,7 +263,8 @@ pub fn create_project(
 		return Err("Hedef dizin boş olamaz.".to_string());
 	}
 
-	let exe = std::env::current_exe().map_err(|e| format!("Çalıştırılabilir dosya bulunamadı: {e}"))?;
+	let exe =
+		std::env::current_exe().map_err(|e| format!("Çalıştırılabilir dosya bulunamadı: {e}"))?;
 	let mut cmd = Command::new(exe);
 	cmd.arg("init").arg(trimmed_path);
 
@@ -284,7 +287,10 @@ pub fn create_project(
 	} else {
 		let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 		if stderr.is_empty() {
-			Err(format!("Proje oluşturulamadı (kod: {:?})", output.status.code()))
+			Err(format!(
+				"Proje oluşturulamadı (kod: {:?})",
+				output.status.code()
+			))
 		} else {
 			Err(stderr)
 		}

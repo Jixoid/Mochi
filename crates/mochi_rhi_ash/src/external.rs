@@ -72,9 +72,9 @@ impl ExportableImage {
 			.push_next(&mut ext_image_info);
 
 		let image = unsafe {
-			vk_dev
-				.create_image(&image_info, None)
-				.map_err(|e| RhiError::ResourceCreation(format!("Failed to create exportable image: {e}")))?
+			vk_dev.create_image(&image_info, None).map_err(|e| {
+				RhiError::ResourceCreation(format!("Failed to create exportable image: {e}"))
+			})?
 		};
 
 		let mem_reqs = unsafe { vk_dev.get_image_memory_requirements(image) };
@@ -157,10 +157,8 @@ impl ExportableImage {
 
 	#[cfg(unix)]
 	pub fn export_fd(&self, ash_device: &AshDevice) -> RhiResult<RawFd> {
-		let ext_fd = ash::khr::external_memory_fd::Device::new(
-			ash_device.instance(),
-			ash_device.device(),
-		);
+		let ext_fd =
+			ash::khr::external_memory_fd::Device::new(ash_device.instance(), ash_device.device());
 		let get_fd_info = vk::MemoryGetFdInfoKHR::default()
 			.memory(self.memory)
 			.handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_FD);

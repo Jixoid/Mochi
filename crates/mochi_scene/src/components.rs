@@ -323,7 +323,12 @@ pub struct SpringJointComponent {
 }
 
 impl SpringJointComponent {
-	pub fn new(target_entity_name: impl Into<String>, rest_length: f32, stiffness: f32, damping: f32) -> Self {
+	pub fn new(
+		target_entity_name: impl Into<String>,
+		rest_length: f32,
+		stiffness: f32,
+		damping: f32,
+	) -> Self {
 		Self {
 			target_entity_name: target_entity_name.into(),
 			local_anchor_a: Vec3::ZERO,

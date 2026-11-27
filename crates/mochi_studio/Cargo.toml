@@ -5,10 +5,7 @@ edition = "2024"
 license.workspace = true
 
 [dependencies]
-nimbus = { git = "https://github.com/Jixoid/Nimbus.git", rev = "801c5198ac9214fb46e9c3362e7df38373b3c129" }
-nimbus_ui_dock = { git = "https://github.com/Jixoid/Nimbus.git", rev = "801c5198ac9214fb46e9c3362e7df38373b3c129" }
-nimbus_ui_gizmo = { git = "https://github.com/Jixoid/Nimbus.git", rev = "801c5198ac9214fb46e9c3362e7df38373b3c129" }
-nimbus_ui_inspector = { git = "https://github.com/Jixoid/Nimbus.git", rev = "801c5198ac9214fb46e9c3362e7df38373b3c129" }
+nimbus = { git = "https://github.com/Jixoid/Nimbus.git", rev = "5f86bcfea6283a8341665ca78e136b05a30e4d5d" }
 mochi_asset = { path = "../mochi_asset" }
 mochi_math = { path = "../mochi_math" }
 mochi_rendering = { path = "../mochi_rendering" }

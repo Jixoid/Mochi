@@ -438,8 +438,16 @@ fn attach_common_entity_components(
 				sj.damping,
 			)
 			.with_anchors(
-				Vec3::new(sj.local_anchor_a[0], sj.local_anchor_a[1], sj.local_anchor_a[2]),
-				Vec3::new(sj.local_anchor_b[0], sj.local_anchor_b[1], sj.local_anchor_b[2]),
+				Vec3::new(
+					sj.local_anchor_a[0],
+					sj.local_anchor_a[1],
+					sj.local_anchor_a[2],
+				),
+				Vec3::new(
+					sj.local_anchor_b[0],
+					sj.local_anchor_b[1],
+					sj.local_anchor_b[2],
+				),
 			),
 		);
 	}
@@ -452,8 +460,16 @@ fn attach_common_entity_components(
 				sj.damping,
 			)
 			.with_anchors(
-				Vec3::new(sj.local_anchor_a[0], sj.local_anchor_a[1], sj.local_anchor_a[2]),
-				Vec3::new(sj.local_anchor_b[0], sj.local_anchor_b[1], sj.local_anchor_b[2]),
+				Vec3::new(
+					sj.local_anchor_a[0],
+					sj.local_anchor_a[1],
+					sj.local_anchor_a[2],
+				),
+				Vec3::new(
+					sj.local_anchor_b[0],
+					sj.local_anchor_b[1],
+					sj.local_anchor_b[2],
+				),
 			),
 		);
 	}
@@ -709,5 +725,4 @@ mod tests {
 			"Expected at least 1000 physics entities, got {body_count}"
 		);
 	}
-
 }

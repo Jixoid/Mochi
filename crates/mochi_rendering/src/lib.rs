@@ -12,6 +12,7 @@
 
 pub mod aa;
 pub mod cluster;
+pub mod debug_draw;
 pub mod frame;
 pub mod frame_gen;
 pub mod fsr;
@@ -25,6 +26,7 @@ pub mod velocity;
 
 pub use aa::*;
 pub use cluster::*;
+pub use debug_draw::*;
 pub use frame::*;
 pub use frame_gen::*;
 pub use fsr::*;
